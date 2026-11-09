@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Backlog</title>
+<meta name="theme-color" content="#111419">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <h1>Backlog</h1>
+      <span class="mono muted" id="sync"></span>
+      <button class="btn ghost" id="importBtn" hidden>Import</button>
+      <button class="btn ghost" id="userBtn" hidden></button>
+    </div>
+    <div class="progress" id="progress" hidden><div class="bar"><span id="progFill"></span></div><span id="progText"></span></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+  </header>
+  <main id="main"><div class="empty">Loading…</div></main>
+</div>
+<button class="btn fab" id="addBtn" hidden>+ Add games</button>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<dialog id="dlg"><div class="sheet" id="sheet"></div></dialog>
+<script type="module" src="app.js"></script>
+</body>
+</html>
