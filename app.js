@@ -26,6 +26,7 @@ const tagsOf = g => [...new Set([...(g.genres || []), ...(g.tags || [])].map(t =
 
 /* ---------- RAWG ---------- */
 async function rawg(path, params = {}){
+  if (!RAWG_KEY) throw new Error("Covers and tags need a RAWG key in config.js.");
   const u = new URL("https://api.rawg.io/api/" + path);
   u.searchParams.set("key", RAWG_KEY);
   for (const [k, v] of Object.entries(params)) if (v !== "" && v != null) u.searchParams.set(k, v);
@@ -382,7 +383,7 @@ $("#importBtn").onclick = () => $("#importFile").click();
 function setupNeeded(){
   $("#main").innerHTML = `<div class="empty"><h2>Almost there</h2><p>Fill in your RAWG key and Firebase settings in <code>config.js</code>. SETUP.md walks through it.</p></div>`;
 }
-if (!RAWG_KEY || !FIREBASE.apiKey){ setupNeeded(); }
+if (!FIREBASE.apiKey){ setupNeeded(); }
 else {
   const app = initializeApp(FIREBASE);
   const auth = getAuth(app);
@@ -403,6 +404,7 @@ else {
       return;
     }
     uid = user.uid; col = collection(db, "users", uid, "games");
+    if (!RAWG_KEY) progress(0, 0, "Covers and tags will load once the RAWG key is added.", true);
     ["#addBtn", "#importBtn", "#userBtn"].forEach(s => $(s).hidden = false);
     $("#userBtn").textContent = "Sign out";
     $("#userBtn").onclick = () => signOut(auth);
