@@ -12,6 +12,7 @@ const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated se
 
 /* ---------- state ---------- */
 let games = new Map(), tab = "home", loaded = false;
+let homeMode = "owned";
 let q = "", platF = new Set(), statF = "", genreF = "", sort = "title", accessF = "";
 let mood = new Set(), time = "", discovered = null, leavingArticles = [];
 let db = null, col = null;
@@ -288,7 +289,7 @@ function coverHTML(g){
     <span class="badges">${badges(g.platforms)}</span>${coverTag(g)}</div>`;
 }
 function cardHTML(g, sub){
-  const right = g.myRating ? `<span class="stars">${"★".repeat(g.myRating)}</span>` : g.rating ? `<span class="score ${g.rating >= 80 ? "hi" : ""}">${g.rating}</span>` : "";
+  const right = g.myRating ? `<span class="stars">${"★".repeat(g.myRating)}</span>` : "";
   return `<button class="card" data-edit="${g.id}">${coverHTML(g)}<span class="ctitle">${esc(g.title)}</span>
     <span class="csub"><span>${esc(sub ?? (basicTags(g).slice(0, 2).join(" · ") || g.year || ""))}</span>${right}</span></button>`;
 }
@@ -300,7 +301,7 @@ const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; /
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status !== "done" && g.status !== "dropped");
+  const pool = list().filter(g => isPlatformer(g) && playable(g) && (homeMode === "wish" ? g.status === "wishlist" : g.status === "backlog" || g.status === "playing"));
   const pinned = pool.filter(g => g.upNext).sort((a, b) => a.upNext - b.upNext);
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -361,25 +362,21 @@ function taste3D(gs){
 const byLikely = (a, b) => (b.status === "playing") - (a.status === "playing") || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0);
 function homeHTML(){
   if (!games.size) return emptyHTML();
+  const wishMode = homeMode === "wish";
   const top = upNextGames(), inTop = new Set(top.map(g => g.id));
-  const owned = list().filter(g => (g.status === "backlog" || g.status === "playing") && playable(g)), wish = list().filter(g => g.status === "wishlist");
-  const playing = owned.filter(g => g.status === "playing" && !inTop.has(g.id));
-  const pinnedOther = list().filter(g => g.upNext && !inTop.has(g.id) && g.status !== "done" && g.status !== "dropped").sort((a, b) => a.upNext - b.upNext);
-  const leaving = list().filter(g => leavingFor(g));
-  const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
-  const cats = CATS.map(([name, test]) =>
-    rowHTML(name, owned.filter(test).sort(byLikely).slice(0, 24))
-    + rowHTML(name + " on your wishlist", wish.filter(test).sort(byLikely).slice(0, 24))).join("");
-  return carouselHTML(top)
+  const pool = list().filter(g => playable(g) && (wishMode ? g.status === "wishlist" : g.status === "backlog" || g.status === "playing"));
+  const switcher = `<div class="wrap modebar"><div class="seg two">${[["owned","Owned"],["wish","Wishlist"]].map(([k, l]) => `<button data-mode="${k}" aria-pressed="${homeMode === k}">${l}</button>`).join("")}</div></div>`;
+  const pinned = pool.filter(g => (g.upNext || g.status === "playing") && !inTop.has(g.id))
+    .sort((a, b) => (b.status === "playing") - (a.status === "playing") || (a.upNext || 9e15) - (b.upNext || 9e15));
+  const cats = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24))).join("");
+  const extra = wishMode
+    ? rowHTML("On sale", list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut), "", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`)
+    : rowHTML("Leaving PS Plus soon", list().filter(g => leavingFor(g)));
+  return switcher + carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
-    + rowHTML("Up next", pinnedOther)
-    + rowHTML("Also playing", playing)
-    + rowHTML("Leaving PS Plus soon", leaving)
-    + cats
-    + rowHTML("3D games for you", taste3D(owned).slice(0, 24))
-    + rowHTML("3D games on your wishlist", taste3D(wish).slice(0, 24))
-    + rowHTML("Recommended from your backlog", recommended().filter(g => !inTop.has(g.id)).slice(0, 20))
-    + rowHTML("On sale from your wishlist", sales, "", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`);
+    + rowHTML(wishMode ? "Most anticipated" : "Playing & up next", pinned)
+    + extra + cats
+    + rowHTML("3D games for you", taste3D(pool).slice(0, 24));
 }
 function topTags(gs){
   const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
@@ -406,18 +403,40 @@ function shelfHTML(wish){
     && (!accessF || g.ps === accessF)
     && (!s || g.title.toLowerCase().includes(s)));
   const by = {title: (a, b) => a.title.localeCompare(b.title), rating: (a, b) => (b.rating || 0) - (a.rating || 0), short: (a, b) => (mainH(a) || 999) - (mainH(b) || 999),
-    added: (a, b) => (b.added || 0) - (a.added || 0), played: (a, b) => (b.steamHours || 0) - (a.steamHours || 0), sale: (a, b) => (b.sale?.cut || 0) - (a.sale?.cut || 0)};
-  const srt = wish && sort === "title" ? "sale" : sort;
+    added: (a, b) => (b.added || 0) - (a.added || 0), played: (a, b) => (b.steamHours || 0) - (a.steamHours || 0),
+    anticipated: (a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0)};
+  const srt = wish && sort === "title" ? "anticipated" : sort;
   shown.sort((a, b) => (srt === "title" ? (b.status === "playing") - (a.status === "playing") : 0) || by[srt](a, b));
+  const SORTS = {title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", played: "Most played (Steam)"};
+  const ACCESS = {bought: "Bought", claimed: "Claimed", catalog: "Catalog", left: "Left PS Plus"};
+  const active = [...[...platF].map(p => [`plat:${p}`, PLAT[p][0]]), genreF && ["genre:", genreF === "__nomatch" ? "Needs a match" : genreF],
+    accessF && ["access:", ACCESS[accessF]], sort !== "title" && ["sort:", SORTS[sort]]].filter(Boolean);
+  const nFilters = active.length;
+  filterCtx = {wish, plats, tags: topTags(scope), nom, hasPs: scope.some(g => g.ps), SORTS, ACCESS};
   return `<div class="wrap"><div class="filters">
     <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
-    ${wish ? "" : `<select id="statSel" aria-label="Status"><option value="">Any status</option>${["backlog","playing","done","dropped"].map(k => `<option value="${k}" ${statF === k ? "selected" : ""}>${STAT[k]}</option>`).join("")}</select>`}
-    ${scope.some(g => g.ps) ? `<select id="accessSel" aria-label="PlayStation access"><option value="">Any PlayStation access</option>${[["bought","Bought"],["claimed","Claimed (PS Plus)"],["catalog","PS Plus catalog"],["left","Left PS Plus"]].map(([k, l]) => `<option value="${k}" ${accessF === k ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-    <select id="genreSel" aria-label="Genre"><option value="">All types</option>${nom ? `<option value="__nomatch" ${genreF === "__nomatch" ? "selected" : ""}>Needs a match (${nom})</option>` : ""}${topTags(scope).map(t => `<option ${t === genreF ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
-    <select id="sortSel" aria-label="Sort">${[["title", wish ? "Biggest discount" : "A–Z"], ["rating","Best rated"], ["short","Shortest"], ["added","Recently added"], ...(wish ? [] : [["played","Most played (Steam)"]])].map(([k, l]) => `<option value="${k}" ${k === sort ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <button class="chip" data-act="filters">Filters${nFilters ? ` · ${nFilters}` : ""}</button>
     <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
-    <div class="chips">${plats.map(p => `<button class="chip" aria-pressed="${platF.has(p)}" data-plat="${p}"><span class="dot" style="background:var(${PLAT[p][2]})"></span>${PLAT[p][0]}</button>`).join("")}</div>
-  </div><div class="grid">${shown.map(g => cardHTML(g, wish && g.sale?.cut ? `${g.sale.price ?? ""} ${g.sale.currency || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div></div>`;
+  </div>
+  ${wish ? "" : `<div class="chips statusbar">${[["","All"],["backlog","To play"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-stat="${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}
+  ${active.length ? `<div class="chips activebar">${active.map(([k, l]) => `<button class="chip on" data-clear="${esc(k)}" aria-label="Remove ${esc(l)}">${esc(l)} ×</button>`).join("")}</div>` : ""}
+  <div class="grid">${shown.map(g => cardHTML(g, wish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div></div>`;
+}
+let filterCtx = null;
+function filterSheet(){
+  const c = filterCtx; if (!c) return;
+  openSheet(`<h2>Filters</h2>
+    <div class="field"><span class="label">Platform</span><div class="chips">${c.plats.map(p => `<button class="chip" data-fplat="${p}" aria-pressed="${platF.has(p)}"><span class="dot" style="background:var(${PLAT[p][2]})"></span>${PLAT[p][0]}</button>`).join("")}</div></div>
+    <div class="field"><label class="label" for="fType">Type</label><select id="fType"><option value="">All types</option>${c.nom ? `<option value="__nomatch" ${genreF === "__nomatch" ? "selected" : ""}>Needs a match (${c.nom})</option>` : ""}${c.tags.map(t => `<option ${t === genreF ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+    ${c.hasPs ? `<div class="field"><label class="label" for="fAccess">PlayStation</label><select id="fAccess"><option value="">Any</option>${Object.entries(c.ACCESS).map(([k, l]) => `<option value="${k}" ${accessF === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>` : ""}
+    <div class="field"><label class="label" for="fSort">Sort</label><select id="fSort">${Object.entries(c.SORTS).filter(([k]) => !(c.wish && k === "played")).map(([k, l]) => `<option value="${k}" ${sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    <div class="actions"><button class="btn ghost" id="fReset">Reset</button><button class="btn" data-act="close">Done</button></div>`);
+  const sh = $("#sheet");
+  sh.querySelectorAll("[data-fplat]").forEach(b => b.onclick = () => { const p = b.dataset.fplat; platF.has(p) ? platF.delete(p) : platF.add(p); b.setAttribute("aria-pressed", platF.has(p)); });
+  $("#fType").onchange = e => genreF = e.target.value;
+  if ($("#fAccess")) $("#fAccess").onchange = e => accessF = e.target.value;
+  $("#fSort").onchange = e => sort = e.target.value;
+  $("#fReset").onclick = () => { platF.clear(); genreF = ""; accessF = ""; sort = "title"; closeSheet(); };
 }
 
 /* ---------- discover ---------- */
@@ -607,6 +626,9 @@ document.addEventListener("click", async e => {
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
   else if (d.time){ time = time === d.time ? "" : d.time; render(); }
   else if (d.edit) editSheet(d.edit);
+  else if (d.mode){ homeMode = d.mode; render(); }
+  else if (d.stat != null){ statF = d.stat; render(); }
+  else if (d.clear){ const [k, v] = d.clear.split(":"); if (k === "plat") platF.delete(v); if (k === "genre") genreF = ""; if (k === "access") accessF = ""; if (k === "sort") sort = "title"; render(); }
   else if (d.mgo != null){ const el = $("#mslides"); el.scrollTo({left: +d.mgo * el.clientWidth, behavior: "smooth"}); }
   else if (d.slide || d.goto != null){
     const el = $("#slides"); if (!el) return;
@@ -637,6 +659,7 @@ document.addEventListener("click", async e => {
       checkPrices(true).then(() => progress(0, 0), err => progress(0, 0, err.message, true)).finally(() => running = false);
       break;
     case "psplus": psPasteSheet(); break;
+    case "filters": filterSheet(); break;
     case "rematch": closeSheet(); rematchAll(); break;
     case "rediscover": discovered = null; render(); break;
     case "signout": closeSheet(); signOut(getAuth()); break;

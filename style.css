@@ -198,3 +198,10 @@ dialog.tall .sheet{padding-top:0}
 .more{display:grid;gap:12px}
 .more[open]{padding-bottom:4px}
 .more .field{margin-top:10px}
+
+/* home mode switch, library bars */
+.modebar{padding-block:12px}
+.seg.two{grid-template-columns:1fr 1fr;max-width:260px}
+.statusbar,.activebar{padding-bottom:12px}
+.chip.on{background:var(--raise);border-color:var(--accent)}
+.filters{padding-block:18px 10px}
