@@ -425,7 +425,7 @@ function coverTag(g){
   return "";
 }
 function coverHTML(g){
-  return `<div class="cover">${g.cover ? `<img src="${esc(g.cover)}" alt="" loading="lazy">` : `<span class="ph">${esc(g.title)}</span>`}
+  return `<div class="cover">${g.cover ? `<img src="${esc(g.cover)}" alt="" loading="${eagerLeft-- > 0 ? "eager" : "lazy"}">` : `<span class="ph">${esc(g.title)}</span>`}
     <span class="badges">${badges(g.platforms, g)}</span>${coverTag(g)}</div>`;
 }
 function cardHTML(g, sub){
@@ -745,7 +745,9 @@ function diaryHTML(){
 
 /* ---------- render ---------- */
 function render(){
-  $("#tabs").innerHTML = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "disc" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
+  eagerLeft = 12;
+  const tabsH = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "disc" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
+  if (tabsH !== lastTabsH){ $("#tabs").innerHTML = tabsH; lastTabsH = tabsH; }
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
   // Keep each row's (and the carousel's) scroll position while staying on the same tab.
@@ -756,10 +758,10 @@ function render(){
   if (pos.size) for (const el of m.querySelectorAll(".row, #slides")){ const x = pos.get(keyOf(el)); if (x) el.scrollLeft = x; }
   document.documentElement.style.setProperty("--barH", $(".bar").offsetHeight + "px");
   // Filters changed while scrolled down: jump back so the new list starts at the top.
-  if (shelfReset){ shelfReset = false; const h = $(".libhead"); if (h && scrollY > h.parentElement.offsetTop) scrollTo(0, h.parentElement.offsetTop); }
+  if (shelfReset && !$("#dlg").open){ shelfReset = false; const h = $(".libhead"); if (h){ const y = h.parentElement.getBoundingClientRect().top + scrollY - $(".bar").offsetHeight; if (scrollY > y) scrollTo(0, Math.max(0, y)); } }
   watchShelf();
 }
-let rowTab = null;
+let rowTab = null, lastTabsH = "", eagerLeft = 0;
 // Phones get 720p heroes instead of the 1080p the worker stores.
 const PHONE = matchMedia("(max-width:999px)").matches;
 const heroSrc = u => PHONE && u ? u.replace("/t_1080p/", "/t_720p/") : u;

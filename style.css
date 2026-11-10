@@ -506,7 +506,7 @@ dialog:not(.full){border-radius:var(--r-l)}
 .dchip{white-space:nowrap;flex-shrink:0}
 
 /* ---------- motion: tab switch, page open/close, tap feedback ---------- */
-@keyframes tabin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes tabin{from{opacity:.4}to{opacity:1}}
 @keyframes sheetin{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes sheetout{to{opacity:0;transform:translateY(24px)}}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
