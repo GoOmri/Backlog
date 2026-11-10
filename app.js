@@ -23,6 +23,17 @@ const genresOf = g => [...new Set([...(g.genres || []), ...(g.themes || [])])];
 const mainH = g => g.ttb?.main || null;
 const lenOf = h => !h ? "" : h < 10 ? "short" : h <= 30 ? "medium" : "long";
 const starsTxt = n => n ? "★".repeat(n) + "☆".repeat(5 - n) : "";
+const VIEW = {"Side view":"2D","Bird view / Isometric":"Top-down","First person":"3D","Third person":"3D","Virtual Reality":"VR","Text":"Text"};
+const KIND = {"Platform":"Platformer","Puzzle":"Puzzle","Shooter":"Shooter","Fighting":"Fighting","Racing":"Racing","Sport":"Sports","Role-playing (RPG)":"RPG","Strategy":"Strategy","Real Time Strategy (RTS)":"Strategy","Turn-based strategy (TBS)":"Strategy","Tactical":"Strategy","Simulator":"Sim","Point-and-click":"Point & click","Hack and slash/Beat 'em up":"Action","Music":"Rhythm","Card & Board Game":"Cards","Arcade":"Arcade","Visual Novel":"Visual novel","Quiz/Trivia":"Quiz","MOBA":"MOBA","Adventure":"Adventure"};
+const THEME = {"Horror":"Horror","Survival":"Survival","Open world":"Open world","Mystery":"Mystery"};
+// Plain description: 2D/3D, what kind of game, co-op.
+function basicTags(g){
+  const v = [...new Set((g.views || []).map(x => VIEW[x]).filter(Boolean))].slice(0, 1);
+  const k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure")).slice(0, 2);
+  const t = (g.themes || []).map(x => THEME[x]).filter(Boolean).slice(0, 1);
+  const c = (g.modes || []).includes("Co-operative") ? ["Co-op"] : [];
+  return [...v, ...k, ...t, ...c];
+}
 const sale = g => g.status === "wishlist" && g.sale?.cut > 0 ? g.sale : null;
 
 /* ---------- API (Cloudflare Worker) ---------- */
@@ -72,18 +83,36 @@ async function runQueue(){
       for (const g of batch){
         const t = g.asTyped || g.title;
         let m = res[t];
-        if (!m){ // wider search (includes editions and DLC) before giving up
+        if (!m || key(m.title) !== key(t)){ // not an exact name: try a wider search for an exact one
           const alt = await api("/search?q=" + encodeURIComponent(t)).catch(() => []);
-          m = alt.find(r => key(r.title) === key(t)) || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
+          m = alt.find(r => key(r.title) === key(t)) || m || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
         }
         if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now()});
       }
       done += batch.length;
     }
+    await backfill();
     await checkPrices();
     progress(0, 0);
   } catch (e){ progress(0, 0, e.message, true); }
   running = false;
+}
+async function backfill(){
+  const need = list().filter(g => g.igdbId && g.views === undefined);
+  for (let i = 0; i < need.length; i += 400){
+    const chunk = need.slice(i, i + 400);
+    progress(i, need.length, "Adding 2D/3D info");
+    const res = await api("/info", {ids: chunk.map(g => g.igdbId)});
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || []})));
+  }
+  const odd = list().filter(g => g.igdbId && g.asTyped && !g.rechecked && key(g.title) !== key(g.asTyped));
+  for (const [i, g] of odd.entries()){
+    progress(i, odd.length, "Double-checking matches");
+    const alt = await api("/search?q=" + encodeURIComponent(g.asTyped)).catch(() => []);
+    const exact = alt.find(r => key(r.title) === key(g.asTyped));
+    if (exact && exact.igdbId !== g.igdbId) await applyMatch(g, exact);
+    else await upd(g.id, {rechecked: true});
+  }
 }
 async function checkPrices(force = false){
   const stale = list().filter(g => g.status === "wishlist" && (force || !g.sale || Date.now() - (g.sale.checked || 0) > 12 * 3600e3));
@@ -183,7 +212,7 @@ function coverHTML(g){
 function cardHTML(g, sub){
   const right = g.myRating ? `<span class="stars">${"★".repeat(g.myRating)}</span>` : g.rating ? `<span class="score ${g.rating >= 80 ? "hi" : ""}">${g.rating}</span>` : "";
   return `<button class="card" data-edit="${g.id}">${coverHTML(g)}<span class="ctitle">${esc(g.title)}</span>
-    <span class="csub"><span>${sub ?? (mainH(g) ? mainH(g) + "h" : g.year || "")}</span>${right}</span></button>`;
+    <span class="csub"><span>${esc(sub ?? (basicTags(g).slice(0, 2).join(" · ") || g.year || ""))}</span>${right}</span></button>`;
 }
 const rowHTML = (title, items, sub = "", subFn) => items.length ? `<section class="section wrap"><div class="row-head"><h3>${title}</h3><span class="dim">${sub}</span></div>
   <div class="row">${items.map(g => cardHTML(g, subFn?.(g))).join("")}</div></section>` : "";
@@ -249,6 +278,10 @@ function homeHTML(){
     + rowHTML("Recently added", recent)
     + rowHTML("On sale from your wishlist", sales, "PC stores", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`);
 }
+function topTags(gs){
+  const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
+  return Object.entries(c).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+}
 function topGenres(gs, n){
   const c = {}; gs.forEach(g => genresOf(g).forEach(t => c[t] = (c[t] || 0) + 1));
   return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, n).map(e => e[0]);
@@ -266,7 +299,7 @@ function shelfHTML(wish){
   const s = q.toLowerCase(), nom = scope.filter(g => g.noMatch).length;
   const shown = scope.filter(g => (!statF || g.status === statF)
     && (!platF.size || (g.platforms || []).some(p => platF.has(p)))
-    && (!genreF || (genreF === "__nomatch" ? g.noMatch : genresOf(g).includes(genreF)))
+    && (!genreF || (genreF === "__nomatch" ? g.noMatch : basicTags(g).includes(genreF)))
     && (!s || g.title.toLowerCase().includes(s)));
   const by = {title: (a, b) => a.title.localeCompare(b.title), rating: (a, b) => (b.rating || 0) - (a.rating || 0), short: (a, b) => (mainH(a) || 999) - (mainH(b) || 999),
     added: (a, b) => (b.added || 0) - (a.added || 0), played: (a, b) => (b.steamHours || 0) - (a.steamHours || 0), sale: (a, b) => (b.sale?.cut || 0) - (a.sale?.cut || 0)};
@@ -275,7 +308,7 @@ function shelfHTML(wish){
   return `<div class="wrap"><div class="filters">
     <input id="q" type="search" autocomplete="off" placeholder="Search ${scope.length} games" value="${esc(q)}" aria-label="Search">
     ${wish ? "" : `<select id="statSel" aria-label="Status"><option value="">Any status</option>${["backlog","playing","done","dropped"].map(k => `<option value="${k}" ${statF === k ? "selected" : ""}>${STAT[k]}</option>`).join("")}</select>`}
-    <select id="genreSel" aria-label="Genre"><option value="">All genres</option>${nom ? `<option value="__nomatch" ${genreF === "__nomatch" ? "selected" : ""}>Needs a match (${nom})</option>` : ""}${topGenres(scope, 40).map(t => `<option ${t === genreF ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
+    <select id="genreSel" aria-label="Genre"><option value="">All types</option>${nom ? `<option value="__nomatch" ${genreF === "__nomatch" ? "selected" : ""}>Needs a match (${nom})</option>` : ""}${topTags(scope).map(t => `<option ${t === genreF ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
     <select id="sortSel" aria-label="Sort">${[["title", wish ? "Biggest discount" : "A–Z"], ["rating","Best rated"], ["short","Shortest"], ["added","Recently added"], ...(wish ? [] : [["played","Most played (Steam)"]])].map(([k, l]) => `<option value="${k}" ${k === sort ? "selected" : ""}>${l}</option>`).join("")}</select>
     <div class="chips">${plats.map(p => `<button class="chip" aria-pressed="${platF.has(p)}" data-plat="${p}"><span class="dot" style="background:var(${PLAT[p][2]})"></span>${PLAT[p][0]}</button>`).join("")}</div>
   </div><div class="grid">${shown.map(g => cardHTML(g, wish && g.sale?.cut ? `${g.sale.price ?? ""} ${g.sale.currency || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div></div>`;
@@ -348,6 +381,12 @@ function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class=
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
 const statOpts = sel => Object.entries(STAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v}</option>`).join("");
 
+function ownedHTML(g){
+  const own = (g.platforms || []).filter(p => p !== "psplus"), plus = (g.platforms || []).includes("psplus");
+  if (g.status === "wishlist") return `<div class="note">Not owned yet. It's on your wishlist${own.length ? ` (for ${own.map(p => PLAT[p][0]).join(", ")})` : ""}.</div>`;
+  return `<div class="note own">${own.length ? `<b>You own it on</b> ${own.map(p => `<span class="chip"><span class="dot" style="background:var(${PLAT[p][2]})"></span>${PLAT[p][0]}</span>`).join(" ")}` : ""}
+    ${plus ? `<div>${own.length ? "Also in" : "<b>Not owned.</b> Playable through"} <b>PS Plus</b> while you're subscribed.</div>` : ""}</div>`;
+}
 function menuSheet(){
   openSheet(`<h2>Backlog</h2><div class="menu">
     <button data-act="steam">Import from Steam<small>Adds your Steam games with hours played</small></button>
@@ -380,7 +419,8 @@ async function editSheet(id){
     ${s ? `<div class="note ${s.cut >= 50 ? "hot" : ""}"><b>−${s.cut}%</b> · ${esc(s.price ?? "")} ${esc(s.currency || "")} at ${esc(s.shop || "a PC store")} ${s.url ? `· <a href="${esc(s.url)}" target="_blank" rel="noopener">Open deal</a>` : ""}</div>` : ""}
     ${lv ? `<div class="note warn">Probably leaving PS Plus soon. <a href="${esc(lv.url)}" target="_blank" rel="noopener">${esc(lv.title)}</a></div>` : ""}
     <div class="desc" id="desc">${g.igdbId ? "Loading…" : g.noMatch ? "No match found yet. Use Fix match below." : ""}</div>
-    <div class="chips">${genresOf(g).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+    <div class="chips">${basicTags(g).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+    ${ownedHTML(g)}
     <div><button class="chip" id="upNextBtn" aria-pressed="${!!g.upNext}">📌 Up next</button></div>
     <div class="field"><span class="label">List</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" aria-pressed="${status === k}" data-setstat="${k}">${v}</button>`).join("")}</div></div>
     <div class="grid2"><div class="field"><span class="label">Your rating</span><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div></div>

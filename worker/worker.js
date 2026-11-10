@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,total_rating,aggregated_rating";
+const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,total_rating,aggregated_rating";
 
 export default {
   async fetch(req, env, ctx){
@@ -22,6 +22,7 @@ export default {
         case "/search":   out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
+        case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 400)); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
         case "/psplus":   out = await psplus(env, ctx); break;
@@ -66,6 +67,7 @@ function slim(g, ttb){
     genres: (g.genres || []).map(x => x.name),
     themes: (g.themes || []).map(x => x.name),
     modes: (g.game_modes || []).map(x => x.name),
+    views: (g.player_perspectives || []).map(x => x.name),
     rating: Math.round(g.total_rating || g.aggregated_rating || 0) || null,
     ttb: t ? {main: hrs(t.normally || t.hastily), rush: hrs(t.hastily), full: hrs(t.completely)} : null
   };
@@ -80,20 +82,28 @@ async function ttbFor(env, ids){
 // Best match for up to 10 titles in one IGDB request.
 async function match(env, titles){
   if (!titles.length) return {};
-  const mq = titles.map((t, i) => `query games "${i}" { search "${q(t)}"; fields ${MATCH_FIELDS}; where version_parent = null & parent_game = null; limit 6; };`).join("\n");
+  const mq = titles.map((t, i) => `query games "${i}" { search "${q(t)}"; fields ${MATCH_FIELDS}; where version_parent = null & parent_game = null; limit 10; };`).join("\n");
   const res = await igdb(env, "multiquery", mq);
   const picks = {};
   for (const r of res){
     const t = titles[+r.name], k = norm(t), list = r.result || [];
-    picks[t] = list.find(g => norm(g.name) === k) || list.find(g => norm(g.name).startsWith(k)) || list[0] || null;
+    const starts = list.filter(g => norm(g.name).startsWith(k)).sort((a, b) => a.name.length - b.name.length);
+    picks[t] = list.find(g => norm(g.name) === k) || starts[0] || list[0] || null;
   }
   const ttb = await ttbFor(env, Object.values(picks).filter(Boolean).map(g => g.id));
   return Object.fromEntries(Object.entries(picks).map(([t, g]) => [t, g ? slim(g, ttb) : null]));
 }
 
+// Extra fields for games already in the list (backfill).
+async function info(env, ids){
+  if (!ids.length) return {};
+  const rows = await igdb(env, "games", `fields player_perspectives.name; where id = (${ids.join(",")}); limit 500;`);
+  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name)}]));
+}
+
 async function search(env, text){
   if (!text.trim()) return [];
-  const list = await igdb(env, "games", `search "${q(text)}"; fields ${MATCH_FIELDS}; limit 8;`);
+  const list = await igdb(env, "games", `search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10;`);
   const ttb = await ttbFor(env, list.map(g => g.id));
   return list.map(g => slim(g, ttb));
 }
