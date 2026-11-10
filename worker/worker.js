@@ -91,11 +91,20 @@ async function ttbFor(env, ids){
 // Best match for up to 10 titles in one IGDB request.
 async function match(env, titles){
   if (!titles.length) return {};
-  const mq = titles.map((t, i) => `query games "${i}" { search "${q(t)}"; fields ${MATCH_FIELDS}; where version_parent = null & parent_game = null; limit 10; };`).join("\n");
-  const res = await igdb(env, "multiquery", mq);
-  const picks = {};
-  for (const r of res){
-    const t = titles[+r.name], k = norm(t), list = r.result || [];
+  const picks = {}, lists = {};
+  for (let i = 0; i < titles.length; i += 5){
+    const part = titles.slice(i, i + 5);
+    const mq = part.flatMap((t, j) => [
+      `query games "s${i + j}" { search "${q(t)}"; fields ${MATCH_FIELDS}; where version_parent = null & parent_game = null; limit 10; };`,
+      `query games "e${i + j}" { fields ${MATCH_FIELDS}; where name ~ "${q(t)}" & version_parent = null; sort total_rating_count desc; limit 5; };`
+    ]).join("\n");
+    for (const r of await igdb(env, "multiquery", mq)){
+      const n = +r.name.slice(1);
+      lists[n] = r.name[0] === "e" ? [...(r.result || []), ...(lists[n] || [])] : [...(lists[n] || []), ...(r.result || [])];
+    }
+  }
+  for (const [n, list] of Object.entries(lists)){
+    const t = titles[+n], k = norm(t);
     const starts = list.filter(g => norm(g.name).startsWith(k)).sort((a, b) => a.name.length - b.name.length);
     // Several games can share a name (e.g. a mobile spin-off): take the best known one.
     const exact = list.filter(g => norm(g.name) === k).sort((a, b) => (b.total_rating_count || 0) - (a.total_rating_count || 0));
@@ -114,7 +123,10 @@ async function info(env, ids){
 
 async function search(env, text){
   if (!text.trim()) return [];
-  const list = await igdb(env, "games", `search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10;`);
+  const mq = `query games "e" { fields ${MATCH_FIELDS}; where name ~ "${q(text)}"; sort total_rating_count desc; limit 5; };
+query games "s" { search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10; };`;
+  const res = await igdb(env, "multiquery", mq), seen = new Set();
+  const list = [...(res.find(r => r.name === "e")?.result || []), ...(res.find(r => r.name === "s")?.result || [])].filter(g => !seen.has(g.id) && seen.add(g.id));
   const ttb = await ttbFor(env, list.map(g => g.id));
   return list.map(g => slim(g, ttb));
 }
