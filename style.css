@@ -239,3 +239,8 @@ dialog{overflow-x:hidden}
   .mobile-only{display:flex}
   .chip.mobile-only{display:inline-flex}
 }
+
+.strip{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--dim)}
+.strip:empty{display:none}
+.strip b{color:var(--fg);font-variant-numeric:tabular-nums}
+.strip span + span::before{content:"·";margin-right:16px;color:var(--line)}
