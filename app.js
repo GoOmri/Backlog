@@ -65,8 +65,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd4:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd4:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd5:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd5:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -434,7 +434,7 @@ function carouselHTML(gs){
 const heroAsked = new Set();
 async function fetchHero(g){
   heroAsked.add(g.id);
-  try { const d = await gameDetails(g.igdbId); await upd(g.id, {hero: d.hero || "", logo: d.logo || ""}); } catch {}
+  try { const d = await gameDetails(g.igdbId); await upd(g.id, {hero: d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})}); } catch {}
 }
 // Omri's categories. A game can sit in more than one.
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
@@ -839,6 +839,7 @@ async function editSheet(id){
     <details class="more"><summary>Edit</summary>
       <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
+      <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
     </details>`;
@@ -868,6 +869,14 @@ async function editSheet(id){
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
+  $("#logoGo").onclick = async () => {
+    const box = $("#logos"); box.textContent = "Loading logos…";
+    try {
+      const urls = await api("/logos?t=" + encodeURIComponent(g.title));
+      box.innerHTML = `<button data-logo="">Use the title instead</button>` + urls.map(u => `<button data-logo="${esc(u)}"><img src="${esc(u)}" alt=""></button>`).join("");
+      box.querySelectorAll("[data-logo]").forEach(b => b.onclick = async () => { await upd(id, {logo: b.dataset.logo, logoSet: true}); toast("Logo changed"); closeSheet(); });
+    } catch (e){ box.textContent = e.message; }
+  };
   $("#coverGo").onclick = async () => {
     const box = $("#covers"); box.textContent = "Loading covers…";
     try {
@@ -886,9 +895,9 @@ async function editSheet(id){
   };
   if (!g.igdbId) return;
   try {
-    const d = await gameDetails(g.igdbId);
+    const d0 = await gameDetails(g.igdbId), d = g.logoSet ? {...d0, logo: g.logo} : d0;
     fillMedia(d); fillStrip(g, d);
-    if (!g.hero && d.hero) upd(id, {hero: d.hero, logo: d.logo || ""});
+    if (!g.hero && d.hero) upd(id, {hero: d.hero, ...(g.logoSet ? {} : {logo: d.logo || ""})});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 

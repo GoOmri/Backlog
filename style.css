@@ -314,3 +314,8 @@ dialog.full .x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));righ
 .coverpick button{padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:none}
 .coverpick button:hover{border-color:var(--accent)}
 .coverpick img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover}
+
+.logopick{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:8px}
+.logopick button{border:2px solid transparent;border-radius:8px;background:var(--raise);padding:10px;min-height:60px;display:grid;place-items:center;font-size:13px}
+.logopick button:hover{border-color:var(--accent)}
+.logopick img{max-height:50px;max-width:100%;object-fit:contain}
