@@ -1,7 +1,7 @@
 /* Layout: console-style home (hero + swipe rows), shelf grid of box art for lists, diary with stats. Deliberately dark-only. */
 :root{
   --bg:#0E1116; --surface:#161B22; --raise:#1F2630; --fg:#E9EDF2; --dim:#8D97A5; --line:#28303B;
-  --accent:#3FC2A9; --accent-fg:#06231D; --hot:#FF7A45; --gold:#F2C14E; --warn:#E39158;
+  --accent:#A78BFA; --accent-fg:#1A1033; --hot:#FF7A45; --gold:#F2C14E; --warn:#E39158;
   --ps:#5C86F2; --psplus:#D9B54A; --steam:#8FA3BC; --epic:#B5B5B5; --itch:#F06A70; --other:#7A808A;
   --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
@@ -319,3 +319,17 @@ dialog.full .x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));righ
 .logopick button{border:2px solid transparent;border-radius:8px;background:var(--raise);padding:10px;min-height:60px;display:grid;place-items:center;font-size:13px}
 .logopick button:hover{border-color:var(--accent)}
 .logopick img{max-height:50px;max-width:100%;object-fit:contain}
+
+/* svg icons, purple accent, thinner stars, no tap flash */
+.ico-svg{display:block}
+.ibtn .ico-svg,.icon-btn svg,.x .ico-svg{margin:auto}
+.x{display:grid;place-items:center}
+#rateBtn,.popmenu.stars button{color:var(--fg);-webkit-text-stroke:0}
+#rateBtn.on{color:var(--gold)}
+.popmenu.stars button{color:var(--fg);display:grid;place-items:center}
+.popmenu.stars button.on{color:var(--gold)}
+.popmenu.stars button.on .ico-svg{fill:currentColor}
+.tab .ico{display:grid;place-items:center}
+*{-webkit-tap-highlight-color:transparent}
+button,.card,.tab,.chip,.fopt{-webkit-user-select:none;user-select:none}
+img{-webkit-touch-callout:none}

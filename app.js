@@ -7,7 +7,24 @@ import { API, FIREBASE } from "./config.js";
 const PLAT = {ps5:["PS5","PS","--ps"], psplus:["PS Plus","P+","--psplus"], steam:["Steam","ST","--steam"], epic:["Epic","EP","--epic"], itch:["itch.io","IO","--itch"], other:["Other","··","--other"]};
 const STAT = {backlog:"To play", playing:"Playing", done:"Finished", dropped:"Dropped", wishlist:"Wishlist"};
 const RANK = {wishlist:1, backlog:2, playing:3, dropped:4, done:5};
-const TABS = [["home","Home","⌂"],["lib","Library","▦"],["wish","Wishlist","♡"],["disc","Discover","✦"],["diary","Diary","★"]];
+// Plain white line icons (Lucide shapes), drawn inline so they follow the text colour.
+const ICON = {
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  down: '<path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>',
+  undo: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>'
+};
+const ic = (n, size = 20, fill = false) => `<svg class="ico-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+const TABS = [["home","Home","home"],["lib","Library","grid"],["wish","Wishlist","heart"],["disc","Discover","compass"],["diary","Diary","book"]];
 const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated server|soundtrack|\bsdk\b|\bdemo\b|benchmark/i;
 
 /* ---------- state ---------- */
@@ -463,14 +480,15 @@ function homeHTML(){
   const wish = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || fits(b) - fits(a) || (b.rating || 0) - (a.rating || 0)).slice(0, 30);
   const leaving = list().filter(g => leavingFor(g));
-  const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24), "", undefined, 3));
+  const is2D = g => basicTags(g).includes("2D");
+  const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test], i) => rowHTML(name, pool.filter(test).sort((a, b) => (i === 0 ? is2D(b) - is2D(a) : 0) || byLikely(a, b)).slice(0, 24), "", undefined, 3));
   if (topMV === null){ topMV = []; api("/topmv").then(r => { topMV = r; if (tab === "home") render(); }, () => {}); }
   const have = new Set(list().map(g => g.igdbId));
-  const mvNew = topMV.filter(x => !inList(x)).slice(0, 24);
+  const mvNew = topMV.filter(x => !inList(x)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 24);
   mvNew.forEach(x => previewCache.set(x.igdbId, x));
   const mvNotOwned = mvNew.length >= 3 ? `<section class="section wrap"><div class="row-head"><h3>MV's you don't own</h3></div><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></section>` : "";
   return carouselHTML(top)
-    + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>📌 Shortlist</b> to put it at the top.</p>`)
+    + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap the <b>pin</b> to put it at the top.</p>`)
     + metroid + mvNotOwned + plat2d + couch + puzzle
     + rowHTML("Wishlist", wish, "", g => sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)
     + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3)
@@ -587,7 +605,7 @@ function radarHTML(){
   const have = new Set(list().map(g => g.igdbId));
   [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
   const card = (x, sub) => `<div class="card"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button><span class="csub"><span>${esc(sub)}</span></span>
-    <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me" title="Not for me">👎</button></span></div>`;
+    <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me" title="Not for me">${ic("down", 18)}</button></span></div>`;
   const row = (t, xs, subf) => { xs = xs.filter(x => !inList(x)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
   const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
@@ -601,7 +619,7 @@ function discoverHTML(){
     <div class="grid">${discovered.map((d, i) => (previewCache.set(d.igdbId, d), `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}
       <span class="ctitle">${esc(d.title)}</span></button><span class="why">Like ${esc(d.because.join(", "))}</span>
       <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
-      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me" title="Not for me">👎</button></span></div>`)).join("")}</div></div></div>`;
+      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me" title="Not for me">${ic("down", 18)}</button></span></div>`)).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
   try {
@@ -645,7 +663,7 @@ function diaryHTML(){
 
 /* ---------- render ---------- */
 function render(){
-  $("#tabs").innerHTML = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k ? 'aria-current="page"' : ""}><span class="ico" aria-hidden="true">${i}</span>${l}</button>`).join("");
+  $("#tabs").innerHTML = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
   m.innerHTML = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
@@ -724,7 +742,7 @@ function inList(x){
 function pageShell(x, {own, actions, facts}){
   const meta = [x.year, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = x.hero || x.cover;
-  return `<button class="x" data-act="close" aria-label="Close">×</button>
+  return `<button class="x" data-act="close" aria-label="Close">${ic("x")}</button>
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
     <div class="gp-head">
       ${x.logo ? `<img class="gp-logo" src="${esc(x.logo)}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
@@ -744,7 +762,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">👎</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -827,10 +845,10 @@ async function editSheet(id){
     : ownP.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
   const actions = `<div class="menuwrap"><button class="btn" id="statBtn" aria-haspopup="true">${STAT[g.status]} ▾</button>
       <div class="popmenu" id="statMenu" hidden>${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
-    <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">★${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
-      <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div></div>
-    <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Shortlist" aria-label="Shortlist" aria-pressed="${!!g.upNext}">📌</button>
-    <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? "↺" : "👎"}</button>`;
+    <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">${ic("star", 20, !!g.myRating)}${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
+      <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">${ic("star", 26)}</button>`).join("")}</div></div>
+    <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Shortlist" aria-label="Shortlist" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
+    <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? ic("undo") : ic("down")}</button>`;
   const facts = `
     ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
@@ -859,7 +877,7 @@ async function editSheet(id){
   sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => {
     stars = +b.dataset.star === stars ? 0 : +b.dataset.star;
     sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars));
-    $("#rateBtn").innerHTML = "★" + (stars ? `<small>${stars}</small>` : ""); $("#rateBtn").classList.toggle("on", !!stars); $("#rateMenu").hidden = true;
+    $("#rateBtn").innerHTML = ic("star", 20, !!stars) + (stars ? `<small>${stars}</small>` : ""); $("#rateBtn").classList.toggle("on", !!stars); $("#rateMenu").hidden = true;
     save({myRating: stars || null});
   });
   // Bought a wishlist game: pick the platform once, then it moves to that status.
