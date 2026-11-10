@@ -239,7 +239,7 @@ async function steamTagSearch(tag, filter){
   }).filter(Boolean);
 }
 async function finds(env){
-  const c = await env.KV.get("finds3", "json");
+  const c = await env.KV.get("finds4", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -273,8 +273,9 @@ async function finds(env){
   const pool = (igdbRows, keep) => {
     const m = new Map();
     for (const g of igdbRows) m.set(g.id, out(g));
-    for (const {g, s} of steamGames) if (keep(g, s)) m.set(g.id, out(g, s));
-    return [...m.values()];
+    for (const {g, s} of steamGames) if (keep(g, s) && (g.genres || []).some(x => x.name === "Platform") ) m.set(g.id, out(g, s));
+    // Drop visual novels and other odd matches IGDB sometimes files under side view.
+    return [...m.values()].filter(x => !x.genres.includes("Visual Novel") && (x.genres.includes("Platform") || x.kw.includes("Metroidvania")));
   };
   const recent = g => !g.first_release_date || g.first_release_date > since;
   const d = {
@@ -284,7 +285,7 @@ async function finds(env){
     classics: classics.map(g => out(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30),
     fresh: pool(fresh, (g, s) => !g.first_release_date || g.first_release_date > half && g.first_release_date <= now).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 40)
   };
-  await env.KV.put("finds3", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds4", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
