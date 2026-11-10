@@ -514,7 +514,8 @@ function couchHTML(){
   if (couchFinds === null){ loadCouch(); return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">Looking…</span></div>`; }
   if (couchFinds.error) return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">${esc(couchFinds.error)}</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
-  const card = d => `<div class="card">${coverHTML({...d, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(d.title)}</span>
+  [...(couchFinds.fresh || []), ...(couchFinds.best || [])].forEach(x => previewCache.set(x.igdbId, x));
+  const card = d => `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(d.title)}</span></button>
     <span class="csub"><span>${d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
     <button class="btn ghost small" data-cwish="${d.igdbId}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button></div>`;
   const row = (t, sub, xs) => { xs = xs.filter(d => !have.has(d.igdbId)); return xs.length ? `<div class="section"><div class="row-head"><h3>${t}</h3><span class="dim">${sub}</span></div><div class="row">${xs.map(card).join("")}</div></div>` : ""; };
@@ -527,7 +528,8 @@ function radarHTML(){
   if (radar.error) return `<div class="section"><h3>Coming soon</h3><span class="why">Couldn't load new releases: ${esc(radar.error)}</span></div>`;
   if (!radar.soon) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
-  const card = (x, sub) => `<div class="card">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${esc(sub)}</span></span>
+  [...(radar.soon || []), ...(radar.recent || [])].forEach(x => previewCache.set(x.igdbId, x));
+  const card = (x, sub) => `<div class="card"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button><span class="csub"><span>${esc(sub)}</span></span>
     <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me">✕</button></span></div>`;
   const row = (t, xs, subf) => { xs = xs.filter(x => !have.has(x.igdbId)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
   return row("Coming soon", radar.soon, x => new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"})) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
@@ -538,10 +540,10 @@ function discoverHTML(){
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
   return `<div class="wrap">${radarHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
-    <div class="grid">${discovered.map((d, i) => `<div class="card">${coverHTML({...d, platforms: [], status: "wishlist"})}
-      <span class="ctitle">${esc(d.title)}</span><span class="why">Like ${esc(d.because.join(", "))}</span>
+    <div class="grid">${discovered.map((d, i) => (previewCache.set(d.igdbId, d), `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}
+      <span class="ctitle">${esc(d.title)}</span></button><span class="why">Like ${esc(d.because.join(", "))}</span>
       <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
-      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me">✕</button></span></div>`).join("")}</div></div></div>`;
+      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me">✕</button></span></div>`)).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
   try {
@@ -653,6 +655,47 @@ function nopeSheet(){
     <div class="actions"><button class="btn" data-act="close">Close</button></div>`);
   $("#sheet").querySelectorAll("[data-unnope]").forEach(b => b.onclick = async () => { await del(b.dataset.unnope); b.closest(".match").remove(); });
 }
+// Preview for a game that isn't in your list (Discover, radar, similar games).
+const previewCache = new Map();
+async function previewSheet(x){
+  const have = list().find(g => g.igdbId === x.igdbId);
+  if (have) return editSheet(have.id);
+  previewCache.set(x.igdbId, x);
+  const meta = [x.year, ...basicTags(x)].filter(Boolean).join(" · ");
+  openSheet(`<button class="x" data-act="close" aria-label="Close">×</button>
+    <div class="media"><div class="mslides" id="mslides"><div class="mslide">${x.cover ? `<img src="${esc(x.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
+    <div class="ghead">${coverHTML({...x, platforms: [], status: "wishlist"})}<div><h2>${esc(x.title)}</h2>${meta ? `<div class="meta">${esc(meta)}</div>` : ""}</div></div>
+    <div class="ctrl"><div class="chips"><button class="btn" id="pvWish">+ Wishlist</button><button class="chip" id="pvNope">Not for me</button></div></div>
+    <p class="desc clamp" id="desc"></p>
+    <details class="more" id="simBox" hidden><summary>Similar to ${esc(x.title)}</summary><div class="row" id="simRow"></div></details>`, true);
+  $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
+  $("#pvWish").onclick = async () => { $("#pvWish").disabled = true; $("#pvWish").textContent = "On wishlist";
+    const {because, score, added, date, ...data} = x; await setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()}); };
+  $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
+  try { fillMedia(await gameDetails(x.igdbId)); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
+}
+// Trailer + screenshots, description and similar games into an open game page.
+function fillMedia(d){
+  if (!$("#dlg").open || !$("#mslides")) return;
+  $("#desc").textContent = d.summary || "";
+  const slides = [
+    d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&loop=1&playlist=${encodeURIComponent(d.trailer)}&controls=0&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
+    ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
+  ].filter(Boolean);
+  if (slides.length){
+    $("#mslides").innerHTML = slides.join("");
+    $("#mdots").innerHTML = slides.map((_, i) => `<button class="dotbtn" data-mgo="${i}" aria-label="Slide ${i + 1}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("");
+  }
+  const byIgdb = new Map(list().map(g => [g.igdbId, g]));
+  const sims = (d.similar || []).filter(x => !byIgdb.get(x.igdbId)?.nope);
+  if (sims.length && $("#simBox")){
+    $("#simBox").hidden = false;
+    sims.forEach(x => previewCache.set(x.igdbId, x));
+    $("#simRow").innerHTML = sims.map(x => { const own = byIgdb.get(x.igdbId);
+      return own ? `<button class="card" data-edit="${own.id}">${coverHTML(own)}<span class="ctitle">${esc(own.title)}</span><span class="csub"><span>${STAT[own.status]}</span></span></button>`
+        : `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button>`; }).join("");
+  }
+}
 async function editSheet(id){
   const g = games.get(id); if (!g) return;
   let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext, couchV = !!g.couch;
@@ -707,29 +750,8 @@ async function editSheet(id){
   if (!g.igdbId) return;
   try {
     const d = await gameDetails(g.igdbId);
-    if (!$("#dlg").open || !$("#mslides")) return;
-    $("#desc").textContent = d.summary || "";
-    const slides = [
-      d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&loop=1&playlist=${encodeURIComponent(d.trailer)}&controls=0&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
-      ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
-    ].filter(Boolean);
-    if (slides.length){
-      $("#mslides").innerHTML = slides.join("");
-      $("#mdots").innerHTML = slides.map((_, i) => `<button class="dotbtn" data-mgo="${i}" aria-label="Slide ${i + 1}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("");
-    }
+    fillMedia(d);
     if (!g.hero && d.hero) upd(id, {hero: d.hero, logo: d.logo || ""});
-    const byIgdb = new Map(list().map(x => [x.igdbId, x]));
-    const sims = (d.similar || []).filter(x => !byIgdb.get(x.igdbId)?.nope);
-    if (sims.length){
-      $("#simBox").hidden = false;
-      $("#simRow").innerHTML = sims.map((x, i) => { const own = byIgdb.get(x.igdbId);
-        return own ? `<button class="card" data-edit="${own.id}">${coverHTML(own)}<span class="ctitle">${esc(own.title)}</span><span class="csub"><span>${STAT[own.status]}</span></span></button>`
-          : `<div class="card">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><button class="btn ghost small" data-simwish="${i}">+ Wishlist</button></div>`; }).join("");
-      $("#simRow").querySelectorAll("[data-simwish]").forEach(b => b.onclick = async () => {
-        const x = sims[+b.dataset.simwish]; b.disabled = true; b.textContent = "On wishlist";
-        await setDoc(doc(col, newId()), {...x, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()});
-      });
-    }
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 
@@ -742,6 +764,7 @@ document.addEventListener("click", async e => {
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
   else if (d.time){ time = time === d.time ? "" : d.time; render(); }
   else if (d.edit) editSheet(d.edit);
+  else if (d.preview){ const x = previewCache.get(+d.preview); if (x) previewSheet(x); }
   else if (d.mode){ homeMode = d.mode; render(); }
   else if (d.stat != null){ statF = d.stat; render(); }
   else if (d.clear){ const [k, v] = d.clear.split(":"); if (k === "plat") platF.delete(v); if (k === "genre") genreF = ""; if (k === "access") accessF = ""; if (k === "sort") sort = "title"; if (k === "deck") deckF = false; render(); }
