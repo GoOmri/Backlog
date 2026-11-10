@@ -494,3 +494,11 @@ dialog:not(.full){border-radius:var(--r-l)}
 .card.sugg .tag{display:none}
 .oneline{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .card .csub{min-width:0}
+
+/* ownership line: green "Owned" + platform colours; red "Not owned" */
+.ownline{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.ownline .st{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:var(--r-s)}
+.ownline .st.yes{background:#1f3b2c;color:#7ee2a8}
+.ownline .st.no{background:#3d1c24;color:#ff8aa0}
+.pc{font-size:var(--t-s);font-weight:600;color:var(--fg);display:inline-flex;align-items:center;gap:6px}
+.pc::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c)}

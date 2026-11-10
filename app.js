@@ -931,10 +931,11 @@ async function editSheet(id){
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
 `;
-  const ownLine = g.ps === "left" ? `<b>Left PS Plus</b> · not playable now`
-    : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b>Not owned</b><span id="ownAvail"></span>`
-    : ownP.length ? `<b>Owned</b> · ${ownP.map(p => PLAT[p][0]).join(", ")}${viaPlus ? " · also on PS Plus" : ""}`
-    : `<b>PS Plus</b> · playable while subscribed`;
+  const pc = p => `<span class="pc" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`;
+  const ownLine = g.ps === "left" ? `<b class="st no">Left PS Plus</b> · not playable now`
+    : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b class="st no">Not owned</b><span id="ownAvail"></span>`
+    : ownP.length ? `<b class="st yes">Owned</b> ${ownP.map(pc).join(" ")}${viaPlus ? ` ${pc("psplus")}` : ""}`
+    : `<b class="st yes">Owned</b> ${pc("psplus")} · while subscribed`;
   openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
   $("#kebab").onclick = e => { e.stopPropagation(); $("#editPanel").hidden = !$("#editPanel").hidden; };
   $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !e.target.closest("#editPanel, #kebab")) $("#editPanel").hidden = true; });
