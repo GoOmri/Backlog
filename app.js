@@ -16,6 +16,7 @@ const ICON = {
   undo: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
   home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  heartf: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="currentColor"/>',
   heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
   compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
   book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
@@ -780,12 +781,12 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {
-    if (wid){ await del(wid); wid = null; $("#pvWish").textContent = "+ Wishlist"; toast("Removed from wishlist"); return; }
-    wid = newId(); $("#pvWish").textContent = "✓ On wishlist";
+    if (wid){ await del(wid); wid = null; $("#pvWish").innerHTML = ic("heart"); $("#pvWish").classList.remove("on-heart"); toast("Removed from wishlist"); return; }
+    wid = newId(); $("#pvWish").innerHTML = ic("heartf"); $("#pvWish").classList.add("on-heart");
     const {because, score, added, date, ...data} = x; await setDoc(doc(col, wid), {...data, asTyped: x.title, platforms: [], status: "wishlist", added: Date.now()});
     toast("Added to wishlist");
   };
@@ -893,8 +894,10 @@ async function editSheet(id){
   const ownP = (g.platforms || []).filter(p => p !== "psplus" && !(p === "ps5" && viaPlus));
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
     : ownP.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
-  const actions = `<div class="menuwrap"><button class="btn" id="statBtn" aria-haspopup="true">${STAT[g.status]} ▾</button>
-      <div class="popmenu" id="statMenu" hidden>${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
+  // One button for the next step only.
+  const NEXT = {wishlist: "I bought it", backlog: "Start playing", playing: "Finished", dropped: "Pick it up again"};
+  const actions = `${NEXT[g.status] ? `<div class="menuwrap"><button class="btn" id="statBtn">${NEXT[g.status]}</button><div class="popmenu" id="statMenu" hidden></div></div>` : ""}
+    ${g.status === "wishlist" ? `<button class="ibtn on-heart" id="wishBtn" title="Remove from wishlist" aria-label="Remove from wishlist">${ic("heartf")}</button>` : ""}
     <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">${ic("star", 20, !!g.myRating)}${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
       <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">${ic("star", 26)}</button>`).join("")}</div></div>
     <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Shortlist" aria-label="Shortlist" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
@@ -905,6 +908,7 @@ async function editSheet(id){
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <details class="more"><summary>Edit</summary>
+      <div class="field"><span class="label">Status</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
@@ -913,14 +917,24 @@ async function editSheet(id){
   openSheet(pageShell(g, {own: `<div class="pills">${pills}</div>`, actions, facts}), "full");
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
   const pop = (btn, menu) => { $(btn).onclick = e => { e.stopPropagation(); sh.querySelectorAll(".popmenu").forEach(m => { if (m !== $(menu)) m.hidden = true; }); $(menu).hidden = !$(menu).hidden; }; };
-  pop("#statBtn", "#statMenu"); pop("#rateBtn", "#rateMenu");
+  pop("#rateBtn", "#rateMenu");
+  const reopen = () => setTimeout(() => editSheet(id), 120);
+  if ($("#statBtn")) $("#statBtn").onclick = async e => {
+    e.stopPropagation();
+    if (g.status === "wishlist") return askBought("backlog");
+    const st = g.status === "playing" ? "done" : "playing";
+    await save({status: st, finishedAt: st === "done" ? Date.now() : null});
+    toast(st === "done" ? "Finished! Rate it with the star" : "Enjoy!"); reopen();
+  };
+  if ($("#wishBtn")) $("#wishBtn").onclick = async () => {
+    const snap = {...g}; delete snap.id; closeSheet(); await del(id);
+    toast(`${g.title} removed from wishlist`, () => setDoc(doc(col, id), snap));
+  };
   sh.addEventListener("click", e => { if (!e.target.closest(".menuwrap")) sh.querySelectorAll(".popmenu").forEach(m => m.hidden = true); });
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => {
     const st = b.dataset.setstat;
-    if (g.status === "wishlist" && st !== "wishlist" && st !== "dropped"){ $("#statMenu").hidden = true; return askBought(st); } $("#statBtn").textContent = STAT[st] + " ▾"; $("#statMenu").hidden = true; $("#finField").hidden = st !== "done";
-    sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b));
-    save({status: st, finishedAt: st === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null});
-    if (st === "done" && !g.myRating) $("#rateMenu").hidden = false;
+    if (g.status === "wishlist" && st !== "wishlist" && st !== "dropped" && $("#statBtn")) return askBought(st);
+    save({status: st, finishedAt: st === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null}); reopen();
   });
   $("#finDate").onchange = () => save({finishedAt: Date.parse($("#finDate").value) || Date.now()});
   let stars = g.myRating || 0;

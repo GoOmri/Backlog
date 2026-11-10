@@ -390,3 +390,4 @@ dialog:not(.full) .x{position:sticky;top:0;margin-left:auto;margin-bottom:-36px;
 .dchip.hard{background:#3d2a1c;color:#ff9a62}
 .dchip.vhard{background:#3d1c24;color:#ff6b86}
 .dchip.none{background:var(--raise);color:var(--dim)}
+.ibtn.on-heart{color:#FF6B86}
