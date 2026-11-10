@@ -189,22 +189,42 @@ const rowHTML = (title, items, sub = "", subFn) => items.length ? `<section clas
   <div class="row">${items.map(g => cardHTML(g, subFn?.(g))).join("")}</div></section>` : "";
 
 /* ---------- home ---------- */
-function heroGame(){
-  const playing = list().filter(g => g.status === "playing").sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
-  return playing[0] || list().filter(g => g.status === "backlog" && g.igdbId).sort((a, b) => (b.rating || 0) - (a.rating || 0))[0] || null;
+const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; // his favourite kinds of games
+function upNextGames(){
+  const pinned = list().filter(g => g.upNext && g.status !== "done" && g.status !== "dropped").sort((a, b) => a.upNext - b.upNext);
+  const playing = list().filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
+  const out = [...pinned, ...playing];
+  return out.length ? out : recommended().slice(0, 3);
+}
+function recommended(){
+  const w = {};
+  list().filter(g => g.status === "playing" || g.status === "done" || g.myRating >= 4)
+    .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2 : 1)));
+  FAV.forEach(t => w[t] = (w[t] || 0) + 3);
+  const max = Math.max(1, ...Object.values(w));
+  return list().filter(g => g.status === "backlog" && g.igdbId && !g.upNext)
+    .map(g => [g, genresOf(g).reduce((s, t) => s + (w[t] || 0), 0) / max + (g.rating || 65) / 100])
+    .sort((a, b) => b[1] - a[1]).map(r => r[0]);
 }
 function heroHTML(g){
-  if (!g) return "";
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
-  return `<section class="hero"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div>
+  const eyebrow = g.status === "playing" ? "Continue playing" : g.upNext ? (g.status === "wishlist" ? "Most anticipated" : "Up next") : "Recommended for you";
+  const main = g.status === "playing" ? `<button class="btn" data-finish="${g.id}">Mark finished</button>`
+    : g.status === "wishlist" ? "" : `<button class="btn" data-start="${g.id}">Start playing</button>`;
+  return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="" loading="lazy">` : ""}</div>
     <div class="hero-in">
-      <span class="eyebrow">${g.status === "playing" ? "Continue playing" : "Up next for you"}</span>
+      <span class="eyebrow">${eyebrow}</span>
       ${g.logo ? `<img class="hero-logo" src="${esc(g.logo)}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
       <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
-      <div class="hero-actions">${g.status === "playing" ? `<button class="btn" data-finish="${g.id}">Mark finished</button>` : `<button class="btn" data-start="${g.id}">Start playing</button>`}
-        <button class="btn ghost" data-edit="${g.id}">Details</button></div>
-    </div></section>`;
+      <div class="hero-actions">${main}<button class="btn ghost" data-edit="${g.id}">Details</button></div>
+    </div></div>`;
+}
+function carouselHTML(gs){
+  if (!gs.length) return "";
+  return `<section class="carousel"><div class="slides" id="slides">${gs.map(heroHTML).join("")}</div>
+    ${gs.length > 1 ? `<button class="nav-arrow prev" data-slide="-1" aria-label="Previous">‹</button><button class="nav-arrow next" data-slide="1" aria-label="Next">›</button>
+    <div class="dots">${gs.map((g, i) => `<button class="dotbtn" data-goto="${i}" aria-label="${esc(g.title)}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("")}</div>` : ""}</section>`;
 }
 const heroAsked = new Set();
 async function fetchHero(g){
@@ -213,34 +233,21 @@ async function fetchHero(g){
 }
 function homeHTML(){
   if (!games.size) return emptyHTML();
-  const h = heroGame(), back = list().filter(g => g.status === "backlog");
-  const playing = list().filter(g => g.status === "playing" && g !== h);
+  const top = upNextGames(), inTop = new Set(top.map(g => g.id)), back = list().filter(g => g.status === "backlog");
+  const playing = list().filter(g => g.status === "playing" && !inTop.has(g.id));
   const leaving = list().filter(g => leavingFor(g));
-  const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
-  const short = back.filter(g => mainH(g) && mainH(g) < 10).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 20);
-  const best = back.filter(g => g.rating).sort((a, b) => b.rating - a.rating).slice(0, 20);
+  const recs = recommended().filter(g => !inTop.has(g.id)).slice(0, 20);
+  const best = back.filter(g => g.rating && !inTop.has(g.id)).sort((a, b) => b.rating - a.rating).slice(0, 20);
   const recent = list().filter(g => g.status !== "wishlist").sort((a, b) => (b.added || 0) - (a.added || 0)).slice(0, 20);
-  return heroHTML(h)
+  const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
+  return carouselHTML(top)
+    + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
     + rowHTML("Also playing", playing)
     + rowHTML("Leaving PS Plus soon", leaving, "play these before they go")
-    + rowHTML("On sale from your wishlist", sales, "PC stores", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`)
-    + pickHTML(back)
-    + rowHTML("Short and great", short, "under 10 hours")
+    + rowHTML("Recommended from your backlog", recs, "based on what you love")
     + rowHTML("Best rated in your backlog", best)
-    + rowHTML("Recently added", recent);
-}
-function pickHTML(back){
-  const moods = topGenres(back, 12);
-  const res = time || mood.size ? back.map(g => {
-    const hit = genresOf(g).filter(t => mood.has(t)).length, timeOk = time && lenOf(mainH(g)) === time;
-    return [g, hit * 3 + (timeOk ? 2 : 0) + (g.rating || 70) / 100 + Math.random() * .3, hit || timeOk];
-  }).filter(r => r[2]).sort((a, b) => b[1] - a[1]).slice(0, 12).map(r => r[0]) : [];
-  return `<section class="section wrap"><div class="panel">
-    <h3>What should I play tonight?</h3>
-    <div class="chips">${moods.map(t => `<button class="chip" aria-pressed="${mood.has(t)}" data-mood="${esc(t)}">${esc(t)}</button>`).join("")}</div>
-    <div class="chips">${[["short","Under 10h"],["medium","10–30h"],["long","30h+"]].map(([k, l]) => `<button class="chip" aria-pressed="${time === k}" data-time="${k}">${l}</button>`).join("")}</div>
-    ${res.length ? `<div class="row">${res.map(g => cardHTML(g)).join("")}</div>` : (time || mood.size) ? `<span class="why">Nothing in your backlog fits. Try fewer moods.</span>` : ""}
-  </div></section>`;
+    + rowHTML("Recently added", recent)
+    + rowHTML("On sale from your wishlist", sales, "PC stores", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`);
 }
 function topGenres(gs, n){
   const c = {}; gs.forEach(g => genresOf(g).forEach(t => c[t] = (c[t] || 0) + 1));
@@ -365,7 +372,7 @@ function addSheet(){
 }
 async function editSheet(id){
   const g = games.get(id); if (!g) return;
-  let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0;
+  let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext;
   const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
   openSheet(`<div class="sheet-hero">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div>
     <div class="sheet-head">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}<div><h2>${esc(g.title)}</h2>
@@ -374,6 +381,7 @@ async function editSheet(id){
     ${lv ? `<div class="note warn">Probably leaving PS Plus soon. <a href="${esc(lv.url)}" target="_blank" rel="noopener">${esc(lv.title)}</a></div>` : ""}
     <div class="desc" id="desc">${g.igdbId ? "Loading…" : g.noMatch ? "No match found yet. Use Fix match below." : ""}</div>
     <div class="chips">${genresOf(g).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+    <div><button class="chip" id="upNextBtn" aria-pressed="${!!g.upNext}">📌 Up next</button></div>
     <div class="field"><span class="label">List</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" aria-pressed="${status === k}" data-setstat="${k}">${v}</button>`).join("")}</div></div>
     <div class="grid2"><div class="field"><span class="label">Your rating</span><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div></div>
       <div class="field" id="finField" ${status === "done" ? "" : "hidden"}><label class="label" for="finDate">Finished on</label><input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></div></div>
@@ -384,8 +392,9 @@ async function editSheet(id){
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => { status = b.dataset.setstat; sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("#finField").hidden = status !== "done"; });
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); });
   sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => { stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); });
+  $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); };
   $("#eSave").onclick = async () => {
-    const d = {status, platforms: [...plats], myRating: stars || null, touched: Date.now()};
+    const d = {status, platforms: [...plats], myRating: stars || null, touched: Date.now(), upNext: pinned ? (g.upNext || Date.now()) : null};
     d.finishedAt = status === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null;
     await upd(id, d); closeSheet();
   };
@@ -417,6 +426,11 @@ document.addEventListener("click", async e => {
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
   else if (d.time){ time = time === d.time ? "" : d.time; render(); }
   else if (d.edit) editSheet(d.edit);
+  else if (d.slide || d.goto != null){
+    const el = $("#slides"); if (!el) return;
+    const i = d.goto != null ? +d.goto : Math.round(el.scrollLeft / el.clientWidth) + +d.slide;
+    el.scrollTo({left: Math.max(0, i) * el.clientWidth, behavior: "smooth"});
+  }
   else if (d.finish){ await upd(d.finish, {status: "done", finishedAt: Date.now(), touched: Date.now()}); editSheet(d.finish); }
   else if (d.start) await upd(d.start, {status: "playing", touched: Date.now()});
   else if (d.wish != null){
@@ -451,6 +465,11 @@ document.addEventListener("change", e => {
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
 $("#dlg").addEventListener("close", () => render());
+document.addEventListener("scroll", e => {
+  if (e.target.id !== "slides") return;
+  const i = Math.round(e.target.scrollLeft / e.target.clientWidth);
+  document.querySelectorAll(".dotbtn").forEach((b, j) => b.toggleAttribute("aria-current", j === i));
+}, true);
 $("#addBtn").onclick = addSheet;
 $("#menuBtn").onclick = menuSheet;
 

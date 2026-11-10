@@ -148,3 +148,16 @@ dialog::backdrop{background:rgb(0 0 0 / .6)}
 .menu small{display:block;color:var(--dim)}
 a{color:var(--accent)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* up-next carousel */
+.carousel{position:relative;border-bottom:1px solid var(--line)}
+.slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.slides::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:start;border-bottom:0}
+.nav-arrow{position:absolute;bottom:22px;width:44px;height:44px;border-radius:999px;border:0;background:rgb(14 17 22 / .6);font-size:28px;line-height:1}
+.nav-arrow.prev{right:calc(max(16px,env(safe-area-inset-right,0px)) + 52px)}
+.nav-arrow.next{right:max(16px,env(safe-area-inset-right,0px))}
+.dots{position:absolute;bottom:14px;left:0;right:0;display:flex;justify-content:center;gap:6px}
+.dotbtn{width:8px;height:8px;border-radius:999px;border:0;padding:0;background:rgb(255 255 255 / .3);transition:width .2s}
+.dotbtn[aria-current]{width:22px;background:var(--fg)}
+@media (max-width:760px){.nav-arrow{display:none}}
