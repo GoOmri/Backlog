@@ -12,7 +12,7 @@ const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated se
 
 /* ---------- state ---------- */
 let games = new Map(), tab = "home", loaded = false;
-let q = "", platF = new Set(), statF = "", genreF = "", sort = "title";
+let q = "", platF = new Set(), statF = "", genreF = "", sort = "title", accessF = "";
 let mood = new Set(), time = "", discovered = null, leavingArticles = [];
 let db = null, col = null;
 const $ = s => document.querySelector(s);
@@ -37,6 +37,10 @@ function basicTags(g){
   const c = g.couch ? ["Couch co-op"] : g.onlineCoop || (g.modes || []).includes("Co-operative") ? ["Online co-op"] : [];
   return [...v, ...k, ...t, ...c];
 }
+// PlayStation access: bought (yours), claimed (monthly PS Plus, yours while subscribed),
+// catalog (PS Plus Extra, can leave), left (gone from PS Plus, not playable now).
+const PS_LABEL = {bought: "Bought on PlayStation", claimed: "Claimed with PS Plus · yours while subscribed", catalog: "PS Plus catalog · can leave anytime", left: "Left PS Plus · not playable now"};
+const playable = g => g.ps !== "left";
 const sale = g => g.status === "wishlist" && g.sale?.cut > 0 && /^(steam|epic)/i.test(g.sale.shop || "") ? g.sale : null;
 
 /* ---------- API (Cloudflare Worker) ---------- */
@@ -173,6 +177,7 @@ async function addTitles(titles, platform, status){
 }
 async function importFile(file){
   let data; try { data = JSON.parse(await file.text()); } catch { return note("That file isn't a Backlog export."); }
+  if (data && !Array.isArray(data) && !data.games) return applyPsStatus(data, false);
   const rows = Array.isArray(data) ? data : data.games;
   if (!Array.isArray(rows)) return note("That file isn't a Backlog export.");
   const groups = new Map();
@@ -189,6 +194,58 @@ async function importFile(file){
   await commitChunks(fresh.map((g, i) => b => b.set(doc(col, newId()), {...g, added: Date.now() + i})));
   note(`Imported ${fresh.length} games. Covers and info are loading now.`);
   runQueue();
+}
+// Apply {title: bought|claimed|catalog} to the list. fullPlusTab: the paste was the whole
+// PS Plus tab, so PS Plus games missing from it have left the service.
+async function applyPsStatus(map, fullPlusTab){
+  const rank = {catalog: 1, claimed: 2, bought: 3};
+  const byKey = new Map(Object.entries(map).map(([t, st]) => [key(t), st]));
+  const have = existingIndex(); let upd8 = 0, left = 0, added = 0; const ops = [], seen = new Set();
+  for (const g of list()){
+    const st = byKey.get(key(g.title)) || byKey.get(key(g.asTyped || g.title));
+    if (st){
+      seen.add(key(g.title)); seen.add(key(g.asTyped || g.title));
+      const best = g.ps === "bought" || rank[st] < (rank[g.ps] || 0) ? g.ps : st;
+      const plats = new Set(g.platforms || []); if (best === "bought") plats.add("ps5"); else plats.add("psplus");
+      if (best !== g.ps || plats.size !== (g.platforms || []).length){ upd8++; ops.push(b => b.update(doc(col, g.id), {ps: best, platforms: [...plats]})); }
+    } else if (fullPlusTab && (g.ps === "claimed" || g.ps === "catalog")){
+      left++; ops.push(b => b.update(doc(col, g.id), {ps: "left"}));
+    }
+  }
+  for (const [t, st] of Object.entries(map)) if (!seen.has(key(t)) && !have.has(key(t))){
+    added++; const n = Date.now() + added;
+    ops.push(b => b.set(doc(col, newId()), {title: t, asTyped: t, platforms: [st === "bought" ? "ps5" : "psplus"], ps: st, status: "backlog", added: n}));
+  }
+  await commitChunks(ops);
+  note(`PlayStation: updated ${upd8}, added ${added}${fullPlusTab ? `, marked ${left} as left PS Plus` : ""}.`);
+  runQueue();
+}
+// Read a pasted page from library.playstation.com (Purchased or PlayStation Plus tab).
+function parsePsPaste(text){
+  const lines = text.split(/\r?\n/).map(l => l.trim().replace(/^\*\s*/, "").replace(/^\[([^\]]+)\]\([^)]*\)$/, "$1"));
+  const plusTab = /Your PS Plus games/i.test(text), map = {};
+  const rank = {catalog: 1, claimed: 2, bought: 3};
+  for (let i = 0; i < lines.length - 1; i++){
+    const t = lines[i];
+    if (!t || /^(PS4|PS5|PS Plus|Download.*)$/.test(t) || !/^(PS4|PS5)$/.test(lines[i + 1])) continue;
+    const after = lines.slice(i + 2, i + 5), plus = after.includes("PS Plus"), consoleOnly = after.includes("Download to Console");
+    const st = plusTab ? (consoleOnly ? "catalog" : "claimed") : (plus ? "claimed" : "bought");
+    const title = t.replace(/[™®©]/g, "").replace(/\s*\(EU\)$/, "").trim();
+    if (!map[title] || rank[st] > rank[map[title]]) map[title] = st;
+  }
+  return {map, plusTab};
+}
+function psPasteSheet(){
+  openSheet(`<h2>Update from PlayStation</h2>
+    <p class="why">On library.playstation.com open the <b>PlayStation Plus</b> tab (or a <b>Purchased</b> page), press Ctrl+A, Ctrl+C, and paste here. Pasting the whole PS Plus tab also marks games that have left PS Plus.</p>
+    <textarea id="psPaste" rows="8" placeholder="Paste the page here"></textarea>
+    <div class="status" id="psMsg"></div>
+    <div class="actions"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" id="psGo">Update</button></div>`);
+  $("#psGo").onclick = async () => {
+    const {map, plusTab} = parsePsPaste($("#psPaste").value);
+    if (!Object.keys(map).length){ $("#psMsg").textContent = "No games found. Copy the whole page with Ctrl+A, then Ctrl+C."; return; }
+    $("#psGo").disabled = true; await applyPsStatus(map, plusTab);
+  };
 }
 async function importSteam(){
   note("Reading your Steam library…");
@@ -219,6 +276,7 @@ function badges(ps){ return (ps || []).map(p => { const v = PLAT[p] || PLAT.othe
 function coverTag(g){
   const s = sale(g), lv = leavingFor(g);
   if (g.noMatch) return `<span class="tag nomatch">No match</span>`;
+  if (g.ps === "left") return `<span class="tag">Left P+</span>`;
   if (lv) return `<span class="tag leaving">Leaving P+</span>`;
   if (s) return `<span class="tag sale ${s.cut >= 50 ? "big" : ""}">−${s.cut}%</span>`;
   if (g.status === "playing") return `<span class="tag playing">Playing</span>`;
@@ -242,7 +300,7 @@ const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; /
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pool = list().filter(g => isPlatformer(g) && g.status !== "done" && g.status !== "dropped");
+  const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status !== "done" && g.status !== "dropped");
   const pinned = pool.filter(g => g.upNext).sort((a, b) => a.upNext - b.upNext);
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -254,7 +312,7 @@ function recommended(){
     .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2 : 1)));
   FAV.forEach(t => w[t] = (w[t] || 0) + 3);
   const max = Math.max(1, ...Object.values(w));
-  return list().filter(g => g.status === "backlog" && g.igdbId && !g.upNext)
+  return list().filter(g => g.status === "backlog" && g.igdbId && !g.upNext && playable(g))
     .map(g => [g, genresOf(g).reduce((s, t) => s + (w[t] || 0), 0) / max + (g.rating || 65) / 100])
     .sort((a, b) => b[1] - a[1]).map(r => r[0]);
 }
@@ -304,7 +362,7 @@ const byLikely = (a, b) => (b.status === "playing") - (a.status === "playing") |
 function homeHTML(){
   if (!games.size) return emptyHTML();
   const top = upNextGames(), inTop = new Set(top.map(g => g.id));
-  const owned = list().filter(g => g.status === "backlog" || g.status === "playing"), wish = list().filter(g => g.status === "wishlist");
+  const owned = list().filter(g => (g.status === "backlog" || g.status === "playing") && playable(g)), wish = list().filter(g => g.status === "wishlist");
   const playing = owned.filter(g => g.status === "playing" && !inTop.has(g.id));
   const pinnedOther = list().filter(g => g.upNext && !inTop.has(g.id) && g.status !== "done" && g.status !== "dropped").sort((a, b) => a.upNext - b.upNext);
   const leaving = list().filter(g => leavingFor(g));
@@ -345,6 +403,7 @@ function shelfHTML(wish){
   const shown = scope.filter(g => (!statF || g.status === statF)
     && (!platF.size || (g.platforms || []).some(p => platF.has(p)))
     && (!genreF || (genreF === "__nomatch" ? g.noMatch : basicTags(g).includes(genreF)))
+    && (!accessF || g.ps === accessF)
     && (!s || g.title.toLowerCase().includes(s)));
   const by = {title: (a, b) => a.title.localeCompare(b.title), rating: (a, b) => (b.rating || 0) - (a.rating || 0), short: (a, b) => (mainH(a) || 999) - (mainH(b) || 999),
     added: (a, b) => (b.added || 0) - (a.added || 0), played: (a, b) => (b.steamHours || 0) - (a.steamHours || 0), sale: (a, b) => (b.sale?.cut || 0) - (a.sale?.cut || 0)};
@@ -353,6 +412,7 @@ function shelfHTML(wish){
   return `<div class="wrap"><div class="filters">
     <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
     ${wish ? "" : `<select id="statSel" aria-label="Status"><option value="">Any status</option>${["backlog","playing","done","dropped"].map(k => `<option value="${k}" ${statF === k ? "selected" : ""}>${STAT[k]}</option>`).join("")}</select>`}
+    ${scope.some(g => g.ps) ? `<select id="accessSel" aria-label="PlayStation access"><option value="">Any PlayStation access</option>${[["bought","Bought"],["claimed","Claimed (PS Plus)"],["catalog","PS Plus catalog"],["left","Left PS Plus"]].map(([k, l]) => `<option value="${k}" ${accessF === k ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
     <select id="genreSel" aria-label="Genre"><option value="">All types</option>${nom ? `<option value="__nomatch" ${genreF === "__nomatch" ? "selected" : ""}>Needs a match (${nom})</option>` : ""}${topTags(scope).map(t => `<option ${t === genreF ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
     <select id="sortSel" aria-label="Sort">${[["title", wish ? "Biggest discount" : "A–Z"], ["rating","Best rated"], ["short","Shortest"], ["added","Recently added"], ...(wish ? [] : [["played","Most played (Steam)"]])].map(([k, l]) => `<option value="${k}" ${k === sort ? "selected" : ""}>${l}</option>`).join("")}</select>
     <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
@@ -452,6 +512,7 @@ function menuSheet(){
   openSheet(`<h2>Backlog</h2><div class="menu">
     <button data-act="steam">Import from Steam<small>Adds your Steam games with hours played</small></button>
     <button data-act="import">Import a file<small>The export from the old Backlog</small></button>
+    <button data-act="psplus">Update from PlayStation<small>Paste your PS Plus tab: bought, claimed, catalog, left</small></button>
     <button data-act="rematch">Re-check all matches<small>Fixes games matched to the wrong version</small></button>
     <button data-act="prices">Check wishlist prices now<small>PC stores via IsThereAnyDeal</small></button>
     <button data-act="signout">Sign out</button></div>
@@ -479,7 +540,7 @@ async function editSheet(id){
   const meta = [g.year, ...basicTags(g).filter(t => t !== "Couch co-op")].filter(Boolean).join(" · ");
   const own = (g.platforms || []).filter(p => p !== "psplus");
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
-    : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + ((g.platforms || []).includes("psplus") ? `<span class="pill" style="--c:var(--psplus)">PS Plus</span>` : "");
+    : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + ((g.platforms || []).includes("psplus") || g.ps ? `<span class="pill" style="--c:var(--psplus)">${esc(PS_LABEL[g.ps] || "PS Plus")}</span>` : "");
   openSheet(`<button class="x" data-act="close" aria-label="Close">×</button>
     <div class="media"><div class="mslides" id="mslides"><div class="mslide">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
     <div class="ghead">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}
@@ -540,7 +601,7 @@ async function editSheet(id){
 document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
-  if (d.tab){ tab = d.tab; platF.clear(); statF = ""; genreF = ""; q = ""; sort = "title"; render(); scrollTo(0, 0); }
+  if (d.tab){ tab = d.tab; platF.clear(); statF = ""; genreF = ""; accessF = ""; q = ""; sort = "title"; render(); scrollTo(0, 0); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
   else if (d.time){ time = time === d.time ? "" : d.time; render(); }
@@ -574,6 +635,7 @@ document.addEventListener("click", async e => {
       running = true;
       checkPrices(true).then(() => progress(0, 0), err => progress(0, 0, err.message, true)).finally(() => running = false);
       break;
+    case "psplus": psPasteSheet(); break;
     case "rematch": closeSheet(); rematchAll(); break;
     case "rediscover": discovered = null; render(); break;
     case "signout": closeSheet(); signOut(getAuth()); break;
@@ -587,6 +649,7 @@ document.addEventListener("change", e => {
   const id = e.target.id;
   if (id === "statSel"){ statF = e.target.value; render(); }
   if (id === "genreSel"){ genreF = e.target.value; render(); }
+  if (id === "accessSel"){ accessF = e.target.value; render(); }
   if (id === "sortSel"){ sort = e.target.value; render(); }
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
