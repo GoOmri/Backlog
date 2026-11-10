@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,total_rating,total_rating_count,aggregated_rating";
+const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating";
 
 export default {
   async fetch(req, env, ctx){
@@ -22,7 +22,7 @@ export default {
         case "/search":   out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
-        case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 400)); break;
+        case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
@@ -69,12 +69,15 @@ function slim(g, ttb){
     themes: (g.themes || []).map(x => x.name),
     modes: (g.game_modes || []).map(x => x.name),
     views: (g.player_perspectives || []).map(x => x.name),
-    ...coop(g),
+    ...coop(g), kw: feel(g),
     rating: Math.round(g.total_rating || g.aggregated_rating || 0) || null,
     ratingCount: g.total_rating_count || 0,
     ttb: t ? {main: hrs(t.normally || t.hastily), rush: hrs(t.hastily), full: hrs(t.completely)} : null
   };
 }
+// Keep only the keywords that describe feel; IGDB has hundreds per game.
+const KW = [[/metroidvania/i, "Metroidvania"], [/souls-?like/i, "Soulslike"], [/^(difficult|hardcore|challenging|hard)$/i, "Hard"], [/relaxing|cozy|casual/i, "Chill"], [/^exploration$/i, "Exploration"], [/puzzle.?platform/i, "Puzzle-platformer"], [/precision platform/i, "Precision"], [/atmospheric/i, "Atmospheric"]];
+const feel = g => [...new Set((g.keywords || []).flatMap(k => KW.filter(([re]) => re.test(k.name || "")).map(([, l]) => l)))];
 const coop = g => ({couch: (g.multiplayer_modes || []).some(m => m.offlinecoop || m.splitscreen), onlineCoop: (g.multiplayer_modes || []).some(m => m.onlinecoop)});
 const hrs = s => s ? Math.max(1, Math.round(s / 3600)) : null;
 async function ttbFor(env, ids){
@@ -103,8 +106,8 @@ async function match(env, titles){
 // Extra fields for games already in the list (backfill).
 async function info(env, ids){
   if (!ids.length) return {};
-  const rows = await igdb(env, "games", `fields player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop; where id = (${ids.join(",")}); limit 500;`);
-  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name), ...coop(g)}]));
+  const rows = await igdb(env, "games", `fields player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
+  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g)}]));
 }
 
 async function search(env, text){
