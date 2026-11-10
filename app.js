@@ -367,7 +367,8 @@ function upNextGames(){
   const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  return [...pinned, ...playing, ...rest].slice(0, Math.max(10, pinned.length));
+  // The carousel is the shortlist. Suggestions only fill it while nothing is pinned.
+  return pinned.length ? pinned : [...playing, ...rest].slice(0, 5);
 }
 function recommended(){
   const w = {};
@@ -382,7 +383,7 @@ function recommended(){
 function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
-  const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "From your backlog";
+  const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "Suggested · pin to keep";
   const main = g.status === "playing" ? `<button class="btn" data-finish="${g.id}">Mark finished</button>`
     : g.status === "wishlist" ? "" : `<button class="btn" data-start="${g.id}">Start playing</button>`;
   return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="" loading="lazy">` : ""}</div>
