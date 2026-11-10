@@ -219,3 +219,23 @@ button.brand{background:none;border:0;padding:0;color:var(--fg)}
 .sheet > *,.more,.more > *{min-width:0}
 dialog{overflow-x:hidden}
 #simRow{overflow-x:auto}
+
+/* library sidebar (desktop) / filter panel (phone) */
+.libwrap{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;align-items:start}
+.side{position:sticky;top:calc(72px + env(safe-area-inset-top,0px));max-height:calc(100dvh - 90px);overflow:auto;padding-block:18px 24px;display:grid;gap:18px;scrollbar-width:thin}
+.side.insheet{position:static;max-height:none;padding:0}
+.fhead{display:flex;justify-content:space-between;align-items:center}
+.linkbtn{background:none;border:0;color:var(--accent);font-size:13px;padding:0}
+.fsec{display:grid;gap:2px}
+.fsec .label{margin-bottom:6px}
+.fopt{display:flex;justify-content:space-between;gap:8px;background:none;border:0;border-radius:8px;padding:6px 8px;text-align:left;font-size:14px;color:var(--dim)}
+.fopt:hover{background:var(--surface);color:var(--fg)}
+.fopt[aria-pressed="true"]{background:var(--raise);color:var(--fg);font-weight:600}
+.fopt .n{font:500 12px var(--mono);color:var(--dim)}
+.mobile-only{display:none}
+@media (max-width:999px){
+  .libwrap{display:block}
+  .libwrap > .side{display:none}
+  .mobile-only{display:flex}
+  .chip.mobile-only{display:inline-flex}
+}
