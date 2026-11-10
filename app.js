@@ -363,11 +363,11 @@ const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; /
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pool = list().filter(g => isPlatformer(g) && playable(g) && (homeMode === "wish" ? g.status === "wishlist" : g.status === "backlog"));
-  const pinned = pool.filter(g => g.upNext).sort((a, b) => a.upNext - b.upNext);
+  const pinned = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
+  const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  return [...pinned, ...playing, ...rest].slice(0, 10);
+  return [...pinned, ...playing, ...rest].slice(0, Math.max(10, pinned.length));
 }
 function recommended(){
   const w = {};
@@ -382,7 +382,7 @@ function recommended(){
 function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
-  const eyebrow = g.status === "playing" ? "Continue playing" : g.upNext ? (g.status === "wishlist" ? "Most anticipated" : "Up next") : g.status === "wishlist" ? "On your wishlist" : "In your backlog";
+  const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "From your backlog";
   const main = g.status === "playing" ? `<button class="btn" data-finish="${g.id}">Mark finished</button>`
     : g.status === "wishlist" ? "" : `<button class="btn" data-start="${g.id}">Start playing</button>`;
   return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="" loading="lazy">` : ""}</div>
@@ -427,15 +427,13 @@ function homeHTML(){
   homeMode = "owned";
   const top = upNextGames(), inTop = new Set(top.map(g => g.id));
   const pool = list().filter(g => playable(g) && g.status === "backlog");
-  const pinned = pool.filter(g => g.upNext && !inTop.has(g.id)).sort((a, b) => a.upNext - b.upNext);
   const fits = g => CATS.some(([, test]) => test(g));
   const wish = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || fits(b) - fits(a) || (b.rating || 0) - (a.rating || 0)).slice(0, 30);
   const leaving = list().filter(g => leavingFor(g));
   const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24), "", undefined, 3));
   return carouselHTML(top)
-    + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
-    + rowHTML("Up next", pinned)
+    + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>📌 Shortlist</b> to put it at the top.</p>`)
     + metroid + plat2d + couch + puzzle
     + rowHTML("Wishlist", wish, "", g => sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)
     + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3)
@@ -672,7 +670,7 @@ async function editSheet(id){
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
     <div class="seg">${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${status === k}">${v}</button>`).join("")}</div>
     <div class="ctrl"><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div>
-      <div class="chips"><button class="chip" id="upNextBtn" aria-pressed="${pinned}">📌 Up next</button><button class="chip" id="nopeBtn">${g.hidden ? "Show again" : "Not for me"}</button></div></div>
+      <div class="chips"><button class="chip" id="upNextBtn" aria-pressed="${pinned}">📌 Shortlist</button><button class="chip" id="nopeBtn">${g.hidden ? "Show again" : "Not for me"}</button></div></div>
     <label class="fin" id="finField" ${status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <p class="desc clamp" id="desc" title="Show more"></p>
     <details class="more" id="simBox" hidden><summary>Similar to ${esc(g.title)}</summary><div class="row" id="simRow"></div></details>
