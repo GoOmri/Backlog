@@ -217,37 +217,33 @@ async function topMetroidvanias(env){
   return out;
 }
 
-/* ---------- Find rows: recent (2008+) metroidvanias and 2D platformers ---------- */
-// Two sources: IGDB (ratings) and Steam tag searches (better indie coverage).
-// Ranked by score with a boost for newer games. Cached for a day.
-async function steamTagIds(env){
-  const c = await env.KV.get("steamtags", "json");
-  if (c) return c;
-  const all = await (await fetch("https://store.steampowered.com/tagdata/populartags/english")).json();
-  const want = {mv: "Metroidvania", plat: "2D Platformer", puzzle: "Puzzle Platformer"}, out = {};
-  for (const [k, n] of Object.entries(want)) out[k] = all.find(t => t.name === n)?.tagid;
-  await env.KV.put("steamtags", JSON.stringify(out), {expirationTtl: 30 * 86400});
-  return out;
+/* ---------- Find rows: Steam tag searches, quality bar, ranked by Omri's taste ---------- */
+// Steam's full tag list (id <-> name), cached for a month.
+async function tagList(env){
+  let all = await env.KV.get("steamtagall", "json");
+  if (!all){ all = await (await fetch("https://store.steampowered.com/tagdata/populartags/english")).json(); await env.KV.put("steamtagall", JSON.stringify(all), {expirationTtl: 30 * 86400}); }
+  return all;
 }
 // Steam user tags for owned/wishlist games, kept to the few the app uses.
 const STAG = {"Metroidvania": "Metroidvania", "Souls-like": "Soulslike", "Difficult": "Hard", "Relaxing": "Chill", "Cozy": "Chill", "Puzzle Platformer": "Puzzle-platformer", "Precision Platformer": "Precision", "Atmospheric": "Atmospheric", "Exploration": "Exploration", "Local Co-Op": "Couch co-op"};
-async function steamTags(env, apps){
-  if (!apps.length) return {};
-  let map = await env.KV.get("steamtagmap", "json");
-  if (!map){
-    map = {};
-    for (const t of await (await fetch("https://store.steampowered.com/tagdata/populartags/english")).json()) if (STAG[t.name]) map[t.tagid] = STAG[t.name];
-    await env.KV.put("steamtagmap", JSON.stringify(map), {expirationTtl: 30 * 86400});
+async function getItems(apps, req){
+  const out = [];
+  for (let i = 0; i < apps.length; i += 100){
+    const input = {ids: apps.slice(i, i + 100).map(appid => ({appid: +appid})), context: {language: "english", country_code: "US"}, data_request: req};
+    const r = await (await fetch(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`)).json();
+    out.push(...(r.response?.store_items || []));
   }
-  const input = {ids: apps.map(appid => ({appid})), context: {language: "english", country_code: "US"}, data_request: {include_tag_count: 20}};
-  const r = await (await fetch(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`)).json();
-  const out = {};
-  for (const it of r.response?.store_items || []) out[it.appid] = [...new Set((it.tags || []).map(t => map[t.tagid]).filter(Boolean))];
   return out;
 }
-async function steamTagSearch(tag, filter){
-  if (!tag) return [];
-  const u = `https://store.steampowered.com/search/results/?infinite=1&start=0&count=50&tags=${tag}&category1=998&cc=us&l=english&${filter}`;
+async function steamTags(env, apps){
+  if (!apps.length) return {};
+  const name = new Map((await tagList(env)).map(t => [t.tagid, t.name])), out = {};
+  for (const it of await getItems(apps, {include_tag_count: 20})) out[it.appid] = [...new Set((it.tags || []).map(t => STAG[name.get(t.tagid)]).filter(Boolean))];
+  return out;
+}
+async function steamTagSearch(tagIds, filter, start = 0){
+  if (!tagIds.length || tagIds.some(t => !t)) return [];
+  const u = `https://store.steampowered.com/search/results/?infinite=1&start=${start}&count=100&tags=${tagIds.join(",")}&category1=998&cc=us&l=english&${filter}`;
   const html = (await (await fetch(u)).json()).results_html || "";
   return html.split("search_result_row").slice(1).map(ch => {
     const app = ch.match(/data-ds-appid="(\d+)"/)?.[1];
@@ -255,55 +251,78 @@ async function steamTagSearch(tag, filter){
     return app ? {app, pct: pct ? +pct[1] : null, n: pct ? +pct[2].replace(/,/g, "") : 0} : null;
   }).filter(Boolean);
 }
+// Taste: pushed up / pushed down by Steam tags (only the top tags of a game count).
+const LIKE = ["Puzzle Platformer", "Exploration", "Atmospheric", "Hand-drawn", "Beautiful", "Story Rich", "Precision Platformer", "Relaxing", "Metroidvania", "Great Soundtrack", "Emotional", "Cozy", "Mystery", "Detective", "Walking Simulator", "Short"];
+const DISLIKE = ["Souls-like", "Hack and Slash", "Action Roguelike", "Bullet Hell", "Fighting", "Roguelike", "Roguelite", "Shoot 'Em Up", "Beat 'em up", "Gore", "Character Action Game"];
+const SEARCHES = [
+  ["mv", ["Metroidvania"], "sort_by=Reviews_DESC"], ["mv", ["Metroidvania"], "sort_by=Reviews_DESC", 100],
+  ["plat", ["2D Platformer"], "sort_by=Reviews_DESC"], ["plat", ["2D Platformer"], "sort_by=Reviews_DESC", 100],
+  ["plat", ["Puzzle Platformer"], "sort_by=Reviews_DESC"], ["plat", ["Precision Platformer"], "sort_by=Reviews_DESC"],
+  ["walk", ["Walking Simulator"], "sort_by=Reviews_DESC"], ["mystery", ["Mystery"], "sort_by=Reviews_DESC"], ["mystery", ["Detective"], "sort_by=Reviews_DESC"],
+  ["cozy", ["Cozy"], "sort_by=Reviews_DESC"], ["zelda", ["Top-Down", "Action-Adventure"], "sort_by=Reviews_DESC"],
+  ["coopPuzzle", ["Local Co-Op", "Puzzle"], "sort_by=Reviews_DESC"], ["coopPlat", ["Local Co-Op", "Platformer"], "sort_by=Reviews_DESC"],
+  ["fresh", ["Metroidvania"], "filter=popularnew"], ["fresh", ["2D Platformer"], "filter=popularnew"],
+  ["soon", ["Metroidvania"], "filter=popularcomingsoon"], ["soon", ["2D Platformer"], "filter=popularcomingsoon"]
+];
 async function finds(env){
-  const c = await env.KV.get("finds6", "json");
+  const c = await env.KV.get("finds7", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
+  const all = await tagList(env), tid = new Map(all.map(t => [t.name, t.tagid])), tname = new Map(all.map(t => [t.tagid, t.name]));
   const kws = await igdb(env, "keywords", `fields id; where name ~ *"metroidvania"*; limit 20;`);
   const mvKw = kws.length ? `keywords = (${kws.map(k => k.id).join(",")})` : "id = 0";
-  const tags = await steamTagIds(env).catch(() => ({}));
-  const [mv, plat, missed, fresh, classics, ...st] = await Promise.all([
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${mvKw} & ${clean} & first_release_date > ${since} & total_rating_count > 5 & total_rating > 75; sort total_rating desc; limit 80;`),
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${side} & ${clean} & first_release_date > ${since} & total_rating_count > 5 & total_rating > 75; sort total_rating desc; limit 100;`),
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date > ${three} & first_release_date < ${half} & total_rating_count > 3 & total_rating > 77; sort total_rating desc; limit 60;`),
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date > ${half} & first_release_date <= ${now}; sort hypes desc; limit 60;`),
+  const [classics, ...res] = await Promise.all([
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date < ${since} & total_rating_count > 30 & total_rating > 78; sort total_rating_count desc; limit 60;`),
-    ...[["mv", "sort_by=Reviews_DESC"], ["plat", "sort_by=Reviews_DESC"], ["puzzle", "sort_by=Reviews_DESC"], ["mv", "filter=popularnew"], ["plat", "filter=popularnew"], ["mv", "filter=popularcomingsoon"], ["plat", "filter=popularcomingsoon"]]
-      .map(([k, f]) => steamTagSearch(tags[k], f).then(r => r.map(x => ({...x, k, isNew: f.includes("new"), soon: f.includes("soon")}))).catch(() => []))
+    ...SEARCHES.map(([k, t, f, st]) => steamTagSearch(t.map(n => tid.get(n)), f, st).then(r => r.map(x => ({...x, k}))).catch(() => []))
   ]);
-  // Map Steam app ids to IGDB games.
-  const steamHits = st.flat().filter(x => x.isNew || x.soon || (x.pct >= 85 && x.n >= 200));
-  const byApp = new Map(steamHits.map(x => [x.app, x]));
-  let steamGames = [];
-  if (byApp.size){
-    const ext = await igdb(env, "external_games", `fields game,uid,url; where uid = (${[...byApp.keys()].map(a => `"${a}"`).join(",")}); limit 500;`);
-    const gid = new Map(ext.filter(e => !e.url || /steampowered/.test(e.url)).map(e => [e.game, byApp.get(e.uid)]));
-    if (gid.size){
-      const gs = await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${[...gid.keys()].join(",")}) & ${clean}; limit 500;`);
-      steamGames = gs.map(g => ({g, s: gid.get(g.id)}));
-    }
+  // Quality bar: well reviewed, or a hidden gem (few reviews but nearly all positive).
+  const good = x => (x.pct >= 85 && x.n >= 300) || (x.pct >= 92 && x.n >= 40);
+  const hits = new Map();
+  for (const x of res.flat()){
+    if (!(x.k === "soon" || (x.k === "fresh" && (x.pct == null || x.pct >= 75)) || good(x))) continue;
+    const h = hits.get(x.app) || {...x, keys: new Set()};
+    h.keys.add(x.k); hits.set(x.app, h);
   }
-  const out = (g, s) => ({...slim(g), ...(s?.k === "mv" ? {kw: [...new Set([...feel(g), "Metroidvania"])]} : {}), date: g.first_release_date || null, steamPct: s?.pct ?? null, steamN: s?.n || 0, rating: Math.round(g.total_rating || g.aggregated_rating || 0) || s?.pct || null});
-  // Trust a score more when many people rated it (IGDB ratings, or Steam reviews / 50).
-  const score = x => { const n = Math.max(x.ratingCount || 0, (x.steamN || 0) / 50); return ((x.rating || 70) * n + 70 * 30) / (n + 30) + Math.max(0, (x.year || 2008) - 2008) * 0.6; };
-  const pool = (igdbRows, keep) => {
-    const m = new Map();
-    for (const g of igdbRows) m.set(g.id, out(g));
-    for (const {g, s} of steamGames) if (keep(g, s) && (g.genres || []).some(x => x.name === "Platform") ) m.set(g.id, out(g, s));
-    // Drop visual novels and other odd matches IGDB sometimes files under side view.
-    return [...m.values()].filter(x => !x.genres.includes("Visual Novel") && (x.genres.includes("Platform") || x.kw.includes("Metroidvania")));
-  };
-  const recent = g => !g.first_release_date || g.first_release_date > since;
+  // Steam tags for every candidate.
+  for (const it of await getItems([...hits.keys()], {include_tag_count: 12})){
+    const h = hits.get(String(it.appid)); if (h) h.tags = (it.tags || []).map(t => tname.get(t.tagid)).filter(Boolean);
+  }
+  // Map Steam app ids to IGDB games (for covers, details and wishlist).
+  const apps = [...hits.keys()], gameOf = new Map();
+  for (let i = 0; i < apps.length; i += 200){
+    const ext = await igdb(env, "external_games", `fields game,uid,url; where uid = (${apps.slice(i, i + 200).map(a => `"${a}"`).join(",")}); limit 500;`);
+    for (const e of ext) if ((!e.url || /steampowered/.test(e.url)) && hits.has(e.uid) && !gameOf.has(e.game)) gameOf.set(e.game, hits.get(e.uid));
+  }
+  const ids = [...gameOf.keys()], games = [];
+  for (let i = 0; i < ids.length; i += 250) games.push(...await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${ids.slice(i, i + 250).join(",")}) & ${clean}; limit 500;`));
+  const elite = h => h.pct >= 94 && h.n >= 10000;
+  const items = games.map(g => {
+    const h = gameOf.get(g.id), top = (h.tags || []).slice(0, 8);
+    const taste = Math.min(10, top.filter(t => LIKE.includes(t)).length * 2) - (elite(h) ? 0 : top.filter(t => DISLIKE.includes(t)).length * 6);
+    const base = h.pct != null ? (h.pct * h.n + 80 * 50) / (h.n + 50) : 75;
+    const sk = [...new Set((h.tags || []).map(t => STAG[t]).filter(Boolean))];
+    const x = {...slim(g), kw: [...new Set([...feel(g), ...sk.filter(t => t !== "Couch co-op")])], ...(sk.includes("Couch co-op") ? {couch: true} : {}),
+      date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
+    x.score = base + taste + Math.max(0, (x.year || 2008) - 2008) * 0.3;
+    x.gem = h.n < 1500 && h.pct >= 92; x.taste = taste;
+    return {x, keys: h.keys};
+  }).filter(({x}) => !x.genres.includes("Visual Novel"));
+  const pick = (keys, f = () => true, sort = (a, b) => b.score - a.score, n = 40) =>
+    items.filter(i => keys.some(k => i.keys.has(k)) && f(i.x)).map(i => i.x).sort(sort).slice(0, n);
+  const taste = ["mv", "plat", "walk", "mystery", "cozy", "zelda", "coopPuzzle", "coopPlat"];
+  const released = x => x.date && x.date > since && x.date <= now;
   const d = {
-    mv: pool(mv, (g, s) => s.k === "mv" && !s.isNew && !s.soon && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 40),
-    plat: pool(plat, (g, s) => (s.k === "plat" || s.k === "puzzle") && !s.isNew && !s.soon && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 50),
-    missed: pool(missed, (g, s) => !s.isNew && !s.soon && g.first_release_date > three && g.first_release_date < half).sort((a, b) => score(b) - score(a)).slice(0, 40),
-    classics: classics.map(g => out(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30),
-    soon: pool([], (g, s) => s.soon && !(g.first_release_date <= now)).sort((a, b) => (a.date || 9e12) - (b.date || 9e12)).slice(0, 40),
-    fresh: pool(fresh, (g, s) => !s.soon && g.first_release_date > half && g.first_release_date <= now).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 40)
+    fresh: pick(["fresh"], x => !x.date || x.date > half, (a, b) => (b.date || 0) - (a.date || 0)),
+    soon: pick(["soon"], x => !x.date || x.date > now, (a, b) => (a.date || 9e12) - (b.date || 9e12)),
+    mv: pick(["mv"], released), plat: pick(["plat"], released),
+    gems: pick(taste, x => released(x) && x.gem && x.taste >= 0, (a, b) => (b.steamPct + b.taste) - (a.steamPct + a.taste)),
+    coopPuzzle: pick(["coopPuzzle"], released), coopPlat: pick(["coopPlat"], released),
+    walk: pick(["walk"], released), mystery: pick(["mystery"], released), cozy: pick(["cozy"], released), zelda: pick(["zelda"], released),
+    missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
+    classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
   };
-  await env.KV.put("finds6", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds7", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 

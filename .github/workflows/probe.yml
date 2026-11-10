@@ -9,5 +9,5 @@ jobs:
           curl -s -H "Origin: https://goomri.github.io" https://backlog-api.goomric.workers.dev/finds | python3 -c "
           import sys,json; d=json.load(sys.stdin)
           if 'error' in d: print(d); sys.exit()
-          for k,v in d.items(): print(k, len(v), '|', ', '.join(f\"{x['title']} {x['year']}\" for x in v[:12]))
+          for k,v in d.items(): print(k, len(v), '|', ', '.join(f\"{x['title']} {x['year']}\" for x in v[:8]))
           print('GOLDMAN', [ (k,x['title']) for k,v in d.items() for x in v if 'oldman' in x['title']])"
