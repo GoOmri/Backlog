@@ -82,7 +82,7 @@ input,select,textarea{font:inherit;color:var(--fg);background:var(--surface);bor
 .cover img{width:100%;height:100%;object-fit:cover;display:block}
 .ph{position:absolute;inset:0;display:grid;place-items:center;padding:10px;text-align:center;font:800 18px/1.1 var(--display);color:var(--dim);overflow-wrap:anywhere}
 .badges{position:absolute;left:6px;bottom:6px;display:flex;gap:3px}
-.plat{min-width:22px;height:18px;padding:0 4px;border-radius:5px;display:grid;place-items:center;font:500 10px var(--mono);color:#0E1116;letter-spacing:.03em}
+.plat{min-width:26px;height:20px;padding:0 5px;border-radius:5px;display:grid;place-items:center;font:600 11px var(--mono);color:#0E1116;letter-spacing:.03em}
 .tag{position:absolute;right:6px;top:6px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--raise);color:var(--fg)}
 .tag.playing{background:var(--accent);color:var(--accent-fg)}
 .tag.sale{background:var(--raise);color:var(--fg)}
@@ -161,3 +161,6 @@ a{color:var(--accent)}
 .dotbtn{width:8px;height:8px;border-radius:999px;border:0;padding:0;background:rgb(255 255 255 / .3);transition:width .2s}
 .dotbtn[aria-current]{width:22px;background:var(--fg)}
 @media (max-width:760px){.nav-arrow{display:none}}
+
+.note.own{display:grid;gap:8px}
+.note.own .chip{margin:2px 2px 0 0}
