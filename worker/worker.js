@@ -256,7 +256,7 @@ async function steamTagSearch(tag, filter){
   }).filter(Boolean);
 }
 async function finds(env){
-  const c = await env.KV.get("finds5", "json");
+  const c = await env.KV.get("finds6", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -269,7 +269,7 @@ async function finds(env){
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date > ${three} & first_release_date < ${half} & total_rating_count > 3 & total_rating > 77; sort total_rating desc; limit 60;`),
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date > ${half} & first_release_date <= ${now}; sort hypes desc; limit 60;`),
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date < ${since} & total_rating_count > 30 & total_rating > 78; sort total_rating_count desc; limit 60;`),
-    ...[["mv", "sort_by=Reviews_DESC"], ["plat", "sort_by=Reviews_DESC"], ["puzzle", "sort_by=Reviews_DESC"], ["mv", "filter=popularnew"], ["plat", "filter=popularnew"], ["mv", "filter=comingsoon"], ["plat", "filter=comingsoon"]]
+    ...[["mv", "sort_by=Reviews_DESC"], ["plat", "sort_by=Reviews_DESC"], ["puzzle", "sort_by=Reviews_DESC"], ["mv", "filter=popularnew"], ["plat", "filter=popularnew"], ["mv", "filter=popularcomingsoon"], ["plat", "filter=popularcomingsoon"]]
       .map(([k, f]) => steamTagSearch(tags[k], f).then(r => r.map(x => ({...x, k, isNew: f.includes("new"), soon: f.includes("soon")}))).catch(() => []))
   ]);
   // Map Steam app ids to IGDB games.
@@ -303,7 +303,7 @@ async function finds(env){
     soon: pool([], (g, s) => s.soon && !(g.first_release_date <= now)).sort((a, b) => (a.date || 9e12) - (b.date || 9e12)).slice(0, 40),
     fresh: pool(fresh, (g, s) => !s.soon && g.first_release_date > half && g.first_release_date <= now).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 40)
   };
-  await env.KV.put("finds5", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds6", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
