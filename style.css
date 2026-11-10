@@ -533,3 +533,6 @@ html,body{overflow-x:clip}
 /* Library: search + filters stay at the top while scrolling */
 .libhead{position:sticky;top:var(--barH,0px);z-index:15;background:rgb(14 17 22 / .92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);margin-inline:calc(-1 * var(--gut,16px)) -16px;padding-inline:var(--gut,16px) 16px}
 @media (min-width:1000px){.libhead{margin-inline:0;padding-inline:0}}
+
+/* Filter sheet: keep Reset clear of the close button */
+.insheet .fhead{padding-right:48px;min-height:36px}
