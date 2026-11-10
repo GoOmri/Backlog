@@ -116,12 +116,13 @@ async function search(env, text){
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
-  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
+  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
   if (!g) throw new Error("Game not found");
   const out = {...slim(g, await ttbFor(env, [id])), summary: g.summary || "",
     developers: (g.involved_companies || []).filter(c => c.developer).map(c => c.company?.name).filter(Boolean),
     hero: IMG(g.artworks?.[0]?.image_id || g.screenshots?.[0]?.image_id, "1080p"),
-    shots: (g.screenshots || []).slice(0, 6).map(s => IMG(s.image_id, "screenshot_big")), logo: null, igdbUrl: g.url};
+    shots: (g.screenshots || []).slice(0, 8).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
+    trailer: ((g.videos || []).find(v => /gameplay/i.test(v.name || "")) || (g.videos || []).find(v => /trailer/i.test(v.name || "")) || (g.videos || [])[0])?.video_id || null};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
   return out;
 }
@@ -200,7 +201,8 @@ async function prices(env, titles){
   catch { rows = await itad(env, "games/prices/v3?country=US&deals=true", uuids); }
   const best = {};
   for (const r of rows){
-    const d = (r.deals || []).sort((a, b) => (b.cut || 0) - (a.cut || 0))[0];
+    // Only the stores Omri buys from on PC.
+    const d = (r.deals || []).filter(x => /^(steam|epic)/i.test(x.shop?.name || "")).sort((a, b) => (b.cut || 0) - (a.cut || 0))[0];
     if (d) best[r.id] = {cut: d.cut || 0, price: d.price?.amount, regular: d.regular?.amount, currency: d.price?.currency, shop: d.shop?.name, url: d.url};
   }
   return Object.fromEntries(titles.map(t => [t, ids[t] ? (best[ids[t]] || {cut: 0}) : null]));
