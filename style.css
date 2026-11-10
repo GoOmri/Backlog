@@ -485,3 +485,4 @@ dialog:not(.full){border-radius:var(--r-l)}
 
 .ownline{font-size:var(--t-m);color:var(--dim)}
 .ownline b{color:var(--fg);font-weight:600}
+.backbar{display:flex;align-items:center;gap:var(--s3);padding-top:var(--s3)}

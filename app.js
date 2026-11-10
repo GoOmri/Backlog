@@ -25,7 +25,7 @@ const ICON = {
   chev: '<path d="m6 9 6 6 6-6"/>'
 };
 const ic = (n, size = 20, fill = false) => `<svg class="ico-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const TABS = [["home","Play","home"],["disc","Find","compass"],["lib","Library","grid"],["wish","Wishlist","heart"],["diary","Diary","book"]];
+const TABS = [["home","Play","home"],["disc","Find","compass"],["lib","Library","grid"],["diary","Diary","book"]];
 const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated server|soundtrack|\bsdk\b|\bdemo\b|benchmark/i;
 
 /* ---------- state ---------- */
@@ -564,7 +564,7 @@ function shelfHTML(wish){
   const srt = wish && sort === "title" ? "anticipated" : by[sort] ? sort : "title";
   shown.sort((a, b) => (srt === "title" ? (b.status === "playing") - (a.status === "playing") : 0) || by[srt](a, b));
   const nOn = platF.size + F.type.size + F.view.size + F.coop.size + F.access.size + (deckF ? 1 : 0) + (sort !== "title" ? 1 : 0);
-  return `<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
+  return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="disc">← Find</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
     <div class="filters">
       <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
@@ -626,16 +626,20 @@ function findExtrasHTML(){
   const mvNew = topMV.filter(x => !inList(x)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 24);
   mvNew.forEach(x => previewCache.set(x.igdbId, x));
   const mv = mvNew.length >= 3 ? `<div class="section"><h3>MV's you don't own</h3><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></div>` : "";
+  const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
+    .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
+  const wishRow = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3><span class="dim">${wl.length}</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button></div>
+    <div class="row">${wl.slice(0, 24).map(g => cardHTML(g, sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("")}</div></div>` : "";
   const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
   const onSale = sales.length ? `<div class="section"><h3>On sale from your wishlist</h3><div class="row">${sales.map(g => cardHTML(g, `−${g.sale.cut}% ${g.sale.shop || ""}`)).join("")}</div></div>` : "";
-  return onSale + mv;
+  return wishRow + onSale + mv;
 }
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return `<div class="wrap">${radarHTML()}${findExtrasHTML()}${couchHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
+  if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}${couchHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
-  return `<div class="wrap">${radarHTML()}${findExtrasHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
+  return `<div class="wrap">${findExtrasHTML()}${radarHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
     <div class="grid">${discovered.map((d, i) => (previewCache.set(d.igdbId, d), `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}
       <span class="ctitle">${esc(d.title)}</span></button><span class="why">Like ${esc(d.because.join(", "))}</span>
       <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
@@ -683,7 +687,7 @@ function diaryHTML(){
 
 /* ---------- render ---------- */
 function render(){
-  $("#tabs").innerHTML = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
+  $("#tabs").innerHTML = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "disc" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
   m.innerHTML = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
