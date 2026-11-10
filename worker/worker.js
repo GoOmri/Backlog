@@ -30,6 +30,7 @@ export default {
         case "/grids":    out = await grids(env, (body.titles || []).slice(0, 10)); break;
         case "/topmv":    out = await topMetroidvanias(env); break;
         case "/finds":    out = await finds(env); break;
+        case "/steamtags": out = await steamTags(env, (body.apps || []).filter(Number.isFinite).slice(0, 100)); break;
         case "/achievements": out = await achievements(env, +url.searchParams.get("appid")); break;
         case "/trophies": out = await trophies(env); break;
         case "/rarity":   out = await rarity(env, url.searchParams.get("np") || "", url.searchParams.get("svc") || "trophy"); break;
@@ -228,6 +229,22 @@ async function steamTagIds(env){
   await env.KV.put("steamtags", JSON.stringify(out), {expirationTtl: 30 * 86400});
   return out;
 }
+// Steam user tags for owned/wishlist games, kept to the few the app uses.
+const STAG = {"Metroidvania": "Metroidvania", "Souls-like": "Soulslike", "Difficult": "Hard", "Relaxing": "Chill", "Cozy": "Chill", "Puzzle Platformer": "Puzzle-platformer", "Precision Platformer": "Precision", "Atmospheric": "Atmospheric", "Exploration": "Exploration", "Local Co-Op": "Couch co-op"};
+async function steamTags(env, apps){
+  if (!apps.length) return {};
+  let map = await env.KV.get("steamtagmap", "json");
+  if (!map){
+    map = {};
+    for (const t of await (await fetch("https://store.steampowered.com/tagdata/populartags/english")).json()) if (STAG[t.name]) map[t.tagid] = STAG[t.name];
+    await env.KV.put("steamtagmap", JSON.stringify(map), {expirationTtl: 30 * 86400});
+  }
+  const input = {ids: apps.map(appid => ({appid})), context: {language: "english", country_code: "US"}, data_request: {include_tag_count: 20}};
+  const r = await (await fetch(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`)).json();
+  const out = {};
+  for (const it of r.response?.store_items || []) out[it.appid] = [...new Set((it.tags || []).map(t => map[t.tagid]).filter(Boolean))];
+  return out;
+}
 async function steamTagSearch(tag, filter){
   if (!tag) return [];
   const u = `https://store.steampowered.com/search/results/?infinite=1&start=0&count=50&tags=${tag}&category1=998&cc=us&l=english&${filter}`;
@@ -239,7 +256,7 @@ async function steamTagSearch(tag, filter){
   }).filter(Boolean);
 }
 async function finds(env){
-  const c = await env.KV.get("finds4", "json");
+  const c = await env.KV.get("finds5", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -252,11 +269,11 @@ async function finds(env){
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date > ${three} & first_release_date < ${half} & total_rating_count > 3 & total_rating > 77; sort total_rating desc; limit 60;`),
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date > ${half} & first_release_date <= ${now}; sort hypes desc; limit 60;`),
     igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date < ${since} & total_rating_count > 30 & total_rating > 78; sort total_rating_count desc; limit 60;`),
-    ...[["mv", "sort_by=Reviews_DESC"], ["plat", "sort_by=Reviews_DESC"], ["puzzle", "sort_by=Reviews_DESC"], ["mv", "filter=popularnew"], ["plat", "filter=popularnew"]]
-      .map(([k, f]) => steamTagSearch(tags[k], f).then(r => r.map(x => ({...x, k, isNew: f.includes("new")}))).catch(() => []))
+    ...[["mv", "sort_by=Reviews_DESC"], ["plat", "sort_by=Reviews_DESC"], ["puzzle", "sort_by=Reviews_DESC"], ["mv", "filter=popularnew"], ["plat", "filter=popularnew"], ["mv", "filter=comingsoon"], ["plat", "filter=comingsoon"]]
+      .map(([k, f]) => steamTagSearch(tags[k], f).then(r => r.map(x => ({...x, k, isNew: f.includes("new"), soon: f.includes("soon")}))).catch(() => []))
   ]);
   // Map Steam app ids to IGDB games.
-  const steamHits = st.flat().filter(x => x.isNew || (x.pct >= 85 && x.n >= 200));
+  const steamHits = st.flat().filter(x => x.isNew || x.soon || (x.pct >= 85 && x.n >= 200));
   const byApp = new Map(steamHits.map(x => [x.app, x]));
   let steamGames = [];
   if (byApp.size){
@@ -267,7 +284,7 @@ async function finds(env){
       steamGames = gs.map(g => ({g, s: gid.get(g.id)}));
     }
   }
-  const out = (g, s) => ({...slim(g), date: g.first_release_date || null, steamPct: s?.pct ?? null, steamN: s?.n || 0, rating: Math.round(g.total_rating || g.aggregated_rating || 0) || s?.pct || null});
+  const out = (g, s) => ({...slim(g), ...(s?.k === "mv" ? {kw: [...new Set([...feel(g), "Metroidvania"])]} : {}), date: g.first_release_date || null, steamPct: s?.pct ?? null, steamN: s?.n || 0, rating: Math.round(g.total_rating || g.aggregated_rating || 0) || s?.pct || null});
   // Trust a score more when many people rated it (IGDB ratings, or Steam reviews / 50).
   const score = x => { const n = Math.max(x.ratingCount || 0, (x.steamN || 0) / 50); return ((x.rating || 70) * n + 70 * 30) / (n + 30) + Math.max(0, (x.year || 2008) - 2008) * 0.6; };
   const pool = (igdbRows, keep) => {
@@ -279,13 +296,14 @@ async function finds(env){
   };
   const recent = g => !g.first_release_date || g.first_release_date > since;
   const d = {
-    mv: pool(mv, (g, s) => s.k === "mv" && !s.isNew && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 40),
-    plat: pool(plat, (g, s) => (s.k === "plat" || s.k === "puzzle") && !s.isNew && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 50),
-    missed: pool(missed, (g, s) => !s.isNew && g.first_release_date > three && g.first_release_date < half).sort((a, b) => score(b) - score(a)).slice(0, 40),
+    mv: pool(mv, (g, s) => s.k === "mv" && !s.isNew && !s.soon && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 40),
+    plat: pool(plat, (g, s) => (s.k === "plat" || s.k === "puzzle") && !s.isNew && !s.soon && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 50),
+    missed: pool(missed, (g, s) => !s.isNew && !s.soon && g.first_release_date > three && g.first_release_date < half).sort((a, b) => score(b) - score(a)).slice(0, 40),
     classics: classics.map(g => out(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30),
-    fresh: pool(fresh, (g, s) => !g.first_release_date || g.first_release_date > half && g.first_release_date <= now).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 40)
+    soon: pool([], (g, s) => s.soon && !(g.first_release_date <= now)).sort((a, b) => (a.date || 9e12) - (b.date || 9e12)).slice(0, 40),
+    fresh: pool(fresh, (g, s) => !s.soon && g.first_release_date > half && g.first_release_date <= now).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 40)
   };
-  await env.KV.put("finds4", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds5", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 

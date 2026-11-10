@@ -54,12 +54,13 @@ const VIEW = {"Side view":"2D","Bird view / Isometric":"Top-down","First person"
 const KIND = {"Platform":"Platformer","Puzzle":"Puzzle","Shooter":"Shooter","Fighting":"Fighting","Racing":"Racing","Sport":"Sports","Role-playing (RPG)":"RPG","Strategy":"Strategy","Real Time Strategy (RTS)":"Strategy","Turn-based strategy (TBS)":"Strategy","Tactical":"Strategy","Simulator":"Sim","Point-and-click":"Point & click","Hack and slash/Beat 'em up":"Action","Music":"Rhythm","Card & Board Game":"Cards","Arcade":"Arcade","Visual Novel":"Visual novel","Quiz/Trivia":"Quiz","MOBA":"MOBA","Adventure":"Adventure"};
 const THEME = {"Horror":"Horror","Survival":"Survival","Open world":"Open world","Mystery":"Mystery"};
 // Plain description: 2D/3D, what kind of game, co-op.
+const kwOf = g => [...(g.kw || []), ...(g.stags || [])];
 function basicTags(g){
   const v = [...new Set((g.views || []).map(x => VIEW[x]).filter(Boolean))].slice(0, 1);
   let k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure"));
-  if ((g.kw || []).includes("Metroidvania")) k = ["Metroidvania", ...k.filter(x => x !== "Platformer")];
+  if (kwOf(g).includes("Metroidvania")) k = ["Metroidvania", ...k.filter(x => x !== "Platformer")];
   k = k.slice(0, 2);
-  const f = (g.kw || []).filter(x => x === "Soulslike" || x === "Chill").slice(0, 1);
+  const f = kwOf(g).filter(x => x === "Soulslike" || x === "Chill").slice(0, 1);
   const t = f.length ? f : (g.themes || []).map(x => THEME[x]).filter(Boolean).slice(0, 1);
   const c = g.couch ? ["Couch co-op"] : g.onlineCoop || (g.modes || []).includes("Co-operative") ? ["Online co-op"] : (g.modes || []).length && !(g.modes || []).some(m => /multi|co-op|split|mmo|battle/i.test(m)) ? ["Solo"] : [];
   return [...v, ...k, ...t, ...c];
@@ -174,6 +175,7 @@ async function runQueue(){
     }
     await backfill();
     await checkDeck();
+    await checkSteamTags();
     await checkCovers();
     await checkPrices();
     progress(0, 0);
@@ -239,6 +241,16 @@ async function checkCovers(){
     progress(i, need.length, "Getting English covers");
     const res = await api("/grids", {titles: chunk.map(g => g.title)});
     await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {coverV: 1, ...(res[g.title]?.[0] ? {cover: res[g.title][0]} : {})})));
+  }
+}
+// Steam user tags (Metroidvania, Souls-like, Cozy…) for games with a Steam app id.
+async function checkSteamTags(){
+  const need = list().filter(g => g.steamAppId && g.stags === undefined);
+  for (let i = 0; i < need.length; i += 100){
+    const chunk = need.slice(i, i + 100);
+    progress(i, need.length, "Reading Steam tags");
+    const res = await api("/steamtags", {apps: chunk.map(g => g.steamAppId)});
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {stags: res[g.steamAppId] || []})));
   }
 }
 async function checkDeck(){
@@ -472,8 +484,8 @@ async function fetchHero(g){
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
 const plat = g => (g.genres || []).includes("Platform");
 const CATS = [
-  ["MV's you own", g => (g.kw || []).includes("Metroidvania")],
-  ["2D platformers", g => plat(g) && has(g, "2D") && !(g.kw || []).includes("Metroidvania") && !(g.genres || []).includes("Puzzle")],
+  ["MV's you own", g => kwOf(g).includes("Metroidvania")],
+  ["2D platformers", g => plat(g) && has(g, "2D") && !kwOf(g).includes("Metroidvania") && !(g.genres || []).includes("Puzzle")],
   ["Couch co-op platformers", g => plat(g) && g.couch],
   ["Puzzle-platformers", g => plat(g) && ((g.genres || []).includes("Puzzle") || (g.kw || []).includes("Puzzle-platformer"))]
 ];
@@ -635,7 +647,7 @@ function findExtrasHTML(){
     return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, subf(x))).join("")}</div></div>` : "";
   };
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
-  const fresh = frow("New 2D platformers & MVs", topMV.fresh, when);
+  const fresh = frow("New 2D platformers & MVs", topMV.fresh, when) + frow("Coming soon: MVs & 2D platformers", topMV.soon, x => x.date ? when(x) : "Coming soon");
   const mv = fresh + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
