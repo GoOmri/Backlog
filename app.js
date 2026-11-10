@@ -543,6 +543,20 @@ function passes(g, skip){
     && (genreF !== "__nomatch" || g.noMatch);
 }
 let shelfScope = [], shelfWish = false;
+// Library renders in chunks: CHUNK cards, more as you scroll. The count survives data redraws, resets when filters change.
+const CHUNK = 60;
+let shelfShown = [], shelfLimit = CHUNK, shelfKey = "", shelfObs = null;
+function moreShelf(){
+  const grid = $("#main .grid"); if (!grid || shelfLimit >= shelfShown.length) return;
+  const next = shelfShown.slice(shelfLimit, shelfLimit + CHUNK); shelfLimit += next.length;
+  grid.insertAdjacentHTML("beforeend", next.map(g => cardHTML(g, shelfWish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join(""));
+  if (shelfLimit >= shelfShown.length) $("#shelfMore")?.remove();
+}
+function watchShelf(){
+  shelfObs?.disconnect(); const el = $("#shelfMore"); if (!el) return;
+  shelfObs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) moreShelf(); }, {rootMargin: "800px"});
+  shelfObs.observe(el);
+}
 function sidebarHTML(){
   const scope = shelfScope, wish = shelfWish;
   const count = (skip, test) => scope.filter(g => passes(g, skip) && test(g)).length;
@@ -575,6 +589,9 @@ function shelfHTML(wish){
     anticipated: (a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0)};
   const srt = wish && sort === "title" ? "anticipated" : by[sort] ? sort : "title";
   shown.sort((a, b) => (srt === "title" ? (b.status === "playing") - (a.status === "playing") : 0) || by[srt](a, b));
+  const key = JSON.stringify([wish, s, sort, statF, genreF, accessF, deckF, [...platF], ...Object.values(F).map(x => [...x])]);
+  if (key !== shelfKey){ shelfKey = key; shelfLimit = CHUNK; }
+  shelfShown = shown;
   const nOn = platF.size + F.type.size + F.view.size + F.coop.size + F.access.size + (deckF ? 1 : 0) + (sort !== "title" ? 1 : 0);
   return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="disc">← Find</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
     <div class="filters">
@@ -583,7 +600,7 @@ function shelfHTML(wish){
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
     </div>
     ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}
-    <div class="grid">${shown.map(g => cardHTML(g, wish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>
+    <div class="grid">${shown.slice(0, shelfLimit).map(g => cardHTML(g, wish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>${shown.length > shelfLimit ? `<div id="shelfMore" style="height:1px"></div>` : ""}
   </div></div>`;
 }
 function filterSheet(){
@@ -737,8 +754,18 @@ function render(){
   rowTab = tab;
   m.innerHTML = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
   if (pos.size) for (const el of m.querySelectorAll(".row, #slides")){ const x = pos.get(keyOf(el)); if (x) el.scrollLeft = x; }
+  watchShelf();
 }
 let rowTab = null;
+// Batch data-driven redraws (background queue writes games one by one): one render per ~500ms,
+// none while a page is open (closing it renders) or while the app is in the background.
+let softT = 0, softPending = false;
+function softRender(){
+  softPending = true;
+  if (softT) return;
+  softT = setTimeout(() => { softT = 0; if (document.hidden || $("#dlg").open) return; softPending = false; render(); }, 500);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && softPending && !$("#dlg").open){ softPending = false; render(); } });
 
 /* ---------- sheets ---------- */
 // The system back gesture (swipe from the screen edge) closes an open page.
@@ -1152,7 +1179,7 @@ document.addEventListener("change", e => {
   if (id === "sortSel"){ sort = e.target.value; render(); }
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
-$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval(vTimer); if (history.state?.sheet) history.back(); render(); });
+$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval(vTimer); if (history.state?.sheet) history.back(); softPending = false; render(); });
 document.addEventListener("scroll", e => {
   const el = e.target; if (el.id !== "slides" && el.id !== "mslides") return;
   const i = Math.round(el.scrollLeft / el.clientWidth);
@@ -1192,7 +1219,7 @@ onAuthStateChanged(auth, user => {
     games = new Map(snap.docs.map(d => [d.id, {id: d.id, ...d.data()}]));
     $("#sync").textContent = navigator.onLine ? "" : "offline";
     const first = !loaded; loaded = true;
-    if (!$("#dlg").open) render();
+    if (first) render(); else if (snap.docChanges().length) softRender();
     if (first) loadLeaving();
     runQueue();
   }, e => { $("#main").innerHTML = `<div class="empty wrap">Couldn't load your games: ${esc(e.message)}</div>`; });
