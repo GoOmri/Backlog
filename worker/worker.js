@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,total_rating,aggregated_rating";
+const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,total_rating,total_rating_count,aggregated_rating";
 
 export default {
   async fetch(req, env, ctx){
@@ -71,6 +71,7 @@ function slim(g, ttb){
     views: (g.player_perspectives || []).map(x => x.name),
     ...coop(g),
     rating: Math.round(g.total_rating || g.aggregated_rating || 0) || null,
+    ratingCount: g.total_rating_count || 0,
     ttb: t ? {main: hrs(t.normally || t.hastily), rush: hrs(t.hastily), full: hrs(t.completely)} : null
   };
 }
@@ -91,7 +92,9 @@ async function match(env, titles){
   for (const r of res){
     const t = titles[+r.name], k = norm(t), list = r.result || [];
     const starts = list.filter(g => norm(g.name).startsWith(k)).sort((a, b) => a.name.length - b.name.length);
-    picks[t] = list.find(g => norm(g.name) === k) || starts[0] || list[0] || null;
+    // Several games can share a name (e.g. a mobile spin-off): take the best known one.
+    const exact = list.filter(g => norm(g.name) === k).sort((a, b) => (b.total_rating_count || 0) - (a.total_rating_count || 0));
+    picks[t] = exact[0] || starts[0] || list[0] || null;
   }
   const ttb = await ttbFor(env, Object.values(picks).filter(Boolean).map(g => g.id));
   return Object.fromEntries(Object.entries(picks).map(([t, g]) => [t, g ? slim(g, ttb) : null]));
