@@ -26,6 +26,7 @@ export default {
         case "/upcoming": out = await upcoming(env); break;
         case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
         case "/steamrev": out = await steamReviews(env, +url.searchParams.get("appid")); break;
+        case "/logos":    out = await logos(env, url.searchParams.get("t") || ""); break;
         case "/grids":    out = await grids(env, (body.titles || []).slice(0, 10)); break;
         case "/topmv":    out = await topMetroidvanias(env); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
@@ -136,10 +137,10 @@ async function search(env, text){
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
-  const cached = await env.KV.get("game4:" + id, "json");
+  const cached = await env.KV.get("game5:" + id, "json");
   if (cached) return cached;
   const out = await gameFresh(env, id);
-  await env.KV.put("game4:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  await env.KV.put("game5:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 // Gameplay first; avoid teasers, announcements and cinematic (CG/story) trailers when there's a choice.
@@ -173,11 +174,18 @@ async function sgdbArt(env, name, fallbackHero){
   if (!hit) return {};
   const [heroes, logos] = await Promise.all([
     sgdb(env, `heroes/game/${hit.id}?types=static&nsfw=false`).catch(() => []),
-    sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false`).catch(() => [])
+    sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false&language=en`).then(r => r?.length ? r : sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false`)).catch(() => [])
   ]);
   return {hero: heroes?.[0]?.url || fallbackHero, logo: logos?.[0]?.url || null};
 }
 
+// Logo choices for one game (English first).
+async function logos(env, t){
+  const hit = (await sgdb(env, "search/autocomplete/" + encodeURIComponent(t)))?.find(h => norm(h.name) === norm(t)) || (await sgdb(env, "search/autocomplete/" + encodeURIComponent(t)))?.[0];
+  if (!hit) return [];
+  const [en, all] = await Promise.all([sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false&language=en`).catch(() => []), sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false`).catch(() => [])]);
+  return [...new Set([...(en || []), ...(all || [])].map(x => x.url))].slice(0, 8);
+}
 // English box art from SteamGridDB (IGDB sometimes has a regional cover, e.g. Russian).
 async function grids(env, titles){
   const out = {};
