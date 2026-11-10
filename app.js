@@ -358,6 +358,23 @@ function psPasteSheet(){
     $("#psGo").disabled = true; await applyPsStatus(map, plusTab);
   };
 }
+async function importSteamWishlist(){
+  note("Reading your Steam wishlist…");
+  try {
+    const items = await api("/steamwish");
+    let n = 0, skip = 0; const ops = [];
+    for (const it of items){
+      const have = list().find(g => g.steamAppId === it.appid) || inList({title: it.title});
+      if (have){ skip++; if (!have.steamAppId) ops.push(b => b.update(doc(col, have.id), {steamAppId: it.appid})); continue; }
+      const t = it.added || Date.now() + n++;
+      ops.push(b => b.set(doc(col, newId()), {title: it.title, asTyped: it.title, platforms: [], status: "wishlist", steamAppId: it.appid, added: t}));
+      n++;
+    }
+    await commitChunks(ops);
+    note(`Steam wishlist: added ${n} games${skip ? `, ${skip} were already in your list` : ""}.`);
+    runQueue();
+  } catch (e){ note(e.message); }
+}
 async function importSteam(){
   note("Reading your Steam library…");
   try {
@@ -687,6 +704,7 @@ function ownedHTML(g){
 function menuSheet(){
   openSheet(`<h2>Backlog</h2><div class="menu">
     <button data-act="steam">Import from Steam<small>Adds your Steam games with hours played</small></button>
+    <button data-act="steamwish">Import Steam wishlist<small>Adds games from your Steam wishlist</small></button>
     <button data-act="import">Import a file<small>The export from the old Backlog</small></button>
     <button data-act="nope">Not for me<small>Games you dismissed from suggestions</small></button>
     <button data-act="psplus">Update from PlayStation<small>Paste your PS Plus tab: bought, claimed, catalog, left</small></button>
@@ -984,6 +1002,7 @@ document.addEventListener("click", async e => {
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
     case "steam": importSteam(); break;
+    case "steamwish": importSteamWishlist(); break;
     case "prices":
       closeSheet();
       if (running) break;
