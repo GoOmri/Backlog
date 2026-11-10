@@ -32,6 +32,7 @@ export default {
         case "/achievements": out = await achievements(env, +url.searchParams.get("appid")); break;
         case "/trophies": out = await trophies(env); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
+        case "/steamwish": out = await steamWishlist(env); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
         case "/psplus":   out = await psplus(env, ctx); break;
@@ -351,6 +352,21 @@ async function steam(env){
   const games = (await r.json()).response?.games;
   if (!games) throw new Error("Steam returned no games. Set Game details to Public in your Steam privacy settings.");
   return games.map(g => ({appid: g.appid, title: g.name, hours: Math.round(g.playtime_forever / 6) / 10}));
+}
+
+/* ---------- Steam wishlist (needs the wishlist/game details to be public) ---------- */
+async function steamWishlist(env){
+  const r = await fetch(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?key=${env.STEAM_KEY}&steamid=${env.STEAM_ID}`);
+  if (!r.ok) throw new Error("Steam wishlist " + r.status);
+  const items = (await r.json()).response?.items || [];
+  if (!items.length) throw new Error("Steam returned an empty wishlist. Make sure your Steam wishlist / game details are public.");
+  const names = {};
+  for (let i = 0; i < items.length; i += 100){
+    const input = {ids: items.slice(i, i + 100).map(x => ({appid: x.appid})), context: {language: "english", country_code: "US"}, data_request: {}};
+    const s = await (await fetch(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`)).json();
+    for (const it of s.response?.store_items || []) if (it.name) names[it.appid] = it.name;
+  }
+  return items.map(x => ({appid: x.appid, title: names[x.appid], added: (x.date_added || 0) * 1000, priority: x.priority})).filter(x => x.title);
 }
 
 /* ---------- IsThereAnyDeal prices (PC stores) ---------- */
