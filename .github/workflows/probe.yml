@@ -11,4 +11,3 @@ jobs:
           if 'error' in d: print(d); sys.exit()
           for k,v in d.items(): print(k, len(v), '|', ', '.join(f\"{x['title']} {x['year']}\" for x in v[:12]))
           print('GOLDMAN', [ (k,x['title']) for k,v in d.items() for x in v if 'oldman' in x['title']])"
-          echo; curl -s -H "Origin: https://goomri.github.io" "https://backlog-api.goomric.workers.dev/search?q=Eternal%20Life%20of%20Goldman" | head -c 600
