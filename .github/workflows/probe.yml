@@ -5,4 +5,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -H "Origin: https://goomri.github.io" https://backlog-api.goomric.workers.dev/trophies | python3 -c "import sys,json; d=json.load(sys.stdin); print('ERROR', d['error']) if isinstance(d,dict) else print('titles', len(d), 'example', d[0]['title'] if d else '')"
+          curl -s -H "Origin: https://goomri.github.io" https://backlog-api.goomric.workers.dev/steamwish | head -c 300
