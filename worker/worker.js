@@ -19,6 +19,7 @@ export default {
       let out;
       switch (url.pathname){
         case "/match":    out = await match(env, (body.titles || []).slice(0, 10)); break;
+        case "/raw":      out = await igdb(env, url.searchParams.get("ep") || "games", await req.clone().text().catch(() => "") || url.searchParams.get("b")); break;
         case "/search":   globalThis.__debug = url.searchParams.has("debug"); out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
