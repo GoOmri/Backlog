@@ -64,14 +64,19 @@ async function runQueue(){
   let done = 0;
   try {
     while (true){
-      const todo = list().filter(g => !g.igdbId && !g.noMatch && !tried.has(g.id));
+      const todo = list().filter(g => !g.igdbId && (!g.noMatch || !g.noMatchAt) && !tried.has(g.id));
       if (!todo.length) break;
       const batch = todo.slice(0, 10); batch.forEach(g => tried.add(g.id));
       progress(done, done + todo.length, "Getting covers and info");
       const res = await api("/match", {titles: batch.map(g => g.asTyped || g.title)});
       for (const g of batch){
-        const m = res[g.asTyped || g.title];
-        if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true});
+        const t = g.asTyped || g.title;
+        let m = res[t];
+        if (!m){ // wider search (includes editions and DLC) before giving up
+          const alt = await api("/search?q=" + encodeURIComponent(t)).catch(() => []);
+          m = alt.find(r => key(r.title) === key(t)) || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
+        }
+        if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now()});
       }
       done += batch.length;
     }
