@@ -205,3 +205,5 @@ dialog.tall .sheet{padding-top:0}
 .statusbar,.activebar{padding-bottom:12px}
 .chip.on{background:var(--raise);border-color:var(--accent)}
 .filters{padding-block:18px 10px}
+
+button.brand{background:none;border:0;padding:0;color:var(--fg)}
