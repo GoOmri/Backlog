@@ -85,7 +85,7 @@ async function runQueue(){
         let m = res[t];
         if (!m || key(m.title) !== key(t)){ // not an exact name: try a wider search for an exact one
           const alt = await api("/search?q=" + encodeURIComponent(t)).catch(() => []);
-          m = alt.find(r => key(r.title) === key(t)) || m || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
+          m = alt.filter(r => key(r.title) === key(t)).sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0))[0] || m || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
         }
         if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now()});
       }
@@ -94,6 +94,23 @@ async function runQueue(){
     await backfill();
     await checkPrices();
     progress(0, 0);
+  } catch (e){ progress(0, 0, e.message, true); }
+  running = false;
+}
+async function rematchAll(){
+  if (running) return; running = true;
+  const all = list().filter(g => g.igdbId && g.asTyped); let fixed = 0;
+  try {
+    for (let i = 0; i < all.length; i += 10){
+      const batch = all.slice(i, i + 10);
+      progress(i, all.length, "Re-checking matches");
+      const res = await api("/match", {titles: batch.map(g => g.asTyped)});
+      for (const g of batch){
+        const m = res[g.asTyped];
+        if (m && m.igdbId !== g.igdbId && key(m.title) === key(g.asTyped)){ await applyMatch(g, m); fixed++; }
+      }
+    }
+    progress(0, 0); note(`Checked ${all.length} games and fixed ${fixed}.`);
   } catch (e){ progress(0, 0, e.message, true); }
   running = false;
 }
@@ -274,9 +291,9 @@ function homeHTML(){
   return carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
     + rowHTML("Also playing", playing)
-    + rowHTML("Leaving PS Plus soon", leaving, "play these before they go")
-    + rowHTML("Couch co-op you own", couchOwned, "2D platformers first")
-    + rowHTML("Recommended from your backlog", recs, "based on what you love")
+    + rowHTML("Leaving PS Plus soon", leaving)
+    + rowHTML("Couch co-op you own", couchOwned)
+    + rowHTML("Recommended from your backlog", recs)
     + rowHTML("Best rated in your backlog", best)
     + rowHTML("Recently added", recent)
     + rowHTML("On sale from your wishlist", sales, "PC stores", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`);
@@ -409,6 +426,7 @@ function menuSheet(){
   openSheet(`<h2>Backlog</h2><div class="menu">
     <button data-act="steam">Import from Steam<small>Adds your Steam games with hours played</small></button>
     <button data-act="import">Import a file<small>The export from the old Backlog</small></button>
+    <button data-act="rematch">Re-check all matches<small>Fixes games matched to the wrong version</small></button>
     <button data-act="prices">Check wishlist prices now<small>PC stores via IsThereAnyDeal</small></button>
     <button data-act="signout">Sign out</button></div>
     <div class="actions"><button class="btn ghost" data-act="close">Close</button></div>`);
@@ -512,6 +530,7 @@ document.addEventListener("click", async e => {
       running = true;
       checkPrices(true).then(() => progress(0, 0), err => progress(0, 0, err.message, true)).finally(() => running = false);
       break;
+    case "rematch": closeSheet(); rematchAll(); break;
     case "rediscover": discovered = null; render(); break;
     case "signout": closeSheet(); signOut(getAuth()); break;
     case "close": closeSheet(); break;
