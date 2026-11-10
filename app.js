@@ -897,7 +897,7 @@ async function editSheet(id){
   try {
     const d0 = await gameDetails(g.igdbId), d = g.logoSet ? {...d0, logo: g.logo} : d0;
     fillMedia(d); fillStrip(g, d);
-    if (!g.hero && d.hero) upd(id, {hero: d.hero, ...(g.logoSet ? {} : {logo: d.logo || ""})});
+    if ((!g.hero && d.hero) || (!g.logoSet && (d.logo || "") !== (g.logo || ""))) upd(id, {hero: g.hero || d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 
