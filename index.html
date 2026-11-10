@@ -4,26 +4,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Backlog</title>
-<meta name="theme-color" content="#111419">
+<meta name="theme-color" content="#0E1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="top">
-      <h1>Backlog</h1>
-      <span class="mono muted" id="sync"></span>
-      <button class="btn ghost" id="importBtn" hidden>Import</button>
-      <button class="btn ghost" id="userBtn" hidden></button>
-    </div>
-    <div class="progress" id="progress" hidden><div class="bar"><span id="progFill"></span></div><span id="progText"></span></div>
-    <div class="tabs" role="tablist" id="tabs"></div>
-  </header>
-  <main id="main"><div class="empty">Loading…</div></main>
-</div>
-<button class="btn fab" id="addBtn" hidden>+ Add games</button>
+<header class="bar">
+  <div class="bar-in">
+    <span class="brand"><img src="icon-192.png" alt="" width="28" height="28">Backlog</span>
+    <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+    <span class="mono dim" id="sync"></span>
+    <button class="icon-btn" id="addBtn" aria-label="Add games" hidden>+</button>
+    <button class="icon-btn" id="menuBtn" aria-label="Menu" hidden>⋯</button>
+  </div>
+  <div class="progress" id="progress" hidden><div class="track"><span id="progFill"></span></div><span id="progText"></span></div>
+</header>
+<main id="main"><div class="empty">Loading…</div></main>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <dialog id="dlg"><div class="sheet" id="sheet"></div></dialog>
 <script type="module" src="app.js"></script>
