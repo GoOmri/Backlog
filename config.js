@@ -1,9 +1,8 @@
-// Fill these in once (see SETUP.md). Both values are meant to be public in a web page.
+// Your Cloudflare Worker address, e.g. "https://backlog-api.yourname.workers.dev" (no slash at the end).
+// The game data keys live in Cloudflare, not here.
+export const API = "";
 
-// Your free RAWG key from https://rawg.io/apidocs
-export const RAWG_KEY = "";
-
-// From Firebase console → Project settings → Your apps → Web app → "firebaseConfig"
+// Firebase web config (meant to be public; the Firestore rules protect your data).
 export const FIREBASE = {
   apiKey: "AIzaSyA-ph-1LgdNtlZfix1cXDvBOKdL9-eI6DU",
   authDomain: "backlog-fef87.firebaseapp.com",
