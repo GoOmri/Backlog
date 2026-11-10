@@ -31,6 +31,16 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 ## Taste (for ranking)
 Loves: metroidvanias, 2D/puzzle/precision platformers (Hollow Knight, Ori, Celeste), hand-drawn or good pixel art, narrative, mystery, cozy, Zelda-likes. Heavy combat only if the game is great. Couch co-op with his wife: puzzle co-op and co-op platformers. Prefers games from 2008 on, but keeps a Classics row. Wants hidden gems kept.
 
+## Planned: optimization (in this order)
+1. Fewer full redraws: Firestore onSnapshot calls render() on every change, and the background queue writes games one by one, so the whole tab (597 Library cards) redraws many times. Batch into one render per ~500ms; skip if the current tab isn't affected.
+2. Library in chunks: render ~60 cards, add more on scroll.
+3. Service worker: cache app shell (app.js, style.css, index.html, fonts) for instant open, update in background.
+4. Play carousel hero images: IGDB t_1080p → t_720p on phones.
+Skip: style.css cleanup, bundling/minifying.
+
+## Later
+- Steam prices (IL) on every Find card and game page: new worker route /steamprice (appids → price_overview cc=il, KV cache 1 day).
+
 ## Open ideas
 - PS Store prices (would need scraping; ITAD has none).
 - Find caches /finds, /upcoming, /discover in localStorage (c:finds, c:upcoming, c:disc) and refreshes in the background.
