@@ -226,10 +226,10 @@ async function tagList(env){
 }
 // Steam user tags for owned/wishlist games, kept to the few the app uses.
 const STAG = {"Metroidvania": "Metroidvania", "Souls-like": "Soulslike", "Difficult": "Hard", "Relaxing": "Chill", "Cozy": "Chill", "Puzzle Platformer": "Puzzle-platformer", "Precision Platformer": "Precision", "Atmospheric": "Atmospheric", "Exploration": "Exploration", "Local Co-Op": "Couch co-op"};
-async function getItems(apps, req){
+async function getItems(apps, req, cc = "US"){
   const out = [];
   for (let i = 0; i < apps.length; i += 100){
-    const input = {ids: apps.slice(i, i + 100).map(appid => ({appid: +appid})), context: {language: "english", country_code: "US"}, data_request: req};
+    const input = {ids: apps.slice(i, i + 100).map(appid => ({appid: +appid})), context: {language: "english", country_code: cc}, data_request: req};
     const r = await (await fetch(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`)).json();
     out.push(...(r.response?.store_items || []));
   }
@@ -265,7 +265,7 @@ const SEARCHES = [
   ["soon", ["Metroidvania"], "filter=popularcomingsoon"], ["soon", ["2D Platformer"], "filter=popularcomingsoon"]
 ];
 async function finds(env){
-  const c = await env.KV.get("finds9", "json");
+  const c = await env.KV.get("finds10", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -285,8 +285,11 @@ async function finds(env){
     h.keys.add(x.k); hits.set(x.app, h);
   }
   // Steam tags for every candidate.
-  for (const it of await getItems([...hits.keys()], {include_tag_count: 12})){
-    const h = hits.get(String(it.appid)); if (h) h.tags = (it.tags || []).map(t => tname.get(t.tagid)).filter(Boolean);
+  for (const it of await getItems([...hits.keys()], {include_tag_count: 12, include_all_purchase_options: true}, "IL")){
+    const h = hits.get(String(it.appid)); if (!h) continue;
+    h.tags = (it.tags || []).map(t => tname.get(t.tagid)).filter(Boolean);
+    const b = it.best_purchase_option;
+    h.price = it.is_free ? {f: "Free"} : b?.formatted_final_price ? {f: b.formatted_final_price, d: b.discount_pct || 0} : null;
   }
   // Map Steam app ids to IGDB games (for covers, details and wishlist).
   const apps = [...hits.keys()], gameOf = new Map();
@@ -303,7 +306,7 @@ async function finds(env){
     const base = h.pct != null ? (h.pct * h.n + 80 * 300) / (h.n + 300) : 75;
     const sk = [...new Set((h.tags || []).map(t => STAG[t]).filter(Boolean))];
     const x = {...slim(g), kw: [...new Set([...feel(g), ...sk.filter(t => t !== "Couch co-op")])], ...(sk.includes("Couch co-op") ? {couch: true} : {}),
-      date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
+      date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app, price: h.price};
     x.score = base + taste + Math.max(0, (x.year || 2008) - 2008) * 0.3;
     x.gem = h.n < 1500 && h.pct >= 92; x.taste = taste;
     return {x, keys: h.keys};
@@ -322,7 +325,7 @@ async function finds(env){
     missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
     classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
   };
-  await env.KV.put("finds9", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds10", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 

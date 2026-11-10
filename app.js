@@ -636,6 +636,7 @@ function radarHTML(){
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when);
 }
 // Find tab extras: wishlist sales and the best metroidvanias you don't own.
+const priceTxt = x => x?.price ? (x.price.d ? `−${x.price.d}% ${x.price.f}` : x.price.f) : "";
 function findExtrasHTML(){
   const is2D = g => basicTags(g).includes("2D");
   if (topMV === null){ topMV = {}; api("/finds").then(r => { topMV = r; if (tab === "disc") render(); }, () => {}); }
@@ -644,7 +645,7 @@ function findExtrasHTML(){
     xs = (xs || []).filter(x => !inList(x) && !seen.has(x.igdbId));
     if (twoD) xs.sort((a, b) => is2D(b) - is2D(a));
     xs = xs.slice(0, 24); xs.forEach(x => { seen.add(x.igdbId); previewCache.set(x.igdbId, x); });
-    return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, subf(x))).join("")}</div></div>` : "";
+    return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, [subf(x), priceTxt(x)].filter(Boolean).join(" · "))).join("")}</div></div>` : "";
   };
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
   const rev = x => x?.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
@@ -818,13 +819,13 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to top of Find" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span>${x.price ? `<span class="dim">· ${esc(priceTxt(x))} on Steam</span>` : ""}</div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to top of Find" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {
     if (wid){ await del(wid); wid = null; $("#pvWish").innerHTML = ic("heart"); $("#pvWish").classList.remove("on-heart"); toast("Removed from wishlist"); return; }
     wid = newId(); $("#pvWish").innerHTML = ic("heartf"); $("#pvWish").classList.add("on-heart");
-    const {because, score, added, date, gem, taste, appid, steamPct, steamN, ...data} = x; await setDoc(doc(col, wid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, platforms: [], status: "wishlist", added: Date.now(), ...(pinned ? {upNext: Date.now()} : {})});
+    const {because, score, added, date, gem, taste, appid, steamPct, steamN, price, ...data} = x; await setDoc(doc(col, wid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, platforms: [], status: "wishlist", added: Date.now(), ...(pinned ? {upNext: Date.now()} : {})});
     toast("Added to wishlist");
   };
   let pinned = false;
