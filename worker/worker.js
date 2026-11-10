@@ -19,7 +19,7 @@ export default {
       let out;
       switch (url.pathname){
         case "/match":    out = await match(env, (body.titles || []).slice(0, 10)); break;
-        case "/search":   out = await search(env, url.searchParams.get("q") || ""); break;
+        case "/search":   globalThis.__debug = url.searchParams.has("debug"); out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
         case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
@@ -127,6 +127,7 @@ async function search(env, text){
   const mq = `query games "e" { fields ${MATCH_FIELDS}; where name ~ "${q(text)}"; sort total_rating_count desc; limit 5; };
 query games "s" { search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10; };`;
   const res = await igdb(env, "multiquery", mq), seen = new Set();
+  if (globalThis.__debug) return res;
   const list = [...(res.find(r => r.name === "e")?.result || []), ...(res.find(r => r.name === "s")?.result || [])].filter(g => !seen.has(g.id) && seen.add(g.id));
   const ttb = await ttbFor(env, list.map(g => g.id));
   return list.map(g => slim(g, ttb));
