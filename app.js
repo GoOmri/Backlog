@@ -31,7 +31,7 @@ function basicTags(g){
   const v = [...new Set((g.views || []).map(x => VIEW[x]).filter(Boolean))].slice(0, 1);
   const k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure")).slice(0, 2);
   const t = (g.themes || []).map(x => THEME[x]).filter(Boolean).slice(0, 1);
-  const c = (g.modes || []).includes("Co-operative") ? ["Co-op"] : [];
+  const c = g.couch ? ["Couch co-op"] : g.onlineCoop || (g.modes || []).includes("Co-operative") ? ["Online co-op"] : [];
   return [...v, ...k, ...t, ...c];
 }
 const sale = g => g.status === "wishlist" && g.sale?.cut > 0 ? g.sale : null;
@@ -98,12 +98,12 @@ async function runQueue(){
   running = false;
 }
 async function backfill(){
-  const need = list().filter(g => g.igdbId && g.views === undefined);
+  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined));
   for (let i = 0; i < need.length; i += 400){
     const chunk = need.slice(i, i + 400);
-    progress(i, need.length, "Adding 2D/3D info");
+    progress(i, need.length, "Adding 2D/3D and co-op info");
     const res = await api("/info", {ids: chunk.map(g => g.igdbId)});
-    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || []})));
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop})));
   }
   const odd = list().filter(g => g.igdbId && g.asTyped && !g.rechecked && key(g.title) !== key(g.asTyped));
   for (const [i, g] of odd.entries()){
@@ -265,6 +265,8 @@ function homeHTML(){
   const top = upNextGames(), inTop = new Set(top.map(g => g.id)), back = list().filter(g => g.status === "backlog");
   const playing = list().filter(g => g.status === "playing" && !inTop.has(g.id));
   const leaving = list().filter(g => leavingFor(g));
+  const is2DPlat = g => basicTags(g).includes("2D") && basicTags(g).includes("Platformer");
+  const couchOwned = list().filter(g => g.couch && (g.status === "backlog" || g.status === "playing") && !inTop.has(g.id)).sort((a, b) => is2DPlat(b) - is2DPlat(a) || (b.rating || 0) - (a.rating || 0));
   const recs = recommended().filter(g => !inTop.has(g.id)).slice(0, 20);
   const best = back.filter(g => g.rating && !inTop.has(g.id)).sort((a, b) => b.rating - a.rating).slice(0, 20);
   const recent = list().filter(g => g.status !== "wishlist").sort((a, b) => (b.added || 0) - (a.added || 0)).slice(0, 20);
@@ -273,6 +275,7 @@ function homeHTML(){
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
     + rowHTML("Also playing", playing)
     + rowHTML("Leaving PS Plus soon", leaving, "play these before they go")
+    + rowHTML("Couch co-op you own", couchOwned, "2D platformers first")
     + rowHTML("Recommended from your backlog", recs, "based on what you love")
     + rowHTML("Best rated in your backlog", best)
     + rowHTML("Recently added", recent)
@@ -315,12 +318,27 @@ function shelfHTML(wish){
 }
 
 /* ---------- discover ---------- */
+let couchFinds = null;
+async function loadCouch(){
+  try { couchFinds = await api("/couch?kind=platformer"); } catch (e){ couchFinds = {error: e.message}; }
+  if (tab === "disc") render();
+}
+function couchHTML(){
+  if (couchFinds === null){ loadCouch(); return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">Looking…</span></div>`; }
+  if (couchFinds.error) return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">${esc(couchFinds.error)}</span></div>`;
+  const have = new Set(list().map(g => g.igdbId));
+  const card = d => `<div class="card">${coverHTML({...d, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(d.title)}</span>
+    <span class="csub"><span>${d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
+    <button class="btn ghost small" data-cwish="${d.igdbId}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button></div>`;
+  const row = (t, sub, xs) => { xs = xs.filter(d => !have.has(d.igdbId)); return xs.length ? `<div class="section"><div class="row-head"><h3>${t}</h3><span class="dim">${sub}</span></div><div class="row">${xs.map(card).join("")}</div></div>` : ""; };
+  return row("New couch co-op 2D platformers", "released in the last 18 months", couchFinds.fresh) + row("Best couch co-op 2D platformers", "you don't own yet", couchFinds.best);
+}
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return `<div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
+  if (!liked.length) return `<div class="wrap">${couchHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
-  return `<div class="wrap"><div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
+  return `<div class="wrap">${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
     <div class="grid">${discovered.map((d, i) => `<div class="card">${coverHTML({...d, platforms: [], status: "wishlist"})}
       <span class="ctitle">${esc(d.title)}</span><span class="why">Like ${esc(d.because.join(", "))}</span>
       <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
@@ -473,6 +491,11 @@ document.addEventListener("click", async e => {
   }
   else if (d.finish){ await upd(d.finish, {status: "done", finishedAt: Date.now(), touched: Date.now()}); editSheet(d.finish); }
   else if (d.start) await upd(d.start, {status: "playing", touched: Date.now()});
+  else if (d.cwish){
+    const it = [...(couchFinds.fresh || []), ...(couchFinds.best || [])].find(x => x.igdbId === +d.cwish); t.disabled = true;
+    await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: ["other"], status: "wishlist", added: Date.now()});
+    it.added = true; render();
+  }
   else if (d.wish != null){
     const it = discovered[+d.wish]; t.disabled = true;
     const {because, score, ...data} = it;
