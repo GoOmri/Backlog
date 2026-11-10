@@ -412,3 +412,73 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 .hero-title{margin:0}
 .hero-facts,.hero-actions{justify-content:flex-start;margin:0;padding:0}
 .hero-facts .badges{margin:0}
+
+/* =========================================================================
+   Design-system pass: 8-pt spacing, 5 type sizes, 3 button levels,
+   purple only for primary actions + active tab, quieter chrome, set radii.
+   ========================================================================= */
+:root{
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:32px; --s6:48px;
+  --t-xl:32px; --t-l:20px; --t-m:15px; --t-s:13px; --t-xs:11px;
+  --r-s:8px; --r-m:12px; --r-l:16px;
+}
+/* type scale */
+body{font-size:var(--t-m)}
+h2{font-size:var(--t-l)}
+h3,.row-head h3{font-size:var(--t-l);font-weight:600}
+.ctitle{font-size:var(--t-s)}
+.csub,.why,.meta,.strip,.pline,.links,.fin,.diff,.status,.dim{font-size:var(--t-s)}
+.label,.tag,.dchip,.mono,.fopt .n,.pill{font-size:var(--t-xs)}
+.desc{font-size:var(--t-m)}
+
+/* spacing */
+.section{padding-block:var(--s5) 0;gap:var(--s3)}
+.row{gap:var(--s3)}
+.grid{gap:var(--s4) var(--s3)}
+.filters{padding-block:var(--s3);gap:var(--s2)}
+.statusbar,.activebar{padding-bottom:var(--s3)}
+.side{gap:var(--s4)}
+.gp-head{gap:var(--s3);padding-bottom:var(--s5)}
+.gp-actions{gap:var(--s2)}
+.gp-body{column-gap:var(--s5);row-gap:var(--s4);padding-top:var(--s4)}
+.gp-main,.gp-facts{gap:var(--s3)}
+.gp-similar{padding-top:var(--s5);gap:var(--s3)}
+.sheet{gap:var(--s3)}
+.card{gap:var(--s2)}
+
+/* button levels */
+.btn{border-radius:999px;padding:10px var(--s4);font-size:var(--t-m)}           /* 1 primary: filled purple */
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}  /* used rarely */
+.btn.small{padding:6px 12px;font-size:var(--t-s)}
+.ibtn,.icon-btn{background:rgb(255 255 255 / .08);color:var(--fg)}               /* 2 secondary: quiet icons */
+#addBtn{background:var(--accent);color:var(--accent-fg)}
+.links a,.linkbtn{color:var(--fg);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)} /* 3 tertiary */
+.links a:hover,.linkbtn:hover{text-decoration-color:var(--fg)}
+
+/* chips: flatter and smaller than buttons */
+.chip{border-radius:var(--r-s);padding:4px 10px;font-size:var(--t-s);background:transparent;border:1px solid var(--line)}
+.chip[aria-pressed="true"],.chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.fopt{border-radius:var(--r-s)}
+.fopt[aria-pressed="true"]{background:var(--raise);color:var(--fg)}
+
+/* purple is for actions only */
+.tab[aria-current="page"]{color:var(--fg);background:var(--raise)}
+.tab[aria-current="page"] .ico{color:var(--accent)}
+.ptrack span,.track span{background:var(--fg)}
+.plat-ok{color:var(--fg)}
+.tag.playing{background:var(--raise);color:var(--fg)}
+.score.hi{color:var(--fg)}
+.eyebrow{color:var(--dim)}
+a{color:var(--fg)}
+
+/* quieter chrome on art */
+.cover{border-radius:var(--r-m)}
+.badges{left:var(--s1);bottom:var(--s1);gap:2px}
+.plat{min-width:20px;height:16px;padding:0 4px;font-size:9px;border-radius:4px;opacity:.92}
+.tag{top:var(--s1);right:var(--s1);padding:2px 6px;border-radius:var(--r-s)}
+.pill{border-radius:var(--r-s);padding:2px 8px}
+
+/* radii */
+.panel,.stat,.popmenu,.editpanel,.note,.deal,.match,.logopick button,.coverpick button{border-radius:var(--r-m)}
+dialog:not(.full){border-radius:var(--r-l)}
+.gp-main .mslides,.media{border-radius:var(--r-m)}
