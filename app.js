@@ -647,8 +647,12 @@ function findExtrasHTML(){
     return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, subf(x))).join("")}</div></div>` : "";
   };
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
-  const fresh = frow("New 2D platformers & MVs", topMV.fresh, when) + frow("Coming soon: MVs & 2D platformers", topMV.soon, x => x.date ? when(x) : "Coming soon");
-  const mv = fresh + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
+  const rev = x => x.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
+  const mv = frow("New 2D platformers & MVs", topMV.fresh, when) + frow("Coming soon: MVs & 2D platformers", topMV.soon, x => x.date ? when(x) : "Coming soon")
+    + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("Hidden gems", topMV.gems, rev)
+    + frow("Puzzle co-op", topMV.coopPuzzle, yr) + frow("Couch co-op platformers", topMV.coopPlat, yr)
+    + frow("Narrative & walking sims", topMV.walk, yr) + frow("Mystery & deduction", topMV.mystery, yr) + frow("Cozy short indies", topMV.cozy, yr) + frow("Zelda-likes", topMV.zelda, yr)
+    + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
   const wishRow = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3><span class="dim">${wl.length}</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button></div>
@@ -659,10 +663,10 @@ function findExtrasHTML(){
 }
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}${couchHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
+  if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
-  return `<div class="wrap">${findExtrasHTML()}${radarHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
+  return `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
     <div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
