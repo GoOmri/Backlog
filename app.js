@@ -236,11 +236,14 @@ const rowHTML = (title, items, sub = "", subFn) => items.length ? `<section clas
 
 /* ---------- home ---------- */
 const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; // his favourite kinds of games
+// Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
+const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pinned = list().filter(g => g.upNext && g.status !== "done" && g.status !== "dropped").sort((a, b) => a.upNext - b.upNext);
-  const playing = list().filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
-  const out = [...pinned, ...playing];
-  return out.length ? out : recommended().slice(0, 3);
+  const pool = list().filter(g => isPlatformer(g) && g.status !== "done" && g.status !== "dropped");
+  const pinned = pool.filter(g => g.upNext).sort((a, b) => a.upNext - b.upNext);
+  const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
+  const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  return [...pinned, ...playing, ...rest].slice(0, 10);
 }
 function recommended(){
   const w = {};
@@ -255,7 +258,7 @@ function recommended(){
 function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
-  const eyebrow = g.status === "playing" ? "Continue playing" : g.upNext ? (g.status === "wishlist" ? "Most anticipated" : "Up next") : "Recommended for you";
+  const eyebrow = g.status === "playing" ? "Continue playing" : g.upNext ? (g.status === "wishlist" ? "Most anticipated" : "Up next") : g.status === "wishlist" ? "On your wishlist" : "In your backlog";
   const main = g.status === "playing" ? `<button class="btn" data-finish="${g.id}">Mark finished</button>`
     : g.status === "wishlist" ? "" : `<button class="btn" data-start="${g.id}">Start playing</button>`;
   return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="" loading="lazy">` : ""}</div>
@@ -281,6 +284,7 @@ function homeHTML(){
   if (!games.size) return emptyHTML();
   const top = upNextGames(), inTop = new Set(top.map(g => g.id)), back = list().filter(g => g.status === "backlog");
   const playing = list().filter(g => g.status === "playing" && !inTop.has(g.id));
+  const pinnedOther = list().filter(g => g.upNext && !inTop.has(g.id) && g.status !== "done" && g.status !== "dropped").sort((a, b) => a.upNext - b.upNext);
   const leaving = list().filter(g => leavingFor(g));
   const is2DPlat = g => basicTags(g).includes("2D") && basicTags(g).includes("Platformer");
   const couchOwned = list().filter(g => g.couch && (g.status === "backlog" || g.status === "playing") && !inTop.has(g.id)).sort((a, b) => is2DPlat(b) - is2DPlat(a) || (b.rating || 0) - (a.rating || 0));
@@ -290,6 +294,7 @@ function homeHTML(){
   const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
   return carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
+    + rowHTML("Up next", pinnedOther)
     + rowHTML("Also playing", playing)
     + rowHTML("Leaving PS Plus soon", leaving)
     + rowHTML("Couch co-op you own", couchOwned)
