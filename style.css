@@ -207,3 +207,9 @@ dialog.tall .sheet{padding-top:0}
 .filters{padding-block:18px 10px}
 
 button.brand{background:none;border:0;padding:0;color:var(--fg)}
+
+.hovervid{position:absolute;top:0;left:50%;height:100%;width:237%;transform:translateX(-50%);border:0;pointer-events:none;z-index:1}
+.cover .badges,.cover .tag{z-index:2}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;gap:12px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:10px 14px;box-shadow:0 8px 24px rgb(0 0 0 / .4);font-size:14px;max-width:calc(100vw - 32px)}
+@media (min-width:761px){.toast{bottom:24px}}
+#simRow{padding-top:10px;grid-auto-columns:110px}
