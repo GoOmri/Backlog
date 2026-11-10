@@ -26,6 +26,7 @@ export default {
         case "/upcoming": out = await upcoming(env); break;
         case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
         case "/steamrev": out = await steamReviews(env, +url.searchParams.get("appid")); break;
+        case "/grids":    out = await grids(env, (body.titles || []).slice(0, 10)); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
@@ -134,10 +135,10 @@ async function search(env, text){
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
-  const cached = await env.KV.get("game3:" + id, "json");
+  const cached = await env.KV.get("game4:" + id, "json");
   if (cached) return cached;
   const out = await gameFresh(env, id);
-  await env.KV.put("game3:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  await env.KV.put("game4:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 // Gameplay first; avoid teasers, announcements and cinematic (CG/story) trailers when there's a choice.
@@ -146,13 +147,14 @@ function pickTrailer(videos){
   return videos.slice().sort((a, b) => score(b) - score(a))[0]?.video_id || null;
 }
 async function gameFresh(env, id){
-  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
+  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,platforms.abbreviation,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
   if (!g) throw new Error("Game not found");
   const out = {...slim(g, await ttbFor(env, [id])), summary: g.summary || "",
     developers: (g.involved_companies || []).filter(c => c.developer).map(c => c.company?.name).filter(Boolean),
     hero: IMG(g.artworks?.[0]?.image_id || g.screenshots?.[0]?.image_id, "1080p"),
     shots: (g.screenshots || []).slice(0, 8).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
-    trailer: pickTrailer(g.videos || []), critic: Math.round(g.aggregated_rating || 0) || null};
+    trailer: pickTrailer(g.videos || []), critic: Math.round(g.aggregated_rating || 0) || null,
+    available: [...new Set((g.platforms || []).map(p => ({PS5: "PS5", PS4: "PS4", PC: "PC", Switch: "Switch", "Switch 2": "Switch 2", "Series X|S": "Xbox", XONE: "Xbox"})[p.abbreviation]).filter(Boolean))]};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
   const sim = (g.similar_games || []).slice(0, 10);
   out.similar = sim.length ? (await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${sim.join(",")}); limit 10;`)).map(x => slim(x)) : [];
@@ -173,6 +175,18 @@ async function sgdbArt(env, name, fallbackHero){
     sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false`).catch(() => [])
   ]);
   return {hero: heroes?.[0]?.url || fallbackHero, logo: logos?.[0]?.url || null};
+}
+
+// English box art from SteamGridDB (IGDB sometimes has a regional cover, e.g. Russian).
+async function grids(env, titles){
+  const out = {};
+  await Promise.all(titles.map(async t => {
+    try {
+      const hit = (await sgdb(env, "search/autocomplete/" + encodeURIComponent(t)))?.find(h => norm(h.name) === norm(t)) || null;
+      out[t] = hit ? (await sgdb(env, `grids/game/${hit.id}?dimensions=600x900&types=static&nsfw=false&humor=false`) || []).slice(0, 6).map(x => x.url) : [];
+    } catch { out[t] = []; }
+  }));
+  return out;
 }
 
 /* ---------- Discover: games IGDB lists as similar to ones you like ---------- */

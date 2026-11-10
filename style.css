@@ -309,3 +309,8 @@ dialog.full .x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));righ
 .vflash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 22px var(--body);padding:8px 14px;border-radius:999px;background:rgb(0 0 0 / .5);opacity:0;pointer-events:none}
 .vflash.show{animation:vf .7s ease-out}
 @keyframes vf{0%{opacity:1}100%{opacity:0}}
+
+.coverpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-top:8px}
+.coverpick button{padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:none}
+.coverpick button:hover{border-color:var(--accent)}
+.coverpick img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover}
