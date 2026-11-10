@@ -502,3 +502,5 @@ dialog:not(.full){border-radius:var(--r-l)}
 .ownline .st.no{background:#3d1c24;color:#ff8aa0}
 .pc{font-size:var(--t-s);font-weight:600;color:var(--fg);display:inline-flex;align-items:center;gap:6px}
 .pc::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c)}
+
+.dchip{white-space:nowrap;flex-shrink:0}
