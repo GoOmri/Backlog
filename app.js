@@ -750,7 +750,7 @@ async function previewSheet(x){
   $("#pvWish").onclick = async () => {
     if (wid){ await del(wid); wid = null; $("#pvWish").textContent = "+ Wishlist"; toast("Removed from wishlist"); return; }
     wid = newId(); $("#pvWish").textContent = "✓ On wishlist";
-    const {because, score, added, date, ...data} = x; await setDoc(doc(col, wid), {...data, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()});
+    const {because, score, added, date, ...data} = x; await setDoc(doc(col, wid), {...data, asTyped: x.title, platforms: [], status: "wishlist", added: Date.now()});
     toast("Added to wishlist");
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
@@ -837,7 +837,6 @@ async function editSheet(id){
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <details class="more"><summary>Edit</summary>
-      <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
@@ -849,7 +848,8 @@ async function editSheet(id){
   pop("#statBtn", "#statMenu"); pop("#rateBtn", "#rateMenu");
   sh.addEventListener("click", e => { if (!e.target.closest(".menuwrap")) sh.querySelectorAll(".popmenu").forEach(m => m.hidden = true); });
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => {
-    const st = b.dataset.setstat; $("#statBtn").textContent = STAT[st] + " ▾"; $("#statMenu").hidden = true; $("#finField").hidden = st !== "done";
+    const st = b.dataset.setstat;
+    if (g.status === "wishlist" && st !== "wishlist" && st !== "dropped"){ $("#statMenu").hidden = true; return askBought(st); } $("#statBtn").textContent = STAT[st] + " ▾"; $("#statMenu").hidden = true; $("#finField").hidden = st !== "done";
     sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b));
     save({status: st, finishedAt: st === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null});
     if (st === "done" && !g.myRating) $("#rateMenu").hidden = false;
@@ -862,6 +862,15 @@ async function editSheet(id){
     $("#rateBtn").innerHTML = "★" + (stars ? `<small>${stars}</small>` : ""); $("#rateBtn").classList.toggle("on", !!stars); $("#rateMenu").hidden = true;
     save({myRating: stars || null});
   });
+  // Bought a wishlist game: pick the platform once, then it moves to that status.
+  const askBought = st => {
+    const m = $("#statMenu"); m.hidden = false;
+    m.innerHTML = `<div class="label" style="padding:6px 12px">Where did you buy it?</div>` + ["ps5","steam","epic","itch"].map(p => `<button data-buy="${p}">${PLAT[p][0]}</button>`).join("");
+    m.querySelectorAll("[data-buy]").forEach(x => x.onclick = async () => {
+      await save({status: st, platforms: [x.dataset.buy], ps: x.dataset.buy === "ps5" ? "bought" : g.ps || null, upNext: g.upNext || null});
+      toast(`Moved to ${STAT[st]} · ${PLAT[x.dataset.buy][0]}`); closeSheet();
+    });
+  };
   let pinned = !!g.upNext;
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
   $("#nopeBtn").onclick = async () => { closeSheet(); if (g.hidden){ await upd(id, {hidden: false}); toast(`${g.title} is back`); } else notForMe(g); };
@@ -923,17 +932,17 @@ document.addEventListener("click", async e => {
   else if (d.start) await upd(d.start, {status: "playing", touched: Date.now()});
   else if (d.cwish){
     const it = [...(couchFinds.fresh || []), ...(couchFinds.best || [])].find(x => x.igdbId === +d.cwish); t.disabled = true;
-    await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: ["other"], status: "wishlist", added: Date.now()});
+    await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()});
     it.added = true; render();
   }
   else if (d.nope != null){ const it = discovered[+d.nope]; discovered.splice(+d.nope, 1); render(); notForMe(it); }
   else if (d.rwish){ const it = radarItem(+d.rwish); t.disabled = true; t.textContent = "On wishlist";
-    await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: ["other"], status: "wishlist", added: Date.now()}); }
+    await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()}); }
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else if (d.wish != null){
     const it = discovered[+d.wish]; t.disabled = true;
     const {because, score, ...data} = it;
-    await setDoc(doc(col, newId()), {...data, asTyped: it.title, platforms: ["other"], status: "wishlist", added: Date.now()});
+    await setDoc(doc(col, newId()), {...data, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()});
     it.added = true; render(); runQueue();
   }
   else switch (d.act){
