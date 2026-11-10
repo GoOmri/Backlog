@@ -65,8 +65,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd2:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd2:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -709,7 +709,7 @@ function fillMedia(d){
   if (!$("#dlg").open || !$("#mslides")) return;
   $("#desc").textContent = d.summary || "";
   const slides = [
-    d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&loop=1&playlist=${encodeURIComponent(d.trailer)}&controls=0&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
+    d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&start=5&controls=1&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
   ].filter(Boolean);
   if (slides.length){
