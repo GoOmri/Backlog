@@ -589,6 +589,13 @@ function toggleFilter(group, val){
 }
 
 /* ---------- discover ---------- */
+// Suggestion card: cover with a small heart to wishlist, title, one short line.
+function suggestCard(x, sub){
+  previewCache.set(x.igdbId, x);
+  const on = list().some(g => g.igdbId === x.igdbId && g.status === "wishlist");
+  return `<div class="card sugg"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "backlog"})}<span class="ctitle">${esc(x.title)}</span>${sub ? `<span class="csub"><span class="oneline">${esc(sub)}</span></span>` : ""}</button>
+    <button class="heartbtn ${on ? "on-heart" : ""}" data-heart="${x.igdbId}" aria-label="${on ? "Remove from wishlist" : "Add to wishlist"}">${ic(on ? "heartf" : "heart", 18)}</button></div>`;
+}
 let couchFinds = null;
 async function loadCouch(){
   try { couchFinds = await api("/couch?kind=platformer"); } catch (e){ couchFinds = {error: e.message}; }
@@ -599,9 +606,7 @@ function couchHTML(){
   if (couchFinds.error) return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">${esc(couchFinds.error)}</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
   [...(couchFinds.fresh || []), ...(couchFinds.best || [])].forEach(x => previewCache.set(x.igdbId, x));
-  const card = d => `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(d.title)}</span></button>
-    <span class="csub"><span>${d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
-    <button class="btn ghost small" data-cwish="${d.igdbId}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button></div>`;
+  const card = d => suggestCard(d, d.year || "");
   const row = (t, sub, xs) => { xs = xs.filter(d => !inList(d)); return xs.length ? `<div class="section"><div class="row-head"><h3>${t}</h3><span class="dim">${sub}</span></div><div class="row">${xs.map(card).join("")}</div></div>` : ""; };
   return row("New couch co-op 2D platformers", "released in the last 18 months", couchFinds.fresh) + row("Best couch co-op 2D platformers", "you don't own yet", couchFinds.best);
 }
@@ -613,8 +618,7 @@ function radarHTML(){
   if (!radar.soonPs5) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
   [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
-  const card = (x, sub) => `<div class="card"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button><span class="csub"><span>${esc(sub)}</span></span>
-    <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me" title="Not for me">${ic("down", 18)}</button></span></div>`;
+  const card = (x, sub) => suggestCard(x, sub);
   const row = (t, xs, subf) => { xs = xs.filter(x => !inList(x)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
   const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
@@ -625,7 +629,7 @@ function findExtrasHTML(){
   if (topMV === null){ topMV = []; api("/topmv").then(r => { topMV = r; if (tab === "disc") render(); }, () => {}); }
   const mvNew = topMV.filter(x => !inList(x)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 24);
   mvNew.forEach(x => previewCache.set(x.igdbId, x));
-  const mv = mvNew.length >= 3 ? `<div class="section"><h3>MV's you don't own</h3><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></div>` : "";
+  const mv = mvNew.length >= 3 ? `<div class="section"><h3>MV's you don't own</h3><div class="row">${mvNew.map(x => suggestCard(x, x.year || "")).join("")}</div></div>` : "";
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
   const wishRow = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3><span class="dim">${wl.length}</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button></div>
@@ -640,10 +644,7 @@ function discoverHTML(){
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
   return `<div class="wrap">${findExtrasHTML()}${radarHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
-    <div class="grid">${discovered.map((d, i) => (previewCache.set(d.igdbId, d), `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}
-      <span class="ctitle">${esc(d.title)}</span></button><span class="why">Like ${esc(d.because.join(", "))}</span>
-      <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
-      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me" title="Not for me">${ic("down", 18)}</button></span></div>`)).join("")}</div></div></div>`;
+    <div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
   try {
@@ -1024,6 +1025,12 @@ document.addEventListener("click", async e => {
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
   else if (d.time){ time = time === d.time ? "" : d.time; render(); }
   else if (d.edit) editSheet(d.edit);
+  else if (d.heart){
+    const id = +d.heart, have = list().find(g => g.igdbId === id && g.status === "wishlist");
+    if (have){ await del(have.id); toast("Removed from wishlist"); }
+    else { const x = previewCache.get(id); const {because, score, added, date, ...data} = x; await setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: [], status: "wishlist", added: Date.now()}); toast("Added to wishlist"); }
+    render();
+  }
   else if (d.preview){ const x = previewCache.get(+d.preview); if (x) previewSheet(x); }
   else if (d.mode){ homeMode = d.mode; render(); }
   else if (d.mgo != null){ const el = $("#mslides"); el.scrollTo({left: +d.mgo * el.clientWidth, behavior: "smooth"}); }

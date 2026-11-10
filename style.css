@@ -486,3 +486,11 @@ dialog:not(.full){border-radius:var(--r-l)}
 .ownline{font-size:var(--t-m);color:var(--dim)}
 .ownline b{color:var(--fg);font-weight:600}
 .backbar{display:flex;align-items:center;gap:var(--s3);padding-top:var(--s3)}
+
+/* suggestion cards: heart on the cover, one tidy line */
+.card.sugg{position:relative}
+.heartbtn{position:absolute;top:var(--s2);right:var(--s2);z-index:3;width:32px;height:32px;border-radius:999px;border:0;display:grid;place-items:center;background:rgb(14 17 22 / .7);color:var(--fg)}
+.heartbtn.on-heart{color:#FF6B86}
+.card.sugg .tag{display:none}
+.oneline{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.card .csub{min-width:0}
