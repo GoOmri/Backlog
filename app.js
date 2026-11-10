@@ -53,6 +53,21 @@ async function api(path, body){
   return d;
 }
 
+// Game details (description, screenshots, trailer) change rarely: keep them on this device.
+const detailMem = new Map();
+async function gameDetails(id){
+  if (detailMem.has(id)) return detailMem.get(id);
+  try { const c = JSON.parse(localStorage.getItem("gd:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  detailMem.set(id, p); p.catch(() => detailMem.delete(id));
+  return p;
+}
+// Start loading details when the pointer rests on a cover, so the page opens ready.
+document.addEventListener("pointerover", e => {
+  const c = e.target.closest?.("[data-edit]"); const g = c && games.get(c.dataset.edit);
+  if (g?.igdbId && API) gameDetails(g.igdbId).catch(() => {});
+});
+
 /* ---------- writes ---------- */
 const upd = (id, d) => updateDoc(doc(col, id), d);
 const del = id => deleteDoc(doc(col, id));
@@ -358,7 +373,7 @@ function carouselHTML(gs){
 const heroAsked = new Set();
 async function fetchHero(g){
   heroAsked.add(g.id);
-  try { const d = await api("/game?id=" + g.igdbId); await upd(g.id, {hero: d.hero || "", logo: d.logo || ""}); } catch {}
+  try { const d = await gameDetails(g.igdbId); await upd(g.id, {hero: d.hero || "", logo: d.logo || ""}); } catch {}
 }
 // Omri's categories. A game can sit in more than one.
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
@@ -622,7 +637,7 @@ async function editSheet(id){
   };
   if (!g.igdbId) return;
   try {
-    const d = await api("/game?id=" + g.igdbId);
+    const d = await gameDetails(g.igdbId);
     if (!$("#dlg").open || !$("#mslides")) return;
     $("#desc").textContent = d.summary || "";
     const slides = [
