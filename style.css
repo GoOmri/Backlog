@@ -482,3 +482,6 @@ a{color:var(--fg)}
 .panel,.stat,.popmenu,.editpanel,.note,.deal,.match,.logopick button,.coverpick button{border-radius:var(--r-m)}
 dialog:not(.full){border-radius:var(--r-l)}
 .gp-main .mslides,.media{border-radius:var(--r-m)}
+
+.ownline{font-size:var(--t-m);color:var(--dim)}
+.ownline b{color:var(--fg);font-weight:600}
