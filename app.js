@@ -65,8 +65,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd3:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd3:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd4:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd4:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -156,6 +156,7 @@ async function runQueue(){
     }
     await backfill();
     await checkDeck();
+    await checkCovers();
     await checkPrices();
     progress(0, 0);
   } catch (e){ progress(0, 0, e.message, true); }
@@ -211,6 +212,15 @@ async function backfill(){
     const exact = alt.find(r => key(r.title) === key(g.asTyped));
     if (exact && exact.igdbId !== g.igdbId) await applyMatch(g, exact);
     else await upd(g.id, {rechecked: true});
+  }
+}
+async function checkCovers(){
+  const need = list().filter(g => g.igdbId && !g.coverSet && g.coverV !== 1);
+  for (let i = 0; i < need.length; i += 10){
+    const chunk = need.slice(i, i + 10);
+    progress(i, need.length, "Getting English covers");
+    const res = await api("/grids", {titles: chunk.map(g => g.title)});
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {coverV: 1, ...(res[g.title]?.[0] ? {cover: res[g.title][0]} : {})})));
   }
 }
 async function checkDeck(){
@@ -430,7 +440,7 @@ async function fetchHero(g){
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
 const plat = g => (g.genres || []).includes("Platform");
 const CATS = [
-  ["Metroidvanias", g => (g.kw || []).includes("Metroidvania")],
+  ["MV's you own", g => (g.kw || []).includes("Metroidvania")],
   ["2D platformers", g => plat(g) && has(g, "2D") && !(g.kw || []).includes("Metroidvania") && !(g.genres || []).includes("Puzzle")],
   ["Couch co-op platformers", g => plat(g) && g.couch],
   ["Puzzle-platformers", g => plat(g) && ((g.genres || []).includes("Puzzle") || (g.kw || []).includes("Puzzle-platformer"))]
@@ -758,14 +768,14 @@ async function mountTrailer(id){
 // Critics · Steam % · Developer · Your hours.
 async function fillStrip(g, d){
   const box = $("#strip"); if (!box) return;
-  const parts = [d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
+  const parts = [d.available?.length && `<span>Available on <b>${esc(d.available.join(" · "))}</b></span>`, d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
   if (g.steamAppId){
     let r = null;
     try { r = JSON.parse(localStorage.getItem("rev:" + g.steamAppId)); if (r && Date.now() - r.t > 7 * 864e5) r = null; } catch {}
     if (!r){ try { r = {...await api("/steamrev?appid=" + g.steamAppId), t: Date.now()}; localStorage.setItem("rev:" + g.steamAppId, JSON.stringify(r)); } catch {} }
-    if (r?.pct != null){ parts[1] = `<span title="${esc(r.label)} · ${r.total} reviews">Steam reviews <b>${r.pct}%</b> positive</span>`; draw(); }
+    if (r?.pct != null){ parts[2] = `<span title="${esc(r.label)} · ${r.total} reviews">Steam reviews <b>${r.pct}%</b> positive</span>`; draw(); }
   }
 }
 // Trailer (with timeline) + screenshots, description, similar games.
@@ -815,6 +825,7 @@ async function editSheet(id){
     <details class="more"><summary>Edit</summary>
       <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
+      <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
     </details>`;
   openSheet(pageShell(g, {own: `<div class="pills">${pills}</div>`, actions, facts}), "full");
@@ -843,6 +854,14 @@ async function editSheet(id){
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
+  $("#coverGo").onclick = async () => {
+    const box = $("#covers"); box.textContent = "Loading covers…";
+    try {
+      const urls = (await api("/grids", {titles: [g.title]}))[g.title] || [];
+      box.innerHTML = urls.length ? urls.map(u => `<button data-cover="${esc(u)}"><img src="${esc(u)}" alt=""></button>`).join("") : "No other covers found.";
+      box.querySelectorAll("[data-cover]").forEach(b => b.onclick = async () => { await upd(id, {cover: b.dataset.cover, coverSet: true}); toast("Cover changed"); box.innerHTML = ""; });
+    } catch (e){ box.textContent = e.message; }
+  };
   $("#fixGo").onclick = async () => {
     const box = $("#matches"); box.textContent = "Searching…";
     try {
