@@ -34,7 +34,7 @@ function basicTags(g){
   const c = g.couch ? ["Couch co-op"] : g.onlineCoop || (g.modes || []).includes("Co-operative") ? ["Online co-op"] : [];
   return [...v, ...k, ...t, ...c];
 }
-const sale = g => g.status === "wishlist" && g.sale?.cut > 0 ? g.sale : null;
+const sale = g => g.status === "wishlist" && g.sale?.cut > 0 && /^(steam|epic)/i.test(g.sale.shop || "") ? g.sale : null;
 
 /* ---------- API (Cloudflare Worker) ---------- */
 async function api(path, body){
@@ -451,53 +451,69 @@ function addSheet(){
     catch (e){ $("#aMsg").textContent = "Couldn't save: " + e.message; $("#aGo").disabled = false; }
   };
 }
+// Game page: media carousel on top, short facts, quick controls that save as you tap.
 async function editSheet(id){
   const g = games.get(id); if (!g) return;
   let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext, couchV = !!g.couch;
   const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
-  openSheet(`<div class="sheet-hero">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div>
-    <div class="sheet-head">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}<div><h2>${esc(g.title)}</h2>
-      <div class="facts">${[g.year, g.ttb?.main && `${g.ttb.main}h main`, g.ttb?.full && `${g.ttb.full}h 100%`, g.steamHours != null && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean).map(f => `<span>${esc(f)}</span>`).join("")}<span id="devs"></span></div></div></div>
-    ${s ? `<div class="note ${s.cut >= 50 ? "hot" : ""}"><b>−${s.cut}%</b> · ${esc(s.price ?? "")} ${esc(s.currency || "")} at ${esc(s.shop || "a PC store")} ${s.url ? `· <a href="${esc(s.url)}" target="_blank" rel="noopener">Open deal</a>` : ""}</div>` : ""}
-    ${lv ? `<div class="note warn">Probably leaving PS Plus soon. <a href="${esc(lv.url)}" target="_blank" rel="noopener">${esc(lv.title)}</a></div>` : ""}
-    <div class="desc" id="desc">${g.igdbId ? "Loading…" : g.noMatch ? "No match found yet. Use Fix match below." : ""}</div>
-    <div class="chips">${basicTags(g).filter(t => t !== "Couch co-op").map(t => `<span class="chip">${esc(t)}</span>`).join("")}<button class="chip" id="couchBtn" aria-pressed="${!!g.couch}">Couch co-op</button></div>
-    ${ownedHTML(g)}
-    <div><button class="chip" id="upNextBtn" aria-pressed="${!!g.upNext}">📌 Up next</button></div>
-    <div class="field"><span class="label">List</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" aria-pressed="${status === k}" data-setstat="${k}">${v}</button>`).join("")}</div></div>
-    <div class="grid2"><div class="field"><span class="label">Your rating</span><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div></div>
-      <div class="field" id="finField" ${status === "done" ? "" : "hidden"}><label class="label" for="finDate">Finished on</label><input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></div></div>
-    <details><summary class="label">Bought it somewhere else? Edit where you own it</summary><div class="field" style="margin-top:8px"><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div></details>
-    <details><summary class="label">Wrong game? Fix match</summary><div class="field" style="margin-top:8px"><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div></details>
-    <div class="actions"><button class="btn ghost danger" id="eDel" style="margin-right:auto">Delete</button><button class="btn ghost" data-act="close">Cancel</button><button class="btn" id="eSave">Save</button></div>`, true);
-  const sh = $("#sheet");
-  sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => { status = b.dataset.setstat; sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("#finField").hidden = status !== "done"; });
-  sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); });
-  sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => { stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); });
-  $("#couchBtn").onclick = () => { couchV = !couchV; $("#couchBtn").setAttribute("aria-pressed", couchV); };
-  $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); };
-  $("#eSave").onclick = async () => {
-    const d = {status, platforms: [...plats], myRating: stars || null, touched: Date.now(), upNext: pinned ? (g.upNext || Date.now()) : null, ...(couchV !== !!g.couch ? {couch: couchV, couchSet: true} : {})};
-    d.finishedAt = status === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null;
-    await upd(id, d); closeSheet();
-  };
+  const meta = [g.year, ...basicTags(g).filter(t => t !== "Couch co-op")].filter(Boolean).join(" · ");
+  const own = (g.platforms || []).filter(p => p !== "psplus");
+  const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
+    : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + ((g.platforms || []).includes("psplus") ? `<span class="pill" style="--c:var(--psplus)">PS Plus</span>` : "");
+  openSheet(`<button class="x" data-act="close" aria-label="Close">×</button>
+    <div class="media"><div class="mslides" id="mslides"><div class="mslide">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
+    <div class="ghead">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}
+      <div><h2>${esc(g.title)}</h2>${meta ? `<div class="meta">${esc(meta)}</div>` : ""}<div class="pills">${pills}</div></div></div>
+    ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
+    ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
+    <div class="seg">${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${status === k}">${v}</button>`).join("")}</div>
+    <div class="ctrl"><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div>
+      <div class="chips"><button class="chip" id="upNextBtn" aria-pressed="${pinned}">📌 Up next</button><button class="chip" id="couchBtn" aria-pressed="${couchV}">Couch co-op</button></div></div>
+    <label class="fin" id="finField" ${status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
+    <p class="desc clamp" id="desc" title="Show more"></p>
+    <details class="more"><summary>More</summary>
+      <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
+      <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
+      <button class="btn ghost small danger" id="eDel">Delete game</button>
+    </details>`, true);
+  const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
+  sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => {
+    status = b.dataset.setstat; sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("#finField").hidden = status !== "done";
+    save({status, finishedAt: status === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null});
+  });
+  $("#finDate").onchange = () => save({finishedAt: Date.parse($("#finDate").value) || Date.now()});
+  sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => {
+    stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); save({myRating: stars || null});
+  });
+  $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); };
+  $("#couchBtn").onclick = () => { couchV = !couchV; $("#couchBtn").setAttribute("aria-pressed", couchV); save({couch: couchV, couchSet: true}); };
+  sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
+  $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
   $("#fixGo").onclick = async () => {
     const box = $("#matches"); box.textContent = "Searching…";
     try {
       const res = await api("/search?q=" + encodeURIComponent($("#fix").value));
-      box.innerHTML = res.map((r, i) => `<button class="match" data-m="${i}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : "<span></span>"}<span><b>${esc(r.title)}</b><br><span class="why">${r.year || ""} · ${esc(r.genres.join(", "))}</span></span></button>`).join("") || "No results.";
+      box.innerHTML = res.map((r, i) => `<button class="match" data-m="${i}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : "<span></span>"}<span><b>${esc(r.title)}</b><br><span class="why">${r.year || ""}</span></span></button>`).join("") || "No results.";
       box.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => { await applyMatch({...g, status, platforms: [...plats]}, res[+b.dataset.m]); closeSheet(); });
     } catch (e){ box.textContent = e.message; }
   };
-  if (g.igdbId){
-    try {
-      const d = await api("/game?id=" + g.igdbId);
-      if ($("#dlg").open && $("#desc")){ $("#desc").textContent = d.summary || "No description."; $("#devs").textContent = d.developers.join(", "); }
-      if (!g.hero && d.hero) upd(id, {hero: d.hero, logo: d.logo || ""});
-    } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
-  }
+  if (!g.igdbId) return;
+  try {
+    const d = await api("/game?id=" + g.igdbId);
+    if (!$("#dlg").open || !$("#mslides")) return;
+    $("#desc").textContent = d.summary || "";
+    const slides = [
+      d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&loop=1&playlist=${encodeURIComponent(d.trailer)}&controls=0&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
+      ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
+    ].filter(Boolean);
+    if (slides.length){
+      $("#mslides").innerHTML = slides.join("");
+      $("#mdots").innerHTML = slides.map((_, i) => `<button class="dotbtn" data-mgo="${i}" aria-label="Slide ${i + 1}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("");
+    }
+    if (!g.hero && d.hero) upd(id, {hero: d.hero, logo: d.logo || ""});
+  } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 
 /* ---------- events ---------- */
@@ -509,6 +525,7 @@ document.addEventListener("click", async e => {
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
   else if (d.time){ time = time === d.time ? "" : d.time; render(); }
   else if (d.edit) editSheet(d.edit);
+  else if (d.mgo != null){ const el = $("#mslides"); el.scrollTo({left: +d.mgo * el.clientWidth, behavior: "smooth"}); }
   else if (d.slide || d.goto != null){
     const el = $("#slides"); if (!el) return;
     const i = d.goto != null ? +d.goto : Math.round(el.scrollLeft / el.clientWidth) + +d.slide;
@@ -553,11 +570,11 @@ document.addEventListener("change", e => {
   if (id === "sortSel"){ sort = e.target.value; render(); }
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
-$("#dlg").addEventListener("close", () => render());
+$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; render(); });
 document.addEventListener("scroll", e => {
-  if (e.target.id !== "slides") return;
-  const i = Math.round(e.target.scrollLeft / e.target.clientWidth);
-  document.querySelectorAll(".dotbtn").forEach((b, j) => b.toggleAttribute("aria-current", j === i));
+  const el = e.target; if (el.id !== "slides" && el.id !== "mslides") return;
+  const i = Math.round(el.scrollLeft / el.clientWidth);
+  el.parentElement.querySelectorAll(".dotbtn").forEach((b, j) => b.toggleAttribute("aria-current", j === i));
 }, true);
 $("#addBtn").onclick = addSheet;
 $("#menuBtn").onclick = menuSheet;
