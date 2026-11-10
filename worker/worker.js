@@ -239,7 +239,7 @@ async function steamTagSearch(tag, filter){
   }).filter(Boolean);
 }
 async function finds(env){
-  const c = await env.KV.get("finds1", "json");
+  const c = await env.KV.get("finds2", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1451606400, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -266,8 +266,9 @@ async function finds(env){
       steamGames = gs.map(g => ({g, s: gid.get(g.id)}));
     }
   }
-  const out = (g, s) => ({...slim(g), date: g.first_release_date || null, steamPct: s?.pct ?? null, rating: Math.round(g.total_rating || g.aggregated_rating || 0) || s?.pct || null});
-  const score = x => (x.rating || 70) + Math.max(0, (x.year || 2016) - 2016) * 1.5;
+  const out = (g, s) => ({...slim(g), date: g.first_release_date || null, steamPct: s?.pct ?? null, steamN: s?.n || 0, rating: Math.round(g.total_rating || g.aggregated_rating || 0) || s?.pct || null});
+  // Trust a score more when many people rated it (IGDB ratings, or Steam reviews / 50).
+  const score = x => { const n = Math.max(x.ratingCount || 0, (x.steamN || 0) / 50); return ((x.rating || 70) * n + 70 * 15) / (n + 15) + Math.max(0, (x.year || 2016) - 2016) * 1.2; };
   const pool = (igdbRows, keep) => {
     const m = new Map();
     for (const g of igdbRows) m.set(g.id, out(g));
@@ -278,10 +279,10 @@ async function finds(env){
   const d = {
     mv: pool(mv, (g, s) => s.k === "mv" && !s.isNew && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 40),
     plat: pool(plat, (g, s) => (s.k === "plat" || s.k === "puzzle") && !s.isNew && recent(g)).sort((a, b) => score(b) - score(a)).slice(0, 50),
-    missed: pool(missed, (g, s) => !s.isNew && g.first_release_date > three && g.first_release_date < half).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 40),
+    missed: pool(missed, (g, s) => !s.isNew && g.first_release_date > three && g.first_release_date < half).sort((a, b) => score(b) - score(a)).slice(0, 40),
     fresh: pool(fresh, (g, s) => g.first_release_date > half && g.first_release_date <= now).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 40)
   };
-  await env.KV.put("finds1", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds2", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
