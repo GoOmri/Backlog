@@ -377,3 +377,7 @@ dialog.full{overflow-x:hidden}
 dialog.full{scrollbar-gutter:auto}
 .gp-main .mslides{height:auto!important}
 .gp-main .media{min-width:0}
+
+/* filter panel: close button top right, Done always visible */
+dialog:not(.full) .x{position:sticky;top:0;margin-left:auto;margin-bottom:-36px;z-index:3;display:grid;place-items:center;width:36px;height:36px;border-radius:999px;border:0;background:var(--raise)}
+.sticky-actions{position:sticky;bottom:0;background:var(--surface);padding-block:12px;margin-inline:-18px;padding-inline:18px;border-top:1px solid var(--line)}

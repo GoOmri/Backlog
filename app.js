@@ -583,7 +583,7 @@ function shelfHTML(wish){
   </div></div>`;
 }
 function filterSheet(){
-  openSheet(`<div class="side insheet" id="sheetSide">${sidebarHTML()}</div><div class="actions"><button class="btn" data-act="close">Done</button></div>`);
+  openSheet(`<button class="x" data-act="close" aria-label="Close">${ic("x")}</button><div class="side insheet" id="sheetSide">${sidebarHTML()}</div><div class="actions sticky-actions"><button class="btn" data-act="close">Done</button></div>`);
 }
 function toggleFilter(group, val){
   if (group === "reset"){ platF.clear(); statF = ""; sort = "title"; deckF = false; genreF = ""; Object.values(F).forEach(x => x.clear()); }
