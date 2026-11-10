@@ -831,6 +831,11 @@ async function fillProgress(g){
       trophyList ||= api("/trophies");
       const k = baseKey(g.title), t = (await trophyList).find(x => baseKey(x.title) === k);
       if (t) { rows.push(bar("Trophies", t.got, t.total, t.hasPlat ? (t.plat ? ` · <span class="plat-ok">Platinum ✓</span>` : " · no platinum yet") : "")); draw(); }
+      if (t?.npId) api(`/rarity?np=${t.npId}&svc=${t.svc || "trophy"}`).then(r => {
+        const pct = r.plat ?? r.rarest; if (pct == null) return;
+        const lvl = pct < 5 ? ["Very hard", "vhard"] : pct < 15 ? ["Hard", "hard"] : pct < 35 ? ["Medium", "med"] : ["Easy", "easy"];
+        rows.push(`<div class="diff"><span class="dchip ${lvl[1]}">${lvl[0]}</span><span>${r.plat != null ? "Platinum" : "Rarest trophy"} earned by <b>${pct}%</b> of players</span></div>`); draw();
+      }).catch(() => {});
     } catch (e){ trophyList = null; if (/NPSSO/.test(e.message)) { rows.push(`<div class="why">${esc(e.message)}</div>`); draw(); } }
   }
 }

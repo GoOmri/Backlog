@@ -31,6 +31,7 @@ export default {
         case "/topmv":    out = await topMetroidvanias(env); break;
         case "/achievements": out = await achievements(env, +url.searchParams.get("appid")); break;
         case "/trophies": out = await trophies(env); break;
+        case "/rarity":   out = await rarity(env, url.searchParams.get("np") || "", url.searchParams.get("svc") || "trophy"); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steamwish": out = await steamWishlist(env); break;
         case "/steam":    out = await steam(env); break;
@@ -329,20 +330,35 @@ async function psnToken(env){
   return t.access_token;
 }
 async function trophies(env){
-  const c = await env.KV.get("trophies", "json");
+  const c = await env.KV.get("trophies2", "json");
   if (c && Date.now() - c.t < 6 * 3600e3) return c.d;
   const tok = await psnToken(env), d = [];
   for (let off = 0; off < 2000; off += 400){
     const r = await (await fetch(`https://m.np.playstation.com/api/trophy/v1/users/me/trophyTitles?limit=400&offset=${off}`, {headers: {Authorization: "Bearer " + tok}})).json();
     for (const x of r.trophyTitles || []){
       const e = x.earnedTrophies || {}, f = x.definedTrophies || {};
-      d.push({title: x.trophyTitleName, platform: x.trophyTitlePlatform, progress: x.progress || 0,
+      d.push({title: x.trophyTitleName, platform: x.trophyTitlePlatform, npId: x.npCommunicationId, svc: x.npServiceName, progress: x.progress || 0,
         got: (e.bronze || 0) + (e.silver || 0) + (e.gold || 0) + (e.platinum || 0), total: (f.bronze || 0) + (f.silver || 0) + (f.gold || 0) + (f.platinum || 0), plat: !!e.platinum, hasPlat: !!f.platinum});
     }
     if (!r.nextOffset) break;
   }
-  await env.KV.put("trophies", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("trophies2", JSON.stringify({t: Date.now(), d}));
   return d;
+}
+
+// How many players earned the platinum (or the rarest trophy): a difficulty measure from PlayStation's own data.
+async function rarity(env, np, svc){
+  if (!/^NPWR\d+_\d+$/.test(np)) throw new Error("Bad trophy id");
+  const c = await env.KV.get("rar:" + np, "json");
+  if (c) return c;
+  const tok = await psnToken(env);
+  const r = await (await fetch(`https://m.np.playstation.com/api/trophy/v1/users/me/npCommunicationIds/${np}/trophyGroups/all/trophies?npServiceName=${svc === "trophy2" ? "trophy2" : "trophy"}`, {headers: {Authorization: "Bearer " + tok}})).json();
+  const list = r.trophies || [];
+  const plat = list.find(t => t.trophyType === "platinum");
+  const rates = list.map(t => parseFloat(t.trophyEarnedRate)).filter(x => !isNaN(x));
+  const out = {plat: plat ? parseFloat(plat.trophyEarnedRate) : null, rarest: rates.length ? Math.min(...rates) : null};
+  await env.KV.put("rar:" + np, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  return out;
 }
 
 /* ---------- Steam library ---------- */

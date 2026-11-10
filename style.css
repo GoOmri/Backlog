@@ -381,3 +381,11 @@ dialog.full{scrollbar-gutter:auto}
 /* filter panel: close button top right, Done always visible */
 dialog:not(.full) .x{position:sticky;top:0;margin-left:auto;margin-bottom:-36px;z-index:3;display:grid;place-items:center;width:36px;height:36px;border-radius:999px;border:0;background:var(--raise)}
 .sticky-actions{position:sticky;bottom:0;background:var(--surface);padding-block:12px;margin-inline:-18px;padding-inline:18px;border-top:1px solid var(--line)}
+
+.diff{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--dim)}
+.diff b{color:var(--fg)}
+.dchip{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:999px}
+.dchip.easy{background:#1f3b2c;color:#7ee2a8}
+.dchip.med{background:#3b351f;color:#f2d06b}
+.dchip.hard{background:#3d2a1c;color:#ff9a62}
+.dchip.vhard{background:#3d1c24;color:#ff6b86}
