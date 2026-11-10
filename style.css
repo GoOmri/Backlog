@@ -284,3 +284,28 @@ dialog.full .x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));righ
 }
 .gp-hero{overflow:visible;z-index:3}
 .gp-hero .gp-bg{clip-path:inset(0)}
+
+/* icon buttons centred; stars outlined until rated */
+.ibtn{line-height:1;padding:0;font-family:system-ui,"Segoe UI Emoji","Apple Color Emoji",sans-serif}
+#rateBtn{color:transparent;-webkit-text-stroke:1.6px var(--fg);font-size:20px}
+#rateBtn.on{background:rgb(255 255 255 / .12);color:var(--gold);-webkit-text-stroke-color:var(--gold)}
+#rateBtn small{color:var(--fg);-webkit-text-stroke:0;margin-left:2px}
+.popmenu.stars button{color:transparent;-webkit-text-stroke:1.6px #fff;font-size:28px;line-height:1}
+.popmenu.stars button.on{color:var(--gold);-webkit-text-stroke-color:var(--gold)}
+.popmenu.stars button:hover{background:none;transform:scale(1.15)}
+.links{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+.links a{text-decoration:none}
+.gp-facts .strip span b{font-weight:600}
+.row.dragging{cursor:grabbing;user-select:none}
+.row.dragging *{pointer-events:none}
+/* trailer controls */
+.vwrap{position:relative}
+.vwrap iframe,#ytp{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border:0}
+.vctl{position:absolute;inset:0;z-index:2;cursor:pointer}
+.vtitle{position:absolute;left:12px;right:12px;top:10px;font-size:13px;font-weight:600;text-shadow:0 1px 4px rgb(0 0 0 / .8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vbar{position:absolute;left:12px;right:12px;bottom:12px;height:14px;display:flex;align-items:center;cursor:pointer}
+.vbar::before{content:"";position:absolute;left:0;right:0;height:3px;border-radius:3px;background:rgb(255 255 255 / .3)}
+.vbar span{position:relative;height:3px;border-radius:3px;background:var(--fg);width:0}
+.vflash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 22px var(--body);padding:8px 14px;border-radius:999px;background:rgb(0 0 0 / .5);opacity:0;pointer-events:none}
+.vflash.show{animation:vf .7s ease-out}
+@keyframes vf{0%{opacity:1}100%{opacity:0}}

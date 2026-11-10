@@ -89,6 +89,19 @@ if (matchMedia("(hover: hover)").matches){
   });
   document.addEventListener("pointerout", e => { if (e.target.closest?.(".card[data-edit]") && !e.relatedTarget?.closest?.(".card[data-edit]")) clearTimeout(hoverT); });
 }
+// Desktop: drag rows sideways with the mouse.
+let drag = null;
+document.addEventListener("pointerdown", e => {
+  const el = e.pointerType === "mouse" && e.target.closest(".row, .mslides"); if (!el || e.target.closest(".vwrap")) return;
+  drag = {el, x: e.clientX, left: el.scrollLeft, moved: false};
+});
+document.addEventListener("pointermove", e => {
+  if (!drag) return; const dx = e.clientX - drag.x;
+  if (Math.abs(dx) > 5 && !drag.moved){ drag.moved = true; drag.el.style.scrollSnapType = "none"; drag.el.classList.add("dragging"); }
+  if (drag.moved) drag.el.scrollLeft = drag.left - dx;
+});
+addEventListener("pointerup", () => { if (!drag) return; const d = drag; drag = null; d.el.style.scrollSnapType = ""; d.el.classList.remove("dragging");
+  if (d.moved) addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }, {capture: true, once: true}); });
 // Start loading details when the pointer rests on a cover, so the page opens ready.
 document.addEventListener("pointerover", e => {
   const c = e.target.closest?.("[data-edit]"); const g = c && games.get(c.dataset.edit);
@@ -559,9 +572,9 @@ function radarHTML(){
   const have = new Set(list().map(g => g.igdbId));
   [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
   const card = (x, sub) => `<div class="card"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button><span class="csub"><span>${esc(sub)}</span></span>
-    <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me">✕</button></span></div>`;
+    <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me" title="Not for me">👎</button></span></div>`;
   const row = (t, xs, subf) => { xs = xs.filter(x => !have.has(x.igdbId)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
-  const when = x => new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"});
+  const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
 }
 function discoverHTML(){
@@ -573,7 +586,7 @@ function discoverHTML(){
     <div class="grid">${discovered.map((d, i) => (previewCache.set(d.igdbId, d), `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}
       <span class="ctitle">${esc(d.title)}</span></button><span class="why">Like ${esc(d.because.join(", "))}</span>
       <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
-      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me">✕</button></span></div>`)).join("")}</div></div></div>`;
+      <span class="chips"><button class="btn ghost small" data-wish="${i}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button><button class="btn ghost small" data-nope="${i}" aria-label="Not for me" title="Not for me">👎</button></span></div>`)).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
   try {
@@ -624,8 +637,10 @@ function render(){
 }
 
 /* ---------- sheets ---------- */
-function openSheet(html, tall = false){ $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
-function closeSheet(){ $("#dlg").close(); }
+// The system back gesture (swipe from the screen edge) closes an open page.
+addEventListener("popstate", () => { if ($("#dlg").open) $("#dlg").close(); });
+function openSheet(html, tall = false){ if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
+function closeSheet(){ if (history.state?.sheet) history.back(); else $("#dlg").close(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
 const statOpts = sel => Object.entries(STAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v}</option>`).join("");
@@ -710,24 +725,47 @@ async function previewSheet(x){
   const have = list().find(g => g.igdbId === x.igdbId);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: "", actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">✕</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">👎</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   $("#pvWish").onclick = async () => { $("#pvWish").disabled = true; $("#pvWish").textContent = "On wishlist";
     const {because, score, added, date, ...data} = x; await setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()}); };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
+// Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
+let ytReady, vTimer;
+function loadYT(){ return ytReady ||= new Promise(res => { window.onYouTubeIframeAPIReady = res; const sc = document.createElement("script"); sc.src = "https://www.youtube.com/iframe_api"; document.head.append(sc); }); }
+async function mountTrailer(id){
+  await loadYT(); if (!$("#ytp")) return;
+  const flash = t => { const f = $("#vflash"); if (!f) return; f.textContent = t; f.classList.remove("show"); void f.offsetWidth; f.classList.add("show"); };
+  const pl = new YT.Player("ytp", {videoId: id, playerVars: {autoplay: 1, mute: 1, start: 5, controls: 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3, fs: 0},
+    events: {onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($("#vtitle")) $("#vtitle").textContent = t || ""; }}});
+  clearInterval(vTimer);
+  vTimer = setInterval(() => { const f = $("#vfill"); if (!f || !pl.getDuration) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
+  const ctl = $("#vctl");
+  ctl.onclick = e => {
+    if (e.target.closest("#vbar")) return;
+    const r = ctl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+    if (x < .35){ pl.seekTo(Math.max(0, pl.getCurrentTime() - 10), true); flash("−10s"); }
+    else if (x > .65){ pl.seekTo(pl.getCurrentTime() + 10, true); flash("+10s"); }
+    else if (pl.getPlayerState() === 1){ pl.pauseVideo(); flash("❚❚"); } else { pl.playVideo(); flash("▶"); }
+  };
+  const bar = $("#vbar");
+  const seek = e => { const r = bar.getBoundingClientRect(); pl.seekTo(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (pl.getDuration() || 0), true); };
+  bar.onpointerdown = e => { e.stopPropagation(); bar.setPointerCapture(e.pointerId); seek(e); bar.onpointermove = seek; };
+  bar.onpointerup = () => bar.onpointermove = null;
+}
 // Critics · Steam % · Developer · Your hours.
 async function fillStrip(g, d){
   const box = $("#strip"); if (!box) return;
-  const parts = [d.critic && `<span><b>${d.critic}</b> critics</span>`, null, d.developers?.[0] && `<span>${esc(d.developers[0])}</span>`, g.steamHours ? `<span><b>${g.steamHours}h</b> played</span>` : null];
+  const parts = [d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
   if (g.steamAppId){
     let r = null;
     try { r = JSON.parse(localStorage.getItem("rev:" + g.steamAppId)); if (r && Date.now() - r.t > 7 * 864e5) r = null; } catch {}
     if (!r){ try { r = {...await api("/steamrev?appid=" + g.steamAppId), t: Date.now()}; localStorage.setItem("rev:" + g.steamAppId, JSON.stringify(r)); } catch {} }
-    if (r?.pct != null){ parts[1] = `<span title="${esc(r.label)} · ${r.total} reviews"><b>${r.pct}%</b> Steam</span>`; draw(); }
+    if (r?.pct != null){ parts[1] = `<span title="${esc(r.label)} · ${r.total} reviews">Steam reviews <b>${r.pct}%</b> positive</span>`; draw(); }
   }
 }
 // Trailer (with timeline) + screenshots, description, similar games.
@@ -737,13 +775,14 @@ function fillMedia(d){
   if (d.logo && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(d.logo)}" alt="">`;
   if (d.hero && $(".gp-bg") && !$(".gp-bg").src.includes(d.hero)) $(".gp-bg").src = d.hero;
   const slides = [
-    d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&start=5&controls=1&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
+    d.trailer && `<div class="mslide vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vtitle" id="vtitle"></div><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
   ].filter(Boolean);
   if (slides.length){
     $("#mslides").innerHTML = slides.join("");
     $("#mdots").innerHTML = slides.map((_, i) => `<button class="dotbtn" data-mgo="${i}" aria-label="Slide ${i + 1}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("");
   }
+  if (d.trailer && $("#ytp")) mountTrailer(d.trailer);
   const byIgdb = new Map(list().map(g => [g.igdbId, g]));
   const sims = (d.similar || []).filter(x => !byIgdb.get(x.igdbId)?.nope);
   if (sims.length && $("#simBox")){
@@ -767,10 +806,11 @@ async function editSheet(id){
     <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">★${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
       <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div></div>
     <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Shortlist" aria-label="Shortlist" aria-pressed="${!!g.upNext}">📌</button>
-    <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? "↺" : "✕"}</button>`;
+    <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? "↺" : "👎"}</button>`;
   const facts = `
     ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
+    <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <details class="more"><summary>Edit</summary>
       <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
@@ -884,7 +924,7 @@ document.addEventListener("change", e => {
   if (id === "sortSel"){ sort = e.target.value; render(); }
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
-$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; render(); });
+$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval(vTimer); if (history.state?.sheet) history.back(); render(); });
 document.addEventListener("scroll", e => {
   const el = e.target; if (el.id !== "slides" && el.id !== "mslides") return;
   const i = Math.round(el.scrollLeft / el.clientWidth);
