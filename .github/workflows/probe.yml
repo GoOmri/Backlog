@@ -1,0 +1,11 @@
+name: Probe Worker
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for q in "In%20Between" "We%20Were%20Here"; do
+            echo "== search $q"; curl -s -H "Origin: https://goomri.github.io" "https://backlog-api.goomric.workers.dev/search?q=$q" | head -c 1500; echo
+          done
+          echo "== match"; curl -s -X POST -H "Origin: https://goomri.github.io" -H "Content-Type: application/json" -d '{"titles":["In Between","We Were Here"]}' https://backlog-api.goomric.workers.dev/match | head -c 1500; echo
