@@ -27,6 +27,7 @@ export default {
         case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
         case "/steamrev": out = await steamReviews(env, +url.searchParams.get("appid")); break;
         case "/grids":    out = await grids(env, (body.titles || []).slice(0, 10)); break;
+        case "/topmv":    out = await topMetroidvanias(env); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
@@ -186,6 +187,18 @@ async function grids(env, titles){
       out[t] = hit ? (await sgdb(env, `grids/game/${hit.id}?dimensions=600x900&types=static&nsfw=false&humor=false`) || []).slice(0, 6).map(x => x.url) : [];
     } catch { out[t] = []; }
   }));
+  return out;
+}
+
+// Best-known metroidvanias (by number of ratings, then score). Cached for a week.
+async function topMetroidvanias(env){
+  const c = await env.KV.get("topmv", "json");
+  if (c) return c;
+  const kws = await igdb(env, "keywords", `fields id; where name ~ *"metroidvania"*; limit 20;`);
+  if (!kws.length) return [];
+  const rows = await igdb(env, "games", `fields ${MATCH_FIELDS}; where keywords = (${kws.map(k => k.id).join(",")}) & total_rating_count > 25 & total_rating > 70 & version_parent = null & parent_game = null; sort total_rating_count desc; limit 80;`);
+  const out = rows.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  await env.KV.put("topmv", JSON.stringify(out), {expirationTtl: 7 * 86400});
   return out;
 }
 
