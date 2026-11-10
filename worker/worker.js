@@ -32,6 +32,7 @@ export default {
         case "/achievements": out = await achievements(env, +url.searchParams.get("appid")); break;
         case "/trophies": out = await trophies(env); break;
         case "/rarity":   out = await rarity(env, url.searchParams.get("np") || "", url.searchParams.get("svc") || "trophy"); break;
+        case "/achrarity": out = await achRarity(env, +url.searchParams.get("appid")); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steamwish": out = await steamWishlist(env); break;
         case "/steam":    out = await steam(env); break;
@@ -358,6 +359,19 @@ async function rarity(env, np, svc){
   const rates = list.map(t => parseFloat(t.trophyEarnedRate)).filter(x => !isNaN(x));
   const out = {plat: plat ? parseFloat(plat.trophyEarnedRate) : null, rarest: rates.length ? Math.min(...rates) : null};
   await env.KV.put("rar:" + np, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  return out;
+}
+
+// Steam: share of players who earned the rarest achievement.
+async function achRarity(env, appid){
+  if (!appid) throw new Error("Missing appid");
+  const c = await env.KV.get("achr:" + appid, "json");
+  if (c) return c;
+  const r = await fetch(`https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appid}`);
+  const list = r.ok ? (await r.json()).achievementpercentages?.achievements || [] : [];
+  const p = list.map(a => parseFloat(a.percent)).filter(x => !isNaN(x));
+  const out = {rarest: p.length ? Math.round(Math.min(...p) * 10) / 10 : null};
+  await env.KV.put("achr:" + appid, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 

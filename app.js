@@ -449,8 +449,6 @@ function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
   const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "Suggested · pin to keep";
-  const main = g.status === "playing" ? `<button class="btn" data-finish="${g.id}">Mark finished</button>`
-    : g.status === "wishlist" ? "" : `<button class="btn" data-start="${g.id}">Start playing</button>`;
   return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="" loading="lazy">` : ""}</div>
     <div class="hero-in">
       <span class="eyebrow">${eyebrow}</span>
@@ -774,7 +772,7 @@ function pageShell(x, {own, actions, facts}){
       <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
       <p class="desc clamp" id="desc"></p>
     </div>
-    <aside class="gp-facts">${own}<div class="strip" id="strip"></div><div class="prog" id="prog"></div>${facts || ""}</aside>
+    <aside class="gp-facts">${own}<div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"><span class="dchip none">…</span><span>Difficulty</span></div>${facts || ""}</aside>
   </div>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
 }
@@ -792,6 +790,7 @@ async function previewSheet(x){
     toast("Added to wishlist");
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
+  fillDifficulty(x, null);
   try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
@@ -825,19 +824,28 @@ async function fillProgress(g){
   const bar = (label, got, total, extra = "") => `<div class="pbar"><div class="pline"><span>${label}</span><span><b>${got}/${total}</b>${extra}</span></div><div class="ptrack"><span style="width:${total ? got / total * 100 : 0}%"></span></div></div>`;
   const draw = () => { if ($("#prog") === box) box.innerHTML = rows.join(""); };
   const ps = (g.platforms || []).some(p => p === "ps5" || p === "psplus") || g.ps;
+  let psRarity = null;
   if (g.steamAppId) api("/achievements?appid=" + g.steamAppId).then(a => { if (a.total){ rows.unshift(bar("Steam achievements", a.got, a.total)); draw(); } }).catch(() => {});
   if (ps){
     try {
       trophyList ||= api("/trophies");
       const k = baseKey(g.title), t = (await trophyList).find(x => baseKey(x.title) === k);
       if (t) { rows.push(bar("Trophies", t.got, t.total, t.hasPlat ? (t.plat ? ` · <span class="plat-ok">Platinum ✓</span>` : " · no platinum yet") : "")); draw(); }
-      if (t?.npId) api(`/rarity?np=${t.npId}&svc=${t.svc || "trophy"}`).then(r => {
-        const pct = r.plat ?? r.rarest; if (pct == null) return;
-        const lvl = pct < 5 ? ["Very hard", "vhard"] : pct < 15 ? ["Hard", "hard"] : pct < 35 ? ["Medium", "med"] : ["Easy", "easy"];
-        rows.push(`<div class="diff"><span class="dchip ${lvl[1]}">${lvl[0]}</span><span>${r.plat != null ? "Platinum" : "Rarest trophy"} earned by <b>${pct}%</b> of players</span></div>`); draw();
-      }).catch(() => {});
+      if (t?.npId) psRarity = api(`/rarity?np=${t.npId}&svc=${t.svc || "trophy"}`).then(r => r.plat != null ? [r.plat, "Platinum"] : r.rarest != null ? [r.rarest, "Rarest trophy"] : null).catch(() => null);
     } catch (e){ trophyList = null; if (/NPSSO/.test(e.message)) { rows.push(`<div class="why">${esc(e.message)}</div>`); draw(); } }
   }
+  fillDifficulty(g, psRarity);
+}
+// Difficulty, same look for every game: how many players earned the platinum (PS),
+// or the rarest achievement (Steam). Shown as "Unknown" when there's no data.
+async function fillDifficulty(g, psRarity){
+  const box = $("#diffBox"); if (!box) return;
+  let r = psRarity ? await psRarity : null;
+  if (!r && g.steamAppId) r = await api("/achrarity?appid=" + g.steamAppId).then(x => x.rarest != null ? [x.rarest, "Rarest achievement"] : null).catch(() => null);
+  if ($("#diffBox") !== box) return;
+  if (!r){ box.innerHTML = `<span class="dchip none">Unknown</span><span>No trophy data yet</span>`; return; }
+  const [pct, what] = r, lvl = pct < 5 ? ["Very hard", "vhard"] : pct < 15 ? ["Hard", "hard"] : pct < 35 ? ["Medium", "med"] : ["Easy", "easy"];
+  box.innerHTML = `<span class="dchip ${lvl[1]}">${lvl[0]}</span><span>${what} earned by <b>${pct}%</b> of players</span>`;
 }
 // Critics · Steam % · Developer · Your hours.
 async function fillStrip(g, d){
