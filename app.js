@@ -39,7 +39,7 @@ function basicTags(g){
 }
 // PlayStation access: bought (yours), claimed (monthly PS Plus, yours while subscribed),
 // catalog (PS Plus Extra, can leave), left (gone from PS Plus, not playable now).
-const PS_LABEL = {bought: "Bought on PlayStation", claimed: "Claimed with PS Plus · yours while subscribed", catalog: "PS Plus catalog · can leave anytime", left: "Left PS Plus · not playable now"};
+const PS_LABEL = {bought: "Bought", claimed: "Claimed", catalog: "Catalog", left: "Left PS Plus"};
 const playable = g => g.ps !== "left";
 const sale = g => g.status === "wishlist" && g.sale?.cut > 0 && /^(steam|epic)/i.test(g.sale.shop || "") ? g.sale : null;
 
