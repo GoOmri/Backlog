@@ -1,0 +1,12 @@
+# Deploy settings for the Backlog data service (used by the GitHub deploy action).
+name = "backlog-api"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "KV"
+id = "PASTE_KV_ID_HERE"
+
+[triggers]
+crons = ["0 6 * * *"]
