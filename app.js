@@ -5,7 +5,7 @@ import { API, FIREBASE } from "./config.js";
 
 /* ---------- constants ---------- */
 const PLAT = {ps5:["PS5","PS","--ps"], psplus:["PS Plus","P+","--psplus"], steam:["Steam","ST","--steam"], epic:["Epic","EP","--epic"], itch:["itch.io","IO","--itch"], other:["Other","··","--other"]};
-const STAT = {backlog:"To play", playing:"Playing", done:"Finished", dropped:"Dropped", wishlist:"Wishlist"};
+const STAT = {backlog:"Owned", playing:"Playing", done:"Finished", dropped:"Dropped", wishlist:"Wishlist"};
 const RANK = {wishlist:1, backlog:2, playing:3, dropped:4, done:5};
 // Plain white line icons (Lucide shapes), drawn inline so they follow the text colour.
 const ICON = {
@@ -549,7 +549,7 @@ function sidebarHTML(){
   const any = statF || platF.size || F.type.size || F.view.size || F.coop.size || F.access.size || deckF || sort !== "title";
   const SORTS = {title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played (Steam)"})};
   return `<div class="fhead"><b>Filters</b>${any ? `<button class="linkbtn" data-f="reset|">Reset</button>` : ""}</div>`
-    + (wish ? "" : sec("Status", [["","All"],["backlog","To play"],["playing","Playing"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
+    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
         .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join("")))
     + sec("Needs attention", opt("nomatch", "1", "No match found", scope.filter(g => g.noMatch).length, genreF === "__nomatch"))
     + sec("Type", types.map(t => opt("type", t, t, typeCounts[t] || 0, F.type.has(t))).join(""))
@@ -578,7 +578,7 @@ function shelfHTML(wish){
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
     </div>
-    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","To play"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}
+    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}
     <div class="grid">${shown.map(g => cardHTML(g, wish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>
   </div></div>`;
 }
@@ -758,7 +758,9 @@ function inList(x){
   return list().find(g => (x.igdbId && g.igdbId === x.igdbId) || baseKey(g.title) === k || baseKey(g.asTyped || "") === k) || null;
 }
 function pageShell(x, {own, actions, facts}){
-  const meta = [x.year, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
+  const yr = new Date().getFullYear();
+  const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
+  const meta = [when, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = x.hero || x.cover;
   return `<button class="x" data-act="close" aria-label="Close">${ic("x")}</button>
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
