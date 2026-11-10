@@ -537,7 +537,7 @@ async function editSheet(id){
   const g = games.get(id); if (!g) return;
   let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext, couchV = !!g.couch;
   const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
-  const meta = [g.year, ...basicTags(g).filter(t => t !== "Couch co-op")].filter(Boolean).join(" · ");
+  const meta = [g.year, ...basicTags(g)].filter(Boolean).join(" · ");
   const own = (g.platforms || []).filter(p => p !== "psplus");
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
     : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + ((g.platforms || []).includes("psplus") || g.ps ? `<span class="pill" style="--c:var(--psplus)">${esc(PS_LABEL[g.ps] || "PS Plus")}</span>` : "");
@@ -549,10 +549,11 @@ async function editSheet(id){
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
     <div class="seg">${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${status === k}">${v}</button>`).join("")}</div>
     <div class="ctrl"><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div>
-      <div class="chips"><button class="chip" id="upNextBtn" aria-pressed="${pinned}">📌 Up next</button><button class="chip" id="couchBtn" aria-pressed="${couchV}">Couch co-op</button></div></div>
+      <div class="chips"><button class="chip" id="upNextBtn" aria-pressed="${pinned}">📌 Up next</button></div></div>
     <label class="fin" id="finField" ${status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <p class="desc clamp" id="desc" title="Show more"></p>
     <details class="more"><summary>More</summary>
+      <div class="field"><span class="label">Couch co-op</span><div class="chips"><button class="chip" id="couchBtn" aria-pressed="${couchV}">${couchV ? "Yes" : "No"}</button></div></div>
       <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
@@ -567,7 +568,7 @@ async function editSheet(id){
     stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); save({myRating: stars || null});
   });
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); };
-  $("#couchBtn").onclick = () => { couchV = !couchV; $("#couchBtn").setAttribute("aria-pressed", couchV); save({couch: couchV, couchSet: true}); };
+  $("#couchBtn").onclick = () => { couchV = !couchV; $("#couchBtn").setAttribute("aria-pressed", couchV); $("#couchBtn").textContent = couchV ? "Yes" : "No"; save({couch: couchV, couchSet: true}); };
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let armed = false;
