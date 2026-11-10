@@ -29,8 +29,11 @@ const THEME = {"Horror":"Horror","Survival":"Survival","Open world":"Open world"
 // Plain description: 2D/3D, what kind of game, co-op.
 function basicTags(g){
   const v = [...new Set((g.views || []).map(x => VIEW[x]).filter(Boolean))].slice(0, 1);
-  const k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure")).slice(0, 2);
-  const t = (g.themes || []).map(x => THEME[x]).filter(Boolean).slice(0, 1);
+  let k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure"));
+  if ((g.kw || []).includes("Metroidvania")) k = ["Metroidvania", ...k.filter(x => x !== "Platformer")];
+  k = k.slice(0, 2);
+  const f = (g.kw || []).filter(x => x === "Soulslike" || x === "Chill").slice(0, 1);
+  const t = f.length ? f : (g.themes || []).map(x => THEME[x]).filter(Boolean).slice(0, 1);
   const c = g.couch ? ["Couch co-op"] : g.onlineCoop || (g.modes || []).includes("Co-operative") ? ["Online co-op"] : [];
   return [...v, ...k, ...t, ...c];
 }
@@ -115,12 +118,12 @@ async function rematchAll(){
   running = false;
 }
 async function backfill(){
-  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined));
-  for (let i = 0; i < need.length; i += 400){
-    const chunk = need.slice(i, i + 400);
-    progress(i, need.length, "Adding 2D/3D and co-op info");
+  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined || g.kw === undefined));
+  for (let i = 0; i < need.length; i += 200){
+    const chunk = need.slice(i, i + 200);
+    progress(i, need.length, "Adding game details");
     const res = await api("/info", {ids: chunk.map(g => g.igdbId)});
-    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop})));
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: g.couchSet ? !!g.couch : !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop, kw: res[g.igdbId]?.kw || []})));
   }
   const odd = list().filter(g => g.igdbId && g.asTyped && !g.rechecked && key(g.title) !== key(g.asTyped));
   for (const [i, g] of odd.entries()){
@@ -280,28 +283,45 @@ async function fetchHero(g){
   heroAsked.add(g.id);
   try { const d = await api("/game?id=" + g.igdbId); await upd(g.id, {hero: d.hero || "", logo: d.logo || ""}); } catch {}
 }
+// Omri's categories. A game can sit in more than one.
+const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
+const plat = g => (g.genres || []).includes("Platform");
+const CATS = [
+  ["Metroidvanias", g => (g.kw || []).includes("Metroidvania")],
+  ["2D platformers", g => plat(g) && has(g, "2D") && !(g.kw || []).includes("Metroidvania") && !(g.genres || []).includes("Puzzle")],
+  ["Couch co-op platformers", g => plat(g) && g.couch],
+  ["Puzzle-platformers", g => plat(g) && ((g.genres || []).includes("Puzzle") || (g.kw || []).includes("Puzzle-platformer"))]
+];
+// 3D games ranked by how close they are to the 3D games he played and liked.
+function taste3D(gs){
+  const w = {};
+  list().filter(g => has(g, "3D") && (g.status === "done" || g.status === "playing" || g.myRating))
+    .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2.5 : 1)));
+  return gs.filter(g => has(g, "3D")).map(g => [g, genresOf(g).reduce((s, t) => s + (w[t] || 0), 0) + (g.rating || 60) / 50])
+    .sort((a, b) => b[1] - a[1]).map(r => r[0]);
+}
+const byLikely = (a, b) => (b.status === "playing") - (a.status === "playing") || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0);
 function homeHTML(){
   if (!games.size) return emptyHTML();
-  const top = upNextGames(), inTop = new Set(top.map(g => g.id)), back = list().filter(g => g.status === "backlog");
-  const playing = list().filter(g => g.status === "playing" && !inTop.has(g.id));
+  const top = upNextGames(), inTop = new Set(top.map(g => g.id));
+  const owned = list().filter(g => g.status === "backlog" || g.status === "playing"), wish = list().filter(g => g.status === "wishlist");
+  const playing = owned.filter(g => g.status === "playing" && !inTop.has(g.id));
   const pinnedOther = list().filter(g => g.upNext && !inTop.has(g.id) && g.status !== "done" && g.status !== "dropped").sort((a, b) => a.upNext - b.upNext);
   const leaving = list().filter(g => leavingFor(g));
-  const is2DPlat = g => basicTags(g).includes("2D") && basicTags(g).includes("Platformer");
-  const couchOwned = list().filter(g => g.couch && (g.status === "backlog" || g.status === "playing") && !inTop.has(g.id)).sort((a, b) => is2DPlat(b) - is2DPlat(a) || (b.rating || 0) - (a.rating || 0));
-  const recs = recommended().filter(g => !inTop.has(g.id)).slice(0, 20);
-  const best = back.filter(g => g.rating && !inTop.has(g.id)).sort((a, b) => b.rating - a.rating).slice(0, 20);
-  const recent = list().filter(g => g.status !== "wishlist").sort((a, b) => (b.added || 0) - (a.added || 0)).slice(0, 20);
   const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
+  const cats = CATS.map(([name, test]) =>
+    rowHTML(name, owned.filter(test).sort(byLikely).slice(0, 24))
+    + rowHTML(name + " on your wishlist", wish.filter(test).sort(byLikely).slice(0, 24))).join("");
   return carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
     + rowHTML("Up next", pinnedOther)
     + rowHTML("Also playing", playing)
     + rowHTML("Leaving PS Plus soon", leaving)
-    + rowHTML("Couch co-op you own", couchOwned)
-    + rowHTML("Recommended from your backlog", recs)
-    + rowHTML("Best rated in your backlog", best)
-    + rowHTML("Recently added", recent)
-    + rowHTML("On sale from your wishlist", sales, "PC stores", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`);
+    + cats
+    + rowHTML("3D games for you", taste3D(owned).slice(0, 24))
+    + rowHTML("3D games on your wishlist", taste3D(wish).slice(0, 24))
+    + rowHTML("Recommended from your backlog", recommended().filter(g => !inTop.has(g.id)).slice(0, 20))
+    + rowHTML("On sale from your wishlist", sales, "", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`);
 }
 function topTags(gs){
   const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
