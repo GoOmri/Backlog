@@ -456,7 +456,7 @@ function heroHTML(g){
       <span class="eyebrow">${eyebrow}</span>
       ${g.logo ? `<img class="hero-logo" src="${esc(g.logo)}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
       <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
-      <div class="hero-actions">${main}<button class="btn ghost" data-edit="${g.id}">Details</button></div>
+      <div class="hero-actions"><button class="btn" data-edit="${g.id}">Details</button></div>
     </div></div>`;
 }
 function carouselHTML(gs){
