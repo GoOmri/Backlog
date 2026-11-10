@@ -265,7 +265,7 @@ const SEARCHES = [
   ["soon", ["Metroidvania"], "filter=popularcomingsoon"], ["soon", ["2D Platformer"], "filter=popularcomingsoon"]
 ];
 async function finds(env){
-  const c = await env.KV.get("finds8", "json");
+  const c = await env.KV.get("finds9", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -315,14 +315,14 @@ async function finds(env){
   const d = {
     fresh: pick(["fresh"], x => !x.date || x.date > now - 365 * 86400, (a, b) => (b.date || 0) - (a.date || 0)),
     soon: pick(["soon"], x => !x.date || x.date > now, (a, b) => (a.date || 9e12) - (b.date || 9e12)),
-    mv: pick(["mv"], released), plat: pick(["plat"], released),
+    mv: pick(["mv"], released), mvTop: pick(["mv"], x => x.steamN >= 3000 && x.steamPct >= 90, (a, b) => b.steamPct - a.steamPct || b.steamN - a.steamN), plat: pick(["plat"], released),
     gems: pick(taste, x => released(x) && x.gem && x.taste >= 0, (a, b) => (b.steamPct + b.taste) - (a.steamPct + a.taste)),
     coopPuzzle: pick(["coopPuzzle"], released), coopPlat: pick(["coopPlat"], released),
     walk: pick(["walk"], released), mystery: pick(["mystery"], released), cozy: pick(["cozy"], released), zelda: pick(["zelda"], released),
     missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
     classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
   };
-  await env.KV.put("finds8", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds9", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
