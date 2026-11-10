@@ -719,8 +719,14 @@ function render(){
   $("#tabs").innerHTML = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "disc" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
+  // Keep each row's (and the carousel's) scroll position while staying on the same tab.
+  const keyOf = el => el.id || el.closest(".section")?.querySelector("h3")?.textContent || "";
+  const pos = rowTab === tab ? new Map([...m.querySelectorAll(".row, #slides")].map(el => [keyOf(el), el.scrollLeft])) : new Map();
+  rowTab = tab;
   m.innerHTML = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
+  if (pos.size) for (const el of m.querySelectorAll(".row, #slides")){ const x = pos.get(keyOf(el)); if (x) el.scrollLeft = x; }
 }
+let rowTab = null;
 
 /* ---------- sheets ---------- */
 // The system back gesture (swipe from the screen edge) closes an open page.
