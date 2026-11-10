@@ -375,7 +375,7 @@ function render(){
 }
 
 /* ---------- sheets ---------- */
-function openSheet(html){ $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
+function openSheet(html, tall = false){ $("#dlg").classList.toggle("tall", tall); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ $("#dlg").close(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
@@ -427,7 +427,7 @@ async function editSheet(id){
       <div class="field" id="finField" ${status === "done" ? "" : "hidden"}><label class="label" for="finDate">Finished on</label><input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></div></div>
     <div class="field"><span class="label">Platforms</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
     <details><summary class="label">Wrong game? Fix match</summary><div class="field" style="margin-top:8px"><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div></details>
-    <div class="actions"><button class="btn ghost danger" id="eDel" style="margin-right:auto">Delete</button><button class="btn ghost" data-act="close">Cancel</button><button class="btn" id="eSave">Save</button></div>`);
+    <div class="actions"><button class="btn ghost danger" id="eDel" style="margin-right:auto">Delete</button><button class="btn ghost" data-act="close">Cancel</button><button class="btn" id="eSave">Save</button></div>`, true);
   const sh = $("#sheet");
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => { status = b.dataset.setstat; sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("#finField").hidden = status !== "done"; });
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); });

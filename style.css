@@ -164,3 +164,8 @@ a{color:var(--accent)}
 
 .note.own{display:grid;gap:8px}
 .note.own .chip{margin:2px 2px 0 0}
+
+/* game sheet keeps one size: fixed height, own scrollbar space, description area reserved */
+dialog{scrollbar-gutter:stable}
+dialog.tall{height:min(880px,calc(100dvh - 30px))}
+.desc{min-height:8.5em}
