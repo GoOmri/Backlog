@@ -1144,6 +1144,10 @@ document.addEventListener("scroll", e => {
   const i = Math.round(el.scrollLeft / el.clientWidth);
   el.parentElement.querySelectorAll(".dotbtn").forEach((b, j) => b.toggleAttribute("aria-current", j === i));
 }, true);
+// Phones: the tab bar is position:fixed, but inside the sticky header Chrome can misplace it while scrolling. Move it to <body> there.
+const phoneMQ = matchMedia("(max-width:760px)");
+function placeTabs(){ const t = $("#tabs"); if (phoneMQ.matches) document.body.append(t); else $(".bar-in .brand").after(t); }
+placeTabs(); phoneMQ.addEventListener("change", placeTabs);
 $("#addBtn").onclick = addSheet;
 $("#menuBtn").onclick = menuSheet;
 
