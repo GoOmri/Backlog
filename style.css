@@ -504,3 +504,22 @@ dialog:not(.full){border-radius:var(--r-l)}
 .pc::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c)}
 
 .dchip{white-space:nowrap;flex-shrink:0}
+
+/* ---------- motion: tab switch, page open/close, tap feedback ---------- */
+@keyframes tabin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes sheetin{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes sheetout{to{opacity:0;transform:translateY(24px)}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes fadeout{to{opacity:0}}
+@keyframes pop{40%{transform:scale(1.25)}to{transform:none}}
+#main.tabin{animation:tabin .22s ease-out}
+dialog[open]{animation:sheetin .24s cubic-bezier(.2,.8,.2,1)}
+dialog[open]::backdrop{animation:fadein .24s ease-out}
+dialog.closing{animation:sheetout .18s ease-in forwards}
+dialog.closing::backdrop{animation:fadeout .18s ease-in forwards}
+img.imgin{animation:fadein .35s ease-out}
+.btn,.ibtn,.heartbtn,.tab,.linkbtn{transition:transform .12s ease,background-color .15s}
+.btn:active,.ibtn:active,.heartbtn:active,.tab:active,.linkbtn:active{transform:scale(.94)}
+.card:active .cover{transform:scale(.97)}
+.ibtn.pop .ico-svg,.heartbtn.pop svg,.ibtn.pop svg{animation:pop .3s ease-out}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after,dialog::backdrop{animation:none!important;transition:none!important}}

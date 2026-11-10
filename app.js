@@ -730,9 +730,17 @@ let rowTab = null;
 
 /* ---------- sheets ---------- */
 // The system back gesture (swipe from the screen edge) closes an open page.
-addEventListener("popstate", () => { if ($("#dlg").open) $("#dlg").close(); });
-function openSheet(html, tall = false){ if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
-function closeSheet(){ if (history.state?.sheet) history.back(); else $("#dlg").close(); }
+addEventListener("popstate", () => { if ($("#dlg").open) shut(); });
+// Close with a slide-down instead of vanishing; Esc goes through the same path.
+function shut(){ const g = $("#dlg"); if (!g.open || g.classList.contains("closing")) return; g.classList.add("closing"); setTimeout(() => { if (g.classList.contains("closing")){ g.classList.remove("closing"); g.close(); } }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180); }
+$("#dlg").addEventListener("cancel", e => { e.preventDefault(); closeSheet(); });
+// Restart a one-shot CSS animation class on an element.
+function anim(el, c){ if (!el) return; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
+// Fade covers in the first time an image arrives (cached re-renders stay still, no flicker).
+const seenImg = new Set();
+document.addEventListener("load", e => { const i = e.target; if (i.tagName !== "IMG" || seenImg.has(i.src)) return; seenImg.add(i.src); anim(i, "imgin"); }, true);
+function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
+function closeSheet(){ if (history.state?.sheet) history.back(); else shut(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
 const statOpts = sel => Object.entries(STAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v}</option>`).join("");
@@ -1061,7 +1069,8 @@ async function editSheet(id){
 document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
-  if (d.tab){ tab = d.tab; q = ""; loadFilters(); render(); scrollTo(0, 0); }
+  if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
+  if (d.tab){ const ch = tab !== d.tab; tab = d.tab; q = ""; loadFilters(); render(); scrollTo(0, 0); if (ch) anim($("#main"), "tabin"); }
   else if (d.f != null){ const k = d.f.indexOf("|"); toggleFilter(d.f.slice(0, k), d.f.slice(k + 1)); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
