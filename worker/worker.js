@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,total_rating,aggregated_rating";
+const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,total_rating,aggregated_rating";
 
 export default {
   async fetch(req, env, ctx){
@@ -23,6 +23,7 @@ export default {
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
         case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 400)); break;
+        case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
         case "/psplus":   out = await psplus(env, ctx); break;
@@ -68,10 +69,12 @@ function slim(g, ttb){
     themes: (g.themes || []).map(x => x.name),
     modes: (g.game_modes || []).map(x => x.name),
     views: (g.player_perspectives || []).map(x => x.name),
+    ...coop(g),
     rating: Math.round(g.total_rating || g.aggregated_rating || 0) || null,
     ttb: t ? {main: hrs(t.normally || t.hastily), rush: hrs(t.hastily), full: hrs(t.completely)} : null
   };
 }
+const coop = g => ({couch: (g.multiplayer_modes || []).some(m => m.offlinecoop || m.splitscreen), onlineCoop: (g.multiplayer_modes || []).some(m => m.onlinecoop)});
 const hrs = s => s ? Math.max(1, Math.round(s / 3600)) : null;
 async function ttbFor(env, ids){
   if (!ids.length) return {};
@@ -97,8 +100,8 @@ async function match(env, titles){
 // Extra fields for games already in the list (backfill).
 async function info(env, ids){
   if (!ids.length) return {};
-  const rows = await igdb(env, "games", `fields player_perspectives.name; where id = (${ids.join(",")}); limit 500;`);
-  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name)}]));
+  const rows = await igdb(env, "games", `fields player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop; where id = (${ids.join(",")}); limit 500;`);
+  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name), ...coop(g)}]));
 }
 
 async function search(env, text){
@@ -154,6 +157,19 @@ async function discover(env, like, exclude){
   const ttb = await ttbFor(env, list.map(g => g.id));
   return list.map(g => ({...slim(g, ttb), because: because.get(g.id).slice(0, 3), score: count.get(g.id)}))
     .sort((a, b) => b.score - a.score || (b.rating || 0) - (a.rating || 0));
+}
+
+/* ---------- Couch co-op finder ---------- */
+// IGDB ids: genre 8 = Platform, perspective 4 = Side view.
+async function couch(env, kind){
+  const base = `(multiplayer_modes.offlinecoop = true | multiplayer_modes.splitscreen = true)` + (kind === "platformer" ? ` & genres = (8) & player_perspectives = (4)` : "");
+  const yearAgo = Math.floor(Date.now() / 1000) - 540 * 86400, now = Math.floor(Date.now() / 1000);
+  const [best, fresh] = await Promise.all([
+    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & total_rating_count > 8 & version_parent = null & parent_game = null; sort total_rating desc; limit 40;`),
+    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & first_release_date > ${yearAgo} & first_release_date < ${now} & version_parent = null & parent_game = null; sort hypes desc; limit 40;`)
+  ]);
+  const ttb = await ttbFor(env, [...best, ...fresh].map(g => g.id));
+  return {best: best.map(g => slim(g, ttb)), fresh: fresh.map(g => slim(g, ttb))};
 }
 
 /* ---------- Steam library ---------- */
