@@ -65,8 +65,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd2:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd2:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd3:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd3:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -704,6 +704,19 @@ async function previewSheet(x){
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   try { fillMedia(await gameDetails(x.igdbId)); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
+// Critics · Steam % · Developer · Your hours, under the title.
+async function fillStrip(g, d){
+  const box = $("#strip"); if (!box) return;
+  const parts = [d.critic && `<span><b>${d.critic}</b> critics</span>`, null, d.developers?.[0] && `<span>${esc(d.developers[0])}</span>`, g.steamHours ? `<span><b>${g.steamHours}h</b> played</span>` : null];
+  const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
+  draw();
+  if (g.steamAppId){
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem("rev:" + g.steamAppId)); if (r && Date.now() - r.t > 7 * 864e5) r = null; } catch {}
+    if (!r){ try { r = {...await api("/steamrev?appid=" + g.steamAppId), t: Date.now()}; localStorage.setItem("rev:" + g.steamAppId, JSON.stringify(r)); } catch {} }
+    if (r?.pct != null){ parts[1] = `<span title="${esc(r.label)} · ${r.total} reviews"><b>${r.pct}%</b> Steam</span>`; draw(); }
+  }
+}
 // Trailer + screenshots, description and similar games into an open game page.
 function fillMedia(d){
   if (!$("#dlg").open || !$("#mslides")) return;
@@ -741,6 +754,7 @@ async function editSheet(id){
     <div class="media"><div class="mslides" id="mslides"><div class="mslide">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
     <div class="ghead">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}
       <div><h2>${esc(g.title)}</h2>${meta ? `<div class="meta">${esc(meta)}</div>` : ""}<div class="pills">${pills}</div></div></div>
+    <div class="strip" id="strip">${g.steamHours ? `<span><b>${g.steamHours}h</b> played</span>` : ""}</div>
     ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
     <div class="seg">${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${status === k}">${v}</button>`).join("")}</div>
@@ -781,6 +795,7 @@ async function editSheet(id){
   try {
     const d = await gameDetails(g.igdbId);
     fillMedia(d);
+    fillStrip(g, d);
     if (!g.hero && d.hero) upd(id, {hero: d.hero, logo: d.logo || ""});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }

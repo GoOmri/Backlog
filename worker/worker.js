@@ -25,6 +25,7 @@ export default {
         case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
         case "/upcoming": out = await upcoming(env); break;
         case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
+        case "/steamrev": out = await steamReviews(env, +url.searchParams.get("appid")); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
@@ -133,10 +134,10 @@ query games "s" { search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10; };`;
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
-  const cached = await env.KV.get("game2:" + id, "json");
+  const cached = await env.KV.get("game3:" + id, "json");
   if (cached) return cached;
   const out = await gameFresh(env, id);
-  await env.KV.put("game2:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  await env.KV.put("game3:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 // Gameplay first; avoid teasers, announcements and cinematic (CG/story) trailers when there's a choice.
@@ -151,7 +152,7 @@ async function gameFresh(env, id){
     developers: (g.involved_companies || []).filter(c => c.developer).map(c => c.company?.name).filter(Boolean),
     hero: IMG(g.artworks?.[0]?.image_id || g.screenshots?.[0]?.image_id, "1080p"),
     shots: (g.screenshots || []).slice(0, 8).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
-    trailer: pickTrailer(g.videos || [])};
+    trailer: pickTrailer(g.videos || []), critic: Math.round(g.aggregated_rating || 0) || null};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
   const sim = (g.similar_games || []).slice(0, 10);
   out.similar = sim.length ? (await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${sim.join(",")}); limit 10;`)).map(x => slim(x)) : [];
@@ -240,6 +241,18 @@ async function deck(env, items){
       out[it.title] = {appid, deck: d?.results?.resolved_category || 0};
     } catch { out[it.title] = {deck: 0}; }
   }));
+  return out;
+}
+
+/* ---------- Steam user reviews ---------- */
+async function steamReviews(env, appid){
+  if (!appid) throw new Error("Missing appid");
+  const c = await env.KV.get("rev:" + appid, "json");
+  if (c) return c;
+  const r = await (await fetch(`https://store.steampowered.com/appreviews/${appid}?json=1&language=all&purchase_type=all&num_per_page=0`)).json();
+  const s = r.query_summary || {};
+  const out = {pct: s.total_reviews ? Math.round(s.total_positive / s.total_reviews * 100) : null, label: s.review_score_desc || "", total: s.total_reviews || 0};
+  await env.KV.put("rev:" + appid, JSON.stringify(out), {expirationTtl: 7 * 86400});
   return out;
 }
 
