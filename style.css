@@ -523,3 +523,9 @@ img.imgin{animation:fadein .35s ease-out}
 .card:active .cover{transform:scale(.97)}
 .ibtn.pop .ico-svg,.heartbtn.pop svg,.ibtn.pop svg{animation:pop .3s ease-out}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after,dialog::backdrop{animation:none!important;transition:none!important}}
+
+/* Phone: a library card that's too wide made the page slightly wider than the screen, so Chrome
+   zoomed out and the fixed tab bar slid below the visible area. Keep columns shrinkable and clip stray overflow. */
+@media (max-width:420px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.card{min-width:0}
+html,body{overflow-x:clip}
