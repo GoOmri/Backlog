@@ -754,7 +754,7 @@ function pageShell(x, {own, actions, facts}){
       <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
       <p class="desc clamp" id="desc"></p>
     </div>
-    <aside class="gp-facts">${own}<div class="strip" id="strip"></div>${facts || ""}</aside>
+    <aside class="gp-facts">${own}<div class="strip" id="strip"></div><div class="prog" id="prog"></div>${facts || ""}</aside>
   </div>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
 }
@@ -796,6 +796,23 @@ async function mountTrailer(id){
   const seek = e => { const r = bar.getBoundingClientRect(); pl.seekTo(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (pl.getDuration() || 0), true); };
   bar.onpointerdown = e => { e.stopPropagation(); bar.setPointerCapture(e.pointerId); seek(e); bar.onpointermove = seek; };
   bar.onpointerup = () => bar.onpointermove = null;
+}
+// Your progress: Steam achievements and PlayStation trophies.
+let trophyList = null;
+async function fillProgress(g){
+  const box = $("#prog"); if (!box) return;
+  const rows = [];
+  const bar = (label, got, total, extra = "") => `<div class="pbar"><div class="pline"><span>${label}</span><span><b>${got}/${total}</b>${extra}</span></div><div class="ptrack"><span style="width:${total ? got / total * 100 : 0}%"></span></div></div>`;
+  const draw = () => { if ($("#prog") === box) box.innerHTML = rows.join(""); };
+  const ps = (g.platforms || []).some(p => p === "ps5" || p === "psplus") || g.ps;
+  if (g.steamAppId) api("/achievements?appid=" + g.steamAppId).then(a => { if (a.total){ rows.unshift(bar("Steam achievements", a.got, a.total)); draw(); } }).catch(() => {});
+  if (ps){
+    try {
+      trophyList ||= api("/trophies");
+      const k = baseKey(g.title), t = (await trophyList).find(x => baseKey(x.title) === k);
+      if (t) { rows.push(bar("Trophies", t.got, t.total, t.hasPlat ? (t.plat ? ` · <span class="plat-ok">Platinum ✓</span>` : " · no platinum yet") : "")); draw(); }
+    } catch (e){ trophyList = null; if (/NPSSO/.test(e.message)) { rows.push(`<div class="why">${esc(e.message)}</div>`); draw(); } }
+  }
 }
 // Critics · Steam % · Developer · Your hours.
 async function fillStrip(g, d){
@@ -852,7 +869,7 @@ async function editSheet(id){
   const facts = `
     ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
-    <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>
+    <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <details class="more"><summary>Edit</summary>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
@@ -923,7 +940,7 @@ async function editSheet(id){
   if (!g.igdbId) return;
   try {
     const d0 = await gameDetails(g.igdbId), d = g.logoSet ? {...d0, logo: g.logo} : d0;
-    fillMedia(d); fillStrip(g, d);
+    fillMedia(d); fillStrip(g, d); fillProgress(g);
     if ((!g.hero && d.hero) || (!g.logoSet && (d.logo || "") !== (g.logo || ""))) upd(id, {hero: g.hero || d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
