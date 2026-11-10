@@ -35,7 +35,7 @@ Loves: metroidvanias, 2D/puzzle/precision platformers (Hollow Knight, Ori, Celes
 ## Planned: optimization (in this order)
 1. ✅ DONE (softRender: snapshot redraws batched to one per 500ms, skipped while a page is open or app hidden). Fewer full redraws: Firestore onSnapshot calls render() on every change, and the background queue writes games one by one, so the whole tab (597 Library cards) redraws many times. Batch into one render per ~500ms; skip if the current tab isn't affected.
 2. ✅ DONE (CHUNK=60, IntersectionObserver on #shelfMore; count kept across data redraws, reset on filter change). Library in chunks: render ~60 cards, add more on scroll.
-3. ✅ DONE (`sw.js`, stale-while-revalidate; a deploy shows on the 2nd open; bump `V` to clear caches). Service worker: cache app shell (app.js, style.css, index.html, fonts) for instant open, update in background.
+3. ✅ DONE (`sw.js`: app files network-first with no-cache + 3s timeout → cache, so a push shows on next open; fonts/Firebase SDK cache-first; bump `V` to clear caches). Service worker: cache app shell (app.js, style.css, index.html, fonts) for instant open, update in background.
 4. ✅ DONE (`heroSrc()` swaps to t_720p under 1000px, carousel + game page). Play carousel hero images: IGDB t_1080p → t_720p on phones.
 Skip: style.css cleanup, bundling/minifying.
 
