@@ -647,8 +647,11 @@ function findExtrasHTML(){
     return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, subf(x))).join("")}</div></div>` : "";
   };
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
-  const rev = x => x.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
-  const mv = frow("New 2D platformers & MVs", topMV.fresh, when) + frow("Coming soon: MVs & 2D platformers", topMV.soon, x => x.date ? when(x) : "Coming soon")
+  const rev = x => x?.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
+  const played = x => { const g = inList(x); return g && ["playing", "done", "dropped"].includes(g.status); };
+  const top = (topMV.mvTop || []).filter(x => !played(x)).slice(0, 24); top.forEach(x => previewCache.set(x.igdbId, x));
+  const mvTop = top.length >= 3 ? `<div class="section"><h3>Top rated MVs you haven't played</h3><div class="row">${top.map(x => { const g = inList(x); return g ? cardHTML(g, rev(x)) : suggestCard(x, rev(x)); }).join("")}</div></div>` : "";
+  const mv = mvTop + frow("New 2D platformers & MVs", topMV.fresh, when) + frow("Coming soon: MVs & 2D platformers", topMV.soon, x => x.date ? when(x) : "Coming soon")
     + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("Hidden gems", topMV.gems, rev)
     + frow("Puzzle co-op", topMV.coopPuzzle, yr) + frow("Couch co-op platformers", topMV.coopPlat, yr)
     + frow("Narrative & walking sims", topMV.walk, yr) + frow("Mystery & deduction", topMV.mystery, yr) + frow("Cozy short indies", topMV.cozy, yr) + frow("Zelda-likes", topMV.zelda, yr)
@@ -661,12 +664,13 @@ function findExtrasHTML(){
   const onSale = sales.length ? `<div class="section"><h3>On sale from your wishlist</h3><div class="row">${sales.map(g => cardHTML(g, `−${g.sale.cut}% ${g.sale.shop || ""}`)).join("")}</div></div>` : "";
   return wishRow + onSale + mv;
 }
+const findPins = () => carouselHTML(list().filter(g => g.status === "wishlist" && g.upNext && !g.hidden).sort((a, b) => a.upNext - b.upNext));
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
+  if (!liked.length) return findPins() + `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
-  return `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
+  return findPins() + `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
     <div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
@@ -814,14 +818,21 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to top of Find" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {
     if (wid){ await del(wid); wid = null; $("#pvWish").innerHTML = ic("heart"); $("#pvWish").classList.remove("on-heart"); toast("Removed from wishlist"); return; }
     wid = newId(); $("#pvWish").innerHTML = ic("heartf"); $("#pvWish").classList.add("on-heart");
-    const {because, score, added, date, ...data} = x; await setDoc(doc(col, wid), {...data, asTyped: x.title, platforms: [], status: "wishlist", added: Date.now()});
+    const {because, score, added, date, gem, taste, appid, steamPct, steamN, ...data} = x; await setDoc(doc(col, wid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, platforms: [], status: "wishlist", added: Date.now(), ...(pinned ? {upNext: Date.now()} : {})});
     toast("Added to wishlist");
+  };
+  let pinned = false;
+  $("#pvPin").onclick = async () => {
+    pinned = !pinned; $("#pvPin").classList.toggle("on", pinned);
+    if (!wid){ if (pinned) $("#pvWish").onclick(); return; }
+    await setDoc(doc(col, wid), {upNext: pinned ? Date.now() : null}, {merge: true});
+    toast(pinned ? "Pinned to the top of Find" : "Unpinned");
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   fillDifficulty(x, null);
