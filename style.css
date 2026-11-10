@@ -342,3 +342,20 @@ img{-webkit-touch-callout:none}
 .gp-main .mdots{position:static;margin-top:10px}
 .gp-main .dotbtn{background:var(--line)}
 .gp-main .dotbtn[aria-current]{background:var(--fg)}
+
+/* paused: cover YouTube's own pause screen with ours */
+.vctl.paused{background:rgb(14 17 22 / .72)}
+.vctl.paused::after{content:"";position:absolute;top:50%;left:50%;width:0;height:0;transform:translate(-35%,-50%);border-style:solid;border-width:18px 0 18px 30px;border-color:transparent transparent transparent var(--fg)}
+/* breathing room on the game page */
+.gp-body{padding-top:20px;row-gap:24px}
+.gp-main{gap:18px}
+.gp-main .mdots{margin-top:12px}
+.gp-facts{gap:16px;padding-top:2px}
+.gp-head{gap:14px;padding-bottom:28px}
+.gp-actions{gap:12px}
+.desc{line-height:1.6;margin:0}
+@media (max-width:760px){
+  .gp-body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .gp-head{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .gp-similar{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
