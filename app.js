@@ -25,7 +25,7 @@ const ICON = {
   chev: '<path d="m6 9 6 6 6-6"/>'
 };
 const ic = (n, size = 20, fill = false) => `<svg class="ico-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const TABS = [["home","Home","home"],["lib","Library","grid"],["wish","Wishlist","heart"],["disc","Discover","compass"],["diary","Diary","book"]];
+const TABS = [["home","Play","home"],["disc","Find","compass"],["lib","Library","grid"],["wish","Wishlist","heart"],["diary","Diary","book"]];
 const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated server|soundtrack|\bsdk\b|\bdemo\b|benchmark/i;
 
 /* ---------- state ---------- */
@@ -429,7 +429,7 @@ const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; /
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pinned = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
+  const pinned = list().filter(g => g.upNext && playable(g) && g.status === "backlog").sort((a, b) => a.upNext - b.upNext);
   const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -497,15 +497,9 @@ function homeHTML(){
   const leaving = list().filter(g => leavingFor(g));
   const is2D = g => basicTags(g).includes("2D");
   const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test], i) => rowHTML(name, pool.filter(test).sort((a, b) => (i === 0 ? is2D(b) - is2D(a) : 0) || byLikely(a, b)).slice(0, 24), "", undefined, 3));
-  if (topMV === null){ topMV = []; api("/topmv").then(r => { topMV = r; if (tab === "home") render(); }, () => {}); }
-  const have = new Set(list().map(g => g.igdbId));
-  const mvNew = topMV.filter(x => !inList(x)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 24);
-  mvNew.forEach(x => previewCache.set(x.igdbId, x));
-  const mvNotOwned = mvNew.length >= 3 ? `<section class="section wrap"><div class="row-head"><h3>MV's you don't own</h3></div><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></section>` : "";
   return carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap the <b>pin</b> to put it at the top.</p>`)
-    + metroid + mvNotOwned + plat2d + couch + puzzle
-    + rowHTML("Wishlist", wish, "", g => sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)
+    + metroid + plat2d + couch + puzzle
     + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3)
     + rowHTML("Leaving PS Plus soon", leaving);
 }
@@ -625,12 +619,23 @@ function radarHTML(){
   const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
 }
+// Find tab extras: wishlist sales and the best metroidvanias you don't own.
+function findExtrasHTML(){
+  const is2D = g => basicTags(g).includes("2D");
+  if (topMV === null){ topMV = []; api("/topmv").then(r => { topMV = r; if (tab === "disc") render(); }, () => {}); }
+  const mvNew = topMV.filter(x => !inList(x)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 24);
+  mvNew.forEach(x => previewCache.set(x.igdbId, x));
+  const mv = mvNew.length >= 3 ? `<div class="section"><h3>MV's you don't own</h3><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></div>` : "";
+  const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
+  const onSale = sales.length ? `<div class="section"><h3>On sale from your wishlist</h3><div class="row">${sales.map(g => cardHTML(g, `−${g.sale.cut}% ${g.sale.shop || ""}`)).join("")}</div></div>` : "";
+  return onSale + mv;
+}
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return `<div class="wrap">${radarHTML()}${couchHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
+  if (!liked.length) return `<div class="wrap">${radarHTML()}${findExtrasHTML()}${couchHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
-  return `<div class="wrap">${radarHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
+  return `<div class="wrap">${radarHTML()}${findExtrasHTML()}${couchHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
     <div class="grid">${discovered.map((d, i) => (previewCache.set(d.igdbId, d), `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}
       <span class="ctitle">${esc(d.title)}</span></button><span class="why">Like ${esc(d.because.join(", "))}</span>
       <span class="csub"><span>${d.ttb?.main ? d.ttb.main + "h" : d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
@@ -781,7 +786,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b>Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -856,7 +861,8 @@ async function fillDifficulty(g, psRarity){
 // Critics · Steam % · Developer · Your hours.
 async function fillStrip(g, d){
   const box = $("#strip"); if (!box) return;
-  const parts = [d.available?.length && `<span>Available on <b>${esc(d.available.join(" · "))}</b></span>`, d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
+  if (d.available?.length && $("#ownAvail")) $("#ownAvail").textContent = " · available on " + d.available.join(", ");
+  const parts = [null, d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
   if (g.steamAppId){
@@ -920,7 +926,11 @@ async function editSheet(id){
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
 `;
-  openSheet(pageShell(g, {own: `<div class="pills">${pills}</div>`, actions, facts, edit}), "full");
+  const ownLine = g.ps === "left" ? `<b>Left PS Plus</b> · not playable now`
+    : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b>Not owned</b><span id="ownAvail"></span>`
+    : ownP.length ? `<b>Owned</b> · ${ownP.map(p => PLAT[p][0]).join(", ")}${viaPlus ? " · also on PS Plus" : ""}`
+    : `<b>PS Plus</b> · playable while subscribed`;
+  openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
   $("#kebab").onclick = e => { e.stopPropagation(); $("#editPanel").hidden = !$("#editPanel").hidden; };
   $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !e.target.closest("#editPanel, #kebab")) $("#editPanel").hidden = true; });
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
