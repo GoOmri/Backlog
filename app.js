@@ -62,7 +62,7 @@ async function applyMatch(g, m){
       ...(g.steamHours != null ? {steamHours: g.steamHours, steamAppId: g.steamAppId} : {})});
     await del(g.id);
   } else {
-    await upd(g.id, {...m, asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null});
+    await upd(g.id, {...m, ...(g.couchSet ? {couch: g.couch} : {}), asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null});
   }
 }
 
@@ -452,7 +452,7 @@ function addSheet(){
 }
 async function editSheet(id){
   const g = games.get(id); if (!g) return;
-  let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext;
+  let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext, couchV = !!g.couch;
   const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
   openSheet(`<div class="sheet-hero">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div>
     <div class="sheet-head">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}<div><h2>${esc(g.title)}</h2>
@@ -460,7 +460,7 @@ async function editSheet(id){
     ${s ? `<div class="note ${s.cut >= 50 ? "hot" : ""}"><b>−${s.cut}%</b> · ${esc(s.price ?? "")} ${esc(s.currency || "")} at ${esc(s.shop || "a PC store")} ${s.url ? `· <a href="${esc(s.url)}" target="_blank" rel="noopener">Open deal</a>` : ""}</div>` : ""}
     ${lv ? `<div class="note warn">Probably leaving PS Plus soon. <a href="${esc(lv.url)}" target="_blank" rel="noopener">${esc(lv.title)}</a></div>` : ""}
     <div class="desc" id="desc">${g.igdbId ? "Loading…" : g.noMatch ? "No match found yet. Use Fix match below." : ""}</div>
-    <div class="chips">${basicTags(g).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+    <div class="chips">${basicTags(g).filter(t => t !== "Couch co-op").map(t => `<span class="chip">${esc(t)}</span>`).join("")}<button class="chip" id="couchBtn" aria-pressed="${!!g.couch}">Couch co-op</button></div>
     ${ownedHTML(g)}
     <div><button class="chip" id="upNextBtn" aria-pressed="${!!g.upNext}">📌 Up next</button></div>
     <div class="field"><span class="label">List</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" aria-pressed="${status === k}" data-setstat="${k}">${v}</button>`).join("")}</div></div>
@@ -473,9 +473,10 @@ async function editSheet(id){
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => { status = b.dataset.setstat; sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("#finField").hidden = status !== "done"; });
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); });
   sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => { stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); });
+  $("#couchBtn").onclick = () => { couchV = !couchV; $("#couchBtn").setAttribute("aria-pressed", couchV); };
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); };
   $("#eSave").onclick = async () => {
-    const d = {status, platforms: [...plats], myRating: stars || null, touched: Date.now(), upNext: pinned ? (g.upNext || Date.now()) : null};
+    const d = {status, platforms: [...plats], myRating: stars || null, touched: Date.now(), upNext: pinned ? (g.upNext || Date.now()) : null, ...(couchV !== !!g.couch ? {couch: couchV, couchSet: true} : {})};
     d.finishedAt = status === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null;
     await upd(id, d); closeSheet();
   };
