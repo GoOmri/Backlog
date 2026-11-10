@@ -12,7 +12,7 @@ const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated se
 
 /* ---------- state ---------- */
 let games = new Map(), tab = "home", loaded = false;
-let homeMode = "owned";
+let homeMode = "owned", topMV = null;
 let q = "", platF = new Set(), statF = "", genreF = "", sort = "title", accessF = "", deckF = false;
 // Library/Wishlist filters (sidebar on desktop, panel on phone). Remembered per device.
 let F = {type: new Set(), view: new Set(), coop: new Set(), access: new Set()};
@@ -464,9 +464,14 @@ function homeHTML(){
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || fits(b) - fits(a) || (b.rating || 0) - (a.rating || 0)).slice(0, 30);
   const leaving = list().filter(g => leavingFor(g));
   const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24), "", undefined, 3));
+  if (topMV === null){ topMV = []; api("/topmv").then(r => { topMV = r; if (tab === "home") render(); }, () => {}); }
+  const have = new Set(list().map(g => g.igdbId));
+  const mvNew = topMV.filter(x => !have.has(x.igdbId)).slice(0, 24);
+  mvNew.forEach(x => previewCache.set(x.igdbId, x));
+  const mvNotOwned = mvNew.length >= 3 ? `<section class="section wrap"><div class="row-head"><h3>MV's you don't own</h3></div><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></section>` : "";
   return carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>📌 Shortlist</b> to put it at the top.</p>`)
-    + metroid + plat2d + couch + puzzle
+    + metroid + mvNotOwned + plat2d + couch + puzzle
     + rowHTML("Wishlist", wish, "", g => sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)
     + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3)
     + rowHTML("Leaving PS Plus soon", leaving);
