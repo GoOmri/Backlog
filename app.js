@@ -441,7 +441,7 @@ const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; /
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pinned = list().filter(g => g.upNext && playable(g) && g.status === "backlog").sort((a, b) => a.upNext - b.upNext);
+  const pinned = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
   const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -668,10 +668,10 @@ function findExtrasHTML(){
 const findPins = () => carouselHTML(list().filter(g => g.status === "wishlist" && g.upNext && !g.hidden).sort((a, b) => a.upNext - b.upNext));
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return findPins() + `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
+  if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
   if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
   if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
-  return findPins() + `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
+  return `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
     <div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div></div></div>`;
 }
 async function runDiscover(liked){
@@ -819,7 +819,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span>${x.price ? `<span class="dim">· ${esc(priceTxt(x))} on Steam</span>` : ""}</div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to top of Find" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span>${x.price ? `<span class="dim">· ${esc(priceTxt(x))} on Steam</span>` : ""}</div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to Play carousel" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -833,7 +833,7 @@ async function previewSheet(x){
     pinned = !pinned; $("#pvPin").classList.toggle("on", pinned);
     if (!wid){ if (pinned) $("#pvWish").onclick(); return; }
     await setDoc(doc(col, wid), {upNext: pinned ? Date.now() : null}, {merge: true});
-    toast(pinned ? "Pinned to the top of Find" : "Unpinned");
+    toast(pinned ? "Pinned to Play" : "Unpinned");
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   fillDifficulty(x, null);
