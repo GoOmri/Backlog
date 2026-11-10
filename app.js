@@ -122,7 +122,25 @@ async function rematchAll(){
   } catch (e){ progress(0, 0, e.message, true); }
   running = false;
 }
+// "Dandara: Trials of Fear Edition" and "Dandara" are one game: merge editions into one card.
+const EDITION = /\s*[-:–]?\s*(the\s+)?(definitive|remastered|remaster|enhanced|director'?s cut|game of the year|goty|complete|ultimate|deluxe|special|anniversary|collector'?s|premium|gold|legendary|trials of fear|ultra deluxe|redux|hd)(\s+(edition|version|collection))?\s*$/i;
+const baseKey = t => { let x = String(t).replace(/[™®©]/g, ""), y; while ((y = x.replace(EDITION, "")) !== x && y.length > 2) x = y; return key(x); };
+async function mergeEditions(){
+  const groups = new Map();
+  for (const g of list()) { const k = baseKey(g.title); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(g); }
+  for (const gs of groups.values()){
+    if (gs.length < 2) continue;
+    gs.sort((a, b) => (b.myRating || 0) - (a.myRating || 0) || RANK[b.status] - RANK[a.status] || a.title.length - b.title.length);
+    const [keep, ...rest] = gs;
+    const d = {platforms: [...new Set(gs.flatMap(g => g.platforms || []))], status: gs.reduce((m, g) => RANK[g.status] > RANK[m] ? g.status : m, keep.status)};
+    for (const f of ["myRating", "finishedAt", "upNext", "steamHours", "steamAppId"]) { const v = gs.map(g => g[f]).find(v => v != null); if (v != null) d[f] = v; }
+    if (gs.some(g => g.ps === "bought")) d.ps = "bought";
+    await upd(keep.id, d);
+    for (const g of rest) await del(g.id);
+  }
+}
 async function backfill(){
+  await mergeEditions();
   const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined || g.kw === undefined));
   for (let i = 0; i < need.length; i += 200){
     const chunk = need.slice(i, i + 200);
@@ -576,7 +594,6 @@ async function editSheet(id){
     <label class="fin" id="finField" ${status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
     <p class="desc clamp" id="desc" title="Show more"></p>
     <details class="more"><summary>More</summary>
-      <div class="field"><span class="label">Couch co-op</span><div class="chips"><button class="chip" id="couchBtn" aria-pressed="${couchV}">${couchV ? "Yes" : "No"}</button></div></div>
       <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
@@ -591,7 +608,6 @@ async function editSheet(id){
     stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); save({myRating: stars || null});
   });
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); };
-  $("#couchBtn").onclick = () => { couchV = !couchV; $("#couchBtn").setAttribute("aria-pressed", couchV); $("#couchBtn").textContent = couchV ? "Yes" : "No"; save({couch: couchV, couchSet: true}); };
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let armed = false;
