@@ -367,3 +367,13 @@ img{-webkit-touch-callout:none}
 .ptrack{height:4px;border-radius:4px;background:var(--line);overflow:hidden}
 .ptrack span{display:block;height:100%;background:var(--accent)}
 .plat-ok{color:var(--accent);font-weight:600}
+
+/* keep the game page inside the screen: columns may shrink below their content */
+.gp-body{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+@media (max-width:760px){.gp-body{grid-template-columns:minmax(0,1fr)}}
+.gp-main .media,.gp-main .mslides{width:100%;max-width:100%}
+dialog.full{overflow-x:hidden}
+.gp-main .media{margin:0!important;width:auto!important}
+dialog.full{scrollbar-gutter:auto}
+.gp-main .mslides{height:auto!important}
+.gp-main .media{min-width:0}
