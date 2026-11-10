@@ -29,6 +29,8 @@ export default {
         case "/logos":    out = await logos(env, url.searchParams.get("t") || ""); break;
         case "/grids":    out = await grids(env, (body.titles || []).slice(0, 10)); break;
         case "/topmv":    out = await topMetroidvanias(env); break;
+        case "/achievements": out = await achievements(env, +url.searchParams.get("appid")); break;
+        case "/trophies": out = await trophies(env); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
@@ -289,6 +291,57 @@ async function steamReviews(env, appid){
   const out = {pct: s.total_reviews ? Math.round(s.total_positive / s.total_reviews * 100) : null, label: s.review_score_desc || "", total: s.total_reviews || 0};
   await env.KV.put("rev:" + appid, JSON.stringify(out), {expirationTtl: 7 * 86400});
   return out;
+}
+
+/* ---------- Steam achievements (your progress per game) ---------- */
+async function achievements(env, appid){
+  if (!appid) throw new Error("Missing appid");
+  const c = await env.KV.get("ach:" + appid, "json");
+  if (c) return c;
+  const r = await fetch(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid=${appid}&key=${env.STEAM_KEY}&steamid=${env.STEAM_ID}`);
+  const list = r.ok ? (await r.json()).playerstats?.achievements || [] : [];
+  const out = {got: list.filter(a => a.achieved).length, total: list.length};
+  await env.KV.put("ach:" + appid, JSON.stringify(out), {expirationTtl: 6 * 3600});
+  return out;
+}
+
+/* ---------- PlayStation trophies (unofficial PSN API, as used by trophy sites) ----------
+   Needs the secret PSN_NPSSO (a sign-in cookie from playstation.com, valid ~2 months). */
+const PSN_AUTH = "https://ca.account.sony.com/api/authz/v3/oauth";
+const PSN_BASIC = "Basic MDk1MTUxNTktNzIzNy00MzcwLTliNDAtMzgwNmU2N2MwODkxOnVjUGprYTV0bnRCMktxc1A=";
+async function psnToken(env){
+  const c = await env.KV.get("psn_tok", "json");
+  if (c && c.exp > Date.now() + 60e3) return c.access;
+  let body;
+  if (c?.refresh && c.rexp > Date.now()) body = `refresh_token=${encodeURIComponent(c.refresh)}&grant_type=refresh_token&token_format=jwt&scope=psn:mobile.v2.core psn:clientapp`;
+  else {
+    if (!env.PSN_NPSSO) throw new Error("Add your PSN_NPSSO secret in Cloudflare to see trophies.");
+    const a = await fetch(`${PSN_AUTH}/authorize?access_type=offline&client_id=09515159-7237-4370-9b40-3806e67c0891&redirect_uri=com.scee.psxandroid.scecompcall://redirect&response_type=code&scope=psn:mobile.v2.core%20psn:clientapp`,
+      {headers: {Cookie: "npsso=" + env.PSN_NPSSO}, redirect: "manual"});
+    const code = new URL(a.headers.get("location") || "x:").searchParams.get("code");
+    if (!code) throw new Error("PSN sign-in expired. Get a new NPSSO and update the PSN_NPSSO secret.");
+    body = `code=${code}&redirect_uri=com.scee.psxandroid.scecompcall://redirect&grant_type=authorization_code&token_format=jwt`;
+  }
+  const t = await (await fetch(`${PSN_AUTH}/token`, {method: "POST", headers: {Authorization: PSN_BASIC, "Content-Type": "application/x-www-form-urlencoded"}, body})).json();
+  if (!t.access_token){ await env.KV.delete("psn_tok"); throw new Error("PSN sign-in failed. Update the PSN_NPSSO secret."); }
+  await env.KV.put("psn_tok", JSON.stringify({access: t.access_token, exp: Date.now() + t.expires_in * 1000, refresh: t.refresh_token, rexp: Date.now() + (t.refresh_token_expires_in || 0) * 1000}));
+  return t.access_token;
+}
+async function trophies(env){
+  const c = await env.KV.get("trophies", "json");
+  if (c && Date.now() - c.t < 6 * 3600e3) return c.d;
+  const tok = await psnToken(env), d = [];
+  for (let off = 0; off < 2000; off += 400){
+    const r = await (await fetch(`https://m.np.playstation.com/api/trophy/v1/users/me/trophyTitles?limit=400&offset=${off}`, {headers: {Authorization: "Bearer " + tok}})).json();
+    for (const x of r.trophyTitles || []){
+      const e = x.earnedTrophies || {}, f = x.definedTrophies || {};
+      d.push({title: x.trophyTitleName, platform: x.trophyTitlePlatform, progress: x.progress || 0,
+        got: (e.bronze || 0) + (e.silver || 0) + (e.gold || 0) + (e.platinum || 0), total: (f.bronze || 0) + (f.silver || 0) + (f.gold || 0) + (f.platinum || 0), plat: !!e.platinum, hasPlat: !!f.platinum});
+    }
+    if (!r.nextOffset) break;
+  }
+  await env.KV.put("trophies", JSON.stringify({t: Date.now(), d}));
+  return d;
 }
 
 /* ---------- Steam library ---------- */
