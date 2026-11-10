@@ -1162,16 +1162,6 @@ document.addEventListener("scroll", e => {
 const phoneMQ = matchMedia("(max-width:760px)");
 function placeTabs(){ const t = $("#tabs"); if (phoneMQ.matches) document.body.append(t); else $(".bar-in .brand").after(t); }
 placeTabs(); phoneMQ.addEventListener("change", placeTabs);
-/* TEMP DEBUG (bottom bar bug) — remove after testing */
-{ const box = document.createElement("div"), probe = document.createElement("div");
-  box.style.cssText = "position:fixed;top:calc(60px + env(safe-area-inset-top,0px));left:4px;z-index:99;font:11px/1.3 monospace;background:#000c;color:#0f0;padding:4px 6px;border-radius:6px;pointer-events:none;white-space:pre";
-  probe.style.cssText = "position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px)";
-  document.body.append(box, probe);
-  const f = n => Math.round(n * 10) / 10;
-  const upd = () => { const v = visualViewport, r = $("#tabs").getBoundingClientRect(), de = document.documentElement;
-    box.textContent = `inner ${innerWidth}x${innerHeight}  client ${de.clientWidth}x${de.clientHeight}\nvv ${f(v.width)}x${f(v.height)} top ${f(v.offsetTop)} scale ${f(v.scale)}\ntabs top ${f(r.top)} bot ${f(r.bottom)} h ${f(r.height)}\nscrollW ${de.scrollWidth} scrollY ${Math.round(scrollY)}\nsafeB ${getComputedStyle(probe).paddingBottom} pos ${getComputedStyle($("#tabs")).position} parent ${$("#tabs").parentElement.tagName}\nstandalone ${matchMedia("(display-mode: standalone)").matches}`; };
-  let q = 0; const tick = () => { if (!q){ q = 1; requestAnimationFrame(() => { q = 0; upd(); }); } };
-  addEventListener("scroll", tick, {passive: true}); addEventListener("resize", tick); visualViewport.addEventListener("resize", tick); visualViewport.addEventListener("scroll", tick); setInterval(upd, 500); }
 $("#addBtn").onclick = addSheet;
 $("#menuBtn").onclick = menuSheet;
 
