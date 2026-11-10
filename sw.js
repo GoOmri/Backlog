@@ -1,7 +1,8 @@
-// Backlog service worker: serves the app shell from cache for an instant open,
-// then refreshes it in the background (stale-while-revalidate).
-// A new deploy shows up on the open after next. Bump V to force-clear old caches.
-const V = "shell-v1";
+// Backlog service worker.
+// App files (same origin): network first, bypassing the browser's HTTP cache, so a push shows on the next open;
+// falls back to the cached copy when offline or the network takes over 3s.
+// Fonts + pinned Firebase SDK never change: cache first. Bump V to force-clear old caches.
+const V = "shell-v2";
 const SHELL = ["index.html", "app.js", "style.css", "config.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", e => {
@@ -21,9 +22,18 @@ self.addEventListener("fetch", e => {
   const r = e.request;
   if (r.method !== "GET") return;
   const u = new URL(r.url);
-  if (r.mode === "navigate" && u.origin === location.origin){ e.respondWith(swr(e, "index.html")); return; }
-  if (cacheable(u)) e.respondWith(swr(e, r));
+  if (r.mode === "navigate" && u.origin === location.origin){ e.respondWith(fresh(r, "index.html")); return; }
+  if (u.origin === location.origin && !u.search) e.respondWith(fresh(r, r));
+  else if (cacheable(u)) e.respondWith(swr(e, r));
 });
+
+async function fresh(req, key){
+  const c = await caches.open(V);
+  const net = fetch(req.url, {cache: "no-cache"}).then(res => { if (res.ok) c.put(key, res.clone()); return res; });
+  const slow = new Promise(ok => setTimeout(ok, 3000)).then(() => c.match(key));
+  try { return (await Promise.race([net, slow])) || await net; }
+  catch { return (await c.match(key)) || Response.error(); }
+}
 
 async function swr(e, key){
   const c = await caches.open(V);
