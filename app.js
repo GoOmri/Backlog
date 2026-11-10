@@ -362,21 +362,22 @@ function taste3D(gs){
 const byLikely = (a, b) => (b.status === "playing") - (a.status === "playing") || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0);
 function homeHTML(){
   if (!games.size) return emptyHTML();
-  const wishMode = homeMode === "wish";
+  homeMode = "owned";
   const top = upNextGames(), inTop = new Set(top.map(g => g.id));
-  const pool = list().filter(g => playable(g) && (wishMode ? g.status === "wishlist" : g.status === "backlog"));
-  const switcher = `<div class="wrap modebar"><div class="seg two">${[["owned","Owned"],["wish","Wishlist"]].map(([k, l]) => `<button data-mode="${k}" aria-pressed="${homeMode === k}">${l}</button>`).join("")}</div></div>`;
+  const pool = list().filter(g => playable(g) && g.status === "backlog");
   const pinned = pool.filter(g => g.upNext && !inTop.has(g.id)).sort((a, b) => a.upNext - b.upNext);
-  const cats = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24))).join("");
-  const extra = wishMode
-    ? rowHTML("On sale", list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut), "", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`)
-    : rowHTML("Leaving PS Plus soon", list().filter(g => leavingFor(g)));
-  return switcher + carouselHTML(top)
+  const fits = g => CATS.some(([, test]) => test(g));
+  const wish = list().filter(g => g.status === "wishlist")
+    .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || fits(b) - fits(a) || (b.rating || 0) - (a.rating || 0)).slice(0, 30);
+  const leaving = list().filter(g => leavingFor(g));
+  const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24)));
+  return carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
-    + rowHTML(wishMode ? "Most anticipated" : "Up next", pinned)
-    + (wishMode ? extra : "") + cats
+    + rowHTML("Up next", pinned)
+    + metroid + plat2d + couch + puzzle
+    + rowHTML("Wishlist", wish, "", g => sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)
     + rowHTML("3D games for you", taste3D(pool).slice(0, 24))
-    + (wishMode ? "" : extra);
+    + rowHTML("Leaving PS Plus soon", leaving);
 }
 function topTags(gs){
   const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
