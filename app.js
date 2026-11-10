@@ -301,7 +301,7 @@ const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; /
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
-  const pool = list().filter(g => isPlatformer(g) && playable(g) && (homeMode === "wish" ? g.status === "wishlist" : g.status === "backlog" || g.status === "playing"));
+  const pool = list().filter(g => isPlatformer(g) && playable(g) && (homeMode === "wish" ? g.status === "wishlist" : g.status === "backlog"));
   const pinned = pool.filter(g => g.upNext).sort((a, b) => a.upNext - b.upNext);
   const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
   const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -364,19 +364,19 @@ function homeHTML(){
   if (!games.size) return emptyHTML();
   const wishMode = homeMode === "wish";
   const top = upNextGames(), inTop = new Set(top.map(g => g.id));
-  const pool = list().filter(g => playable(g) && (wishMode ? g.status === "wishlist" : g.status === "backlog" || g.status === "playing"));
+  const pool = list().filter(g => playable(g) && (wishMode ? g.status === "wishlist" : g.status === "backlog"));
   const switcher = `<div class="wrap modebar"><div class="seg two">${[["owned","Owned"],["wish","Wishlist"]].map(([k, l]) => `<button data-mode="${k}" aria-pressed="${homeMode === k}">${l}</button>`).join("")}</div></div>`;
-  const pinned = pool.filter(g => (g.upNext || g.status === "playing") && !inTop.has(g.id))
-    .sort((a, b) => (b.status === "playing") - (a.status === "playing") || (a.upNext || 9e15) - (b.upNext || 9e15));
+  const pinned = pool.filter(g => g.upNext && !inTop.has(g.id)).sort((a, b) => a.upNext - b.upNext);
   const cats = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24))).join("");
   const extra = wishMode
     ? rowHTML("On sale", list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut), "", g => `${g.sale.price != null ? g.sale.price + " " + (g.sale.currency || "") : ""} ${g.sale.shop || ""}`)
     : rowHTML("Leaving PS Plus soon", list().filter(g => leavingFor(g)));
   return switcher + carouselHTML(top)
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap <b>Up next</b> to pin it here.</p>`)
-    + rowHTML(wishMode ? "Most anticipated" : "Playing & up next", pinned)
-    + extra + cats
-    + rowHTML("3D games for you", taste3D(pool).slice(0, 24));
+    + rowHTML(wishMode ? "Most anticipated" : "Up next", pinned)
+    + (wishMode ? extra : "") + cats
+    + rowHTML("3D games for you", taste3D(pool).slice(0, 24))
+    + (wishMode ? "" : extra);
 }
 function topTags(gs){
   const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
