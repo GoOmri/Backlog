@@ -18,14 +18,14 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 
 ## Tabs (app.js)
 - **Play** `homeHTML()` — owned games only. Carousel = pinned owned games (`upNextGames`), then rows: MV's you own, 2D platformers, Couch co-op platformers, Puzzle-platformers, 3D games for you, Leaving PS Plus.
-- **Find** `discoverHTML()` → `findPins()` (carousel of pinned wishlist games), then `findExtrasHTML()` (Your wishlist, On sale, then rows from `/finds`: Top rated MVs you haven't played, New, Coming soon, MV's you don't own, 2D platformers, Hidden gems, Puzzle co-op, Couch co-op platformers, Narrative, Mystery, Cozy, Zelda-likes, You missed these, Classics), then `radarHTML()` (Coming soon on PS5 / Steam), then "Because you liked…".
+- **Find** `discoverHTML()` → `findPins()` (carousel of pinned wishlist games), then `findExtrasHTML()` (On sale from your wishlist with a See all link, then rows from `/finds`: Metroidvanias you haven't played (top rated + not owned), 2D platformers, Hidden gems, Puzzle co-op, Couch co-op platformers, Narrative, Mystery, Cozy, Zelda-likes, You missed these, Classics), then `radarHTML()` (Coming soon on PS5 / Steam), then "Because you liked…".
 - **Library** `shelfHTML()` with sidebar filters. **Diary**. **Wishlist** view = tab `wish`.
 - Game page: `pageShell` + `editSheet(id)` (owned/wishlist) or `previewSheet(x)` (not in list: pin, heart, 👎). Ownership line: green Owned + platform chips / red Not owned.
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers → prices.
 
 ## Worker routes (worker.js)
 /match /search /game /info /grids /logos /discover /steam /steamwish /prices (ITAD, PC only) /psplus /upcoming /deck /couch /topmv /finds /steamtags /steamrev /achievements /achrarity /trophies /rarity
-- `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` — bump N when the output shape changes.
+- `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds11) — bump N when the output shape changes.
 - IGDB text `search` is broken; use name lookups (`name ~ "x"`).
 
 ## Taste (for ranking)
@@ -33,5 +33,5 @@ Loves: metroidvanias, 2D/puzzle/precision platformers (Hollow Knight, Ori, Celes
 
 ## Open ideas
 - PS Store prices (would need scraping; ITAD has none).
-- The New row is thin (Steam's popular-new list for these tags is small).
+- Find caches /finds, /upcoming, /discover in localStorage (c:finds, c:upcoming, c:disc) and refreshes in the background.
 - Couch co-op night, studio follow, monthly recap.

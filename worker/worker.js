@@ -260,12 +260,10 @@ const SEARCHES = [
   ["plat", ["Puzzle Platformer"], "sort_by=Reviews_DESC"], ["plat", ["Precision Platformer"], "sort_by=Reviews_DESC"],
   ["walk", ["Walking Simulator"], "sort_by=Reviews_DESC"], ["mystery", ["Mystery"], "sort_by=Reviews_DESC"], ["mystery", ["Detective"], "sort_by=Reviews_DESC"],
   ["cozy", ["Cozy"], "sort_by=Reviews_DESC"], ["zelda", ["Top-Down", "Action-Adventure"], "sort_by=Reviews_DESC"],
-  ["coopPuzzle", ["Local Co-Op", "Puzzle"], "sort_by=Reviews_DESC"], ["coopPlat", ["Local Co-Op", "Platformer"], "sort_by=Reviews_DESC"],
-  ["fresh", ["Metroidvania"], "filter=popularnew"], ["fresh", ["2D Platformer"], "filter=popularnew"],
-  ["soon", ["Metroidvania"], "filter=popularcomingsoon"], ["soon", ["2D Platformer"], "filter=popularcomingsoon"]
+  ["coopPuzzle", ["Local Co-Op", "Puzzle"], "sort_by=Reviews_DESC"], ["coopPlat", ["Local Co-Op", "Platformer"], "sort_by=Reviews_DESC"]
 ];
 async function finds(env){
-  const c = await env.KV.get("finds10", "json");
+  const c = await env.KV.get("finds11", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -316,8 +314,6 @@ async function finds(env){
   const taste = ["mv", "plat", "walk", "mystery", "cozy", "zelda", "coopPuzzle", "coopPlat"];
   const released = x => x.date && x.date > since && x.date <= now;
   const d = {
-    fresh: pick(["fresh"], x => !x.date || x.date > now - 365 * 86400, (a, b) => (b.date || 0) - (a.date || 0)),
-    soon: pick(["soon"], x => !x.date || x.date > now, (a, b) => (a.date || 9e12) - (b.date || 9e12)),
     mv: pick(["mv"], released), mvTop: pick(["mv"], x => x.steamN >= 3000 && x.steamPct >= 90, (a, b) => b.steamPct - a.steamPct || b.steamN - a.steamN), plat: pick(["plat"], released),
     gems: pick(taste, x => released(x) && x.gem && x.taste >= 0, (a, b) => (b.steamPct + b.taste) - (a.steamPct + a.taste)),
     coopPuzzle: pick(["coopPuzzle"], released), coopPlat: pick(["coopPlat"], released),
@@ -325,7 +321,7 @@ async function finds(env){
     missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
     classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
   };
-  await env.KV.put("finds10", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds11", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
