@@ -624,7 +624,7 @@ function render(){
 }
 
 /* ---------- sheets ---------- */
-function openSheet(html, tall = false){ $("#dlg").classList.toggle("tall", tall); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
+function openSheet(html, tall = false){ $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ $("#dlg").close(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
@@ -685,26 +685,39 @@ function nopeSheet(){
     <div class="actions"><button class="btn" data-act="close">Close</button></div>`);
   $("#sheet").querySelectorAll("[data-unnope]").forEach(b => b.onclick = async () => { await del(b.dataset.unnope); b.closest(".match").remove(); });
 }
-// Preview for a game that isn't in your list (Discover, radar, similar games).
+// ---------- Game page: full screen, art behind the title, one status button, icon actions ----------
 const previewCache = new Map();
+function pageShell(x, {own, actions, facts}){
+  const meta = [x.year, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
+  const art = x.hero || x.cover;
+  return `<button class="x" data-act="close" aria-label="Close">×</button>
+  <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
+    <div class="gp-head">
+      ${x.logo ? `<img class="gp-logo" src="${esc(x.logo)}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
+      ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
+      <div class="gp-actions">${actions}</div>
+    </div></header>
+  <div class="gp-body">
+    <div class="gp-main">
+      <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
+      <p class="desc clamp" id="desc"></p>
+    </div>
+    <aside class="gp-facts">${own}<div class="strip" id="strip"></div>${facts || ""}</aside>
+  </div>
+  <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
+}
 async function previewSheet(x){
   const have = list().find(g => g.igdbId === x.igdbId);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  const meta = [x.year, ...basicTags(x)].filter(Boolean).join(" · ");
-  openSheet(`<button class="x" data-act="close" aria-label="Close">×</button>
-    <div class="media"><div class="mslides" id="mslides"><div class="mslide">${x.cover ? `<img src="${esc(x.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
-    <div class="ghead">${coverHTML({...x, platforms: [], status: "wishlist"})}<div><h2>${esc(x.title)}</h2>${meta ? `<div class="meta">${esc(meta)}</div>` : ""}</div></div>
-    <div class="ctrl"><div class="chips"><button class="btn" id="pvWish">+ Wishlist</button><button class="chip" id="pvNope">Not for me</button></div></div>
-    <p class="desc clamp" id="desc"></p>
-    <details class="more" id="simBox" hidden><summary>Similar to ${esc(x.title)}</summary><div class="row" id="simRow"></div></details>`, true);
+  openSheet(pageShell(x, {own: "", actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">✕</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   $("#pvWish").onclick = async () => { $("#pvWish").disabled = true; $("#pvWish").textContent = "On wishlist";
     const {because, score, added, date, ...data} = x; await setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()}); };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
-  try { fillMedia(await gameDetails(x.igdbId)); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
+  try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
-// Critics · Steam % · Developer · Your hours, under the title.
+// Critics · Steam % · Developer · Your hours.
 async function fillStrip(g, d){
   const box = $("#strip"); if (!box) return;
   const parts = [d.critic && `<span><b>${d.critic}</b> critics</span>`, null, d.developers?.[0] && `<span>${esc(d.developers[0])}</span>`, g.steamHours ? `<span><b>${g.steamHours}h</b> played</span>` : null];
@@ -717,10 +730,12 @@ async function fillStrip(g, d){
     if (r?.pct != null){ parts[1] = `<span title="${esc(r.label)} · ${r.total} reviews"><b>${r.pct}%</b> Steam</span>`; draw(); }
   }
 }
-// Trailer + screenshots, description and similar games into an open game page.
+// Trailer (with timeline) + screenshots, description, similar games.
 function fillMedia(d){
   if (!$("#dlg").open || !$("#mslides")) return;
   $("#desc").textContent = d.summary || "";
+  if (d.logo && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(d.logo)}" alt="">`;
+  if (d.hero && $(".gp-bg") && !$(".gp-bg").src.includes(d.hero)) $(".gp-bg").src = d.hero;
   const slides = [
     d.trailer && `<div class="mslide"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&start=5&controls=1&playsinline=1&rel=0&modestbranding=1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
@@ -735,52 +750,57 @@ function fillMedia(d){
     $("#simBox").hidden = false;
     sims.forEach(x => previewCache.set(x.igdbId, x));
     $("#simRow").innerHTML = sims.map(x => { const own = byIgdb.get(x.igdbId);
-      return own ? `<button class="card" data-edit="${own.id}">${coverHTML(own)}<span class="ctitle">${esc(own.title)}</span><span class="csub"><span>${STAT[own.status]}</span></span></button>`
+      return own ? `<button class="card" data-edit="${own.id}">${coverHTML(own)}<span class="ctitle">${esc(own.title)}</span></button>`
         : `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button>`; }).join("");
   }
 }
 async function editSheet(id){
   const g = games.get(id); if (!g) return;
-  let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext, couchV = !!g.couch;
+  let plats = new Set(g.platforms || []);
   const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
-  const meta = [g.year, ...basicTags(g), g.deck === 3 ? "Deck Verified" : g.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
-  // PS5 only counts when bought; PS Plus games get a single "PS+" pill.
   const viaPlus = g.ps ? g.ps !== "bought" : (g.platforms || []).includes("psplus");
-  const own = (g.platforms || []).filter(p => p !== "psplus" && !(p === "ps5" && viaPlus));
+  const ownP = (g.platforms || []).filter(p => p !== "psplus" && !(p === "ps5" && viaPlus));
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
-    : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("")
-      + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
-  openSheet(`<button class="x" data-act="close" aria-label="Close">×</button>
-    <div class="media"><div class="mslides" id="mslides"><div class="mslide">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
-    <div class="ghead">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}
-      <div><h2>${esc(g.title)}</h2>${meta ? `<div class="meta">${esc(meta)}</div>` : ""}<div class="pills">${pills}</div></div></div>
-    <div class="strip" id="strip">${g.steamHours ? `<span><b>${g.steamHours}h</b> played</span>` : ""}</div>
+    : ownP.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
+  const actions = `<div class="menuwrap"><button class="btn" id="statBtn" aria-haspopup="true">${STAT[g.status]} ▾</button>
+      <div class="popmenu" id="statMenu" hidden>${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
+    <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">★${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
+      <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div></div>
+    <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Shortlist" aria-label="Shortlist" aria-pressed="${!!g.upNext}">📌</button>
+    <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? "↺" : "✕"}</button>`;
+  const facts = `
     ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
-    <div class="seg">${Object.entries(STAT).map(([k, v]) => `<button data-setstat="${k}" aria-pressed="${status === k}">${v}</button>`).join("")}</div>
-    <div class="ctrl"><div class="starpick">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= stars ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</div>
-      <div class="chips"><button class="chip" id="upNextBtn" aria-pressed="${pinned}">📌 Shortlist</button><button class="chip" id="nopeBtn">${g.hidden ? "Show again" : "Not for me"}</button></div></div>
-    <label class="fin" id="finField" ${status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
-    <p class="desc clamp" id="desc" title="Show more"></p>
-    <details class="more" id="simBox" hidden><summary>Similar to ${esc(g.title)}</summary><div class="row" id="simRow"></div></details>
-    <details class="more"><summary>More</summary>
+    <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
+    <details class="more"><summary>Edit</summary>
       <div class="field"><span class="label">Where you own it</span><div class="chips">${Object.entries(PLAT).map(([k, v]) => `<button class="chip" aria-pressed="${plats.has(k)}" data-setplat="${k}"><span class="dot" style="background:var(${v[2]})"></span>${v[0]}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
-    </details>`, true);
+    </details>`;
+  openSheet(pageShell(g, {own: `<div class="pills">${pills}</div>`, actions, facts}), "full");
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
+  const pop = (btn, menu) => { $(btn).onclick = e => { e.stopPropagation(); sh.querySelectorAll(".popmenu").forEach(m => { if (m !== $(menu)) m.hidden = true; }); $(menu).hidden = !$(menu).hidden; }; };
+  pop("#statBtn", "#statMenu"); pop("#rateBtn", "#rateMenu");
+  sh.addEventListener("click", e => { if (!e.target.closest(".menuwrap")) sh.querySelectorAll(".popmenu").forEach(m => m.hidden = true); });
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => {
-    status = b.dataset.setstat; sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b)); $("#finField").hidden = status !== "done";
-    save({status, finishedAt: status === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null});
+    const st = b.dataset.setstat; $("#statBtn").textContent = STAT[st] + " ▾"; $("#statMenu").hidden = true; $("#finField").hidden = st !== "done";
+    sh.querySelectorAll("[data-setstat]").forEach(x => x.setAttribute("aria-pressed", x === b));
+    save({status: st, finishedAt: st === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null});
+    if (st === "done" && !g.myRating) $("#rateMenu").hidden = false;
   });
   $("#finDate").onchange = () => save({finishedAt: Date.parse($("#finDate").value) || Date.now()});
+  let stars = g.myRating || 0;
   sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => {
-    stars = +b.dataset.star === stars ? 0 : +b.dataset.star; sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars)); save({myRating: stars || null});
+    stars = +b.dataset.star === stars ? 0 : +b.dataset.star;
+    sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars));
+    $("#rateBtn").innerHTML = "★" + (stars ? `<small>${stars}</small>` : ""); $("#rateBtn").classList.toggle("on", !!stars); $("#rateMenu").hidden = true;
+    save({myRating: stars || null});
   });
-  $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); };
+  let pinned = !!g.upNext;
+  $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
+  $("#nopeBtn").onclick = async () => { closeSheet(); if (g.hidden){ await upd(id, {hidden: false}); toast(`${g.title} is back`); } else notForMe(g); };
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
-  $("#nopeBtn").onclick = async () => { closeSheet(); if (g.hidden){ await upd(id, {hidden: false}); toast(`${g.title} is back`); } else notForMe(g); };
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
   $("#fixGo").onclick = async () => {
@@ -788,14 +808,13 @@ async function editSheet(id){
     try {
       const res = await api("/search?q=" + encodeURIComponent($("#fix").value));
       box.innerHTML = res.map((r, i) => `<button class="match" data-m="${i}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : "<span></span>"}<span><b>${esc(r.title)}</b><br><span class="why">${r.year || ""}</span></span></button>`).join("") || "No results.";
-      box.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => { await applyMatch({...g, status, platforms: [...plats]}, res[+b.dataset.m]); closeSheet(); });
+      box.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => { await applyMatch({...games.get(id), platforms: [...plats]}, res[+b.dataset.m]); closeSheet(); });
     } catch (e){ box.textContent = e.message; }
   };
   if (!g.igdbId) return;
   try {
     const d = await gameDetails(g.igdbId);
-    fillMedia(d);
-    fillStrip(g, d);
+    fillMedia(d); fillStrip(g, d);
     if (!g.hero && d.hero) upd(id, {hero: d.hero, logo: d.logo || ""});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }

@@ -244,3 +244,43 @@ dialog{overflow-x:hidden}
 .strip:empty{display:none}
 .strip b{color:var(--fg);font-variant-numeric:tabular-nums}
 .strip span + span::before{content:"·";margin-right:16px;color:var(--line)}
+
+/* ---------- full-screen game page ---------- */
+dialog.full{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;margin:0;background:var(--bg)}
+dialog.full .sheet{padding:0;gap:0;display:block}
+dialog.full .x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));z-index:5}
+.gp-hero{position:relative;isolation:isolate;min-height:min(56vh,520px);display:grid;align-content:end;overflow:hidden}
+.gp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.gp-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,var(--bg) 0%,rgb(14 17 22 / .55) 45%,rgb(14 17 22 / .15) 100%),linear-gradient(90deg,rgb(14 17 22 / .7),transparent 60%)}
+.gp-head{max-width:1100px;width:100%;margin:0 auto;padding:80px max(20px,env(safe-area-inset-right,0px)) 24px max(20px,env(safe-area-inset-left,0px));display:grid;gap:12px}
+.gp-logo{max-height:120px;max-width:min(420px,80%);object-fit:contain;object-position:left}
+.gp-title{font:800 clamp(32px,6vw,60px)/1 var(--display);letter-spacing:-.03em;margin:0;text-wrap:balance}
+.gp-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ibtn{width:44px;height:44px;border-radius:999px;border:0;background:rgb(255 255 255 / .12);font-size:18px;display:inline-flex;align-items:center;justify-content:center;gap:2px;color:var(--fg)}
+.ibtn small{font-size:12px;font-weight:700}
+.ibtn.on{background:var(--fg);color:var(--bg)}
+.ibtn:hover{background:rgb(255 255 255 / .2)}
+.ibtn.on:hover{background:var(--fg)}
+.menuwrap{position:relative}
+.popmenu{position:absolute;top:calc(100% + 6px);left:0;z-index:6;background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:6px;display:grid;min-width:150px;box-shadow:0 12px 30px rgb(0 0 0 / .5)}
+.popmenu button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:8px;font-size:14px}
+.popmenu button:hover{background:var(--surface)}
+.popmenu button[aria-pressed="true"]{font-weight:700;color:var(--accent)}
+.popmenu.stars{display:flex;min-width:0}
+.popmenu.stars button{font-size:26px;color:var(--line);padding:4px 6px}
+.popmenu.stars button.on{color:var(--gold)}
+.gp-body{max-width:1100px;margin:0 auto;padding:8px max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px));display:grid;grid-template-columns:minmax(0,1.7fr) minmax(220px,1fr);gap:28px;align-items:start}
+.gp-body .media{margin:0;border-radius:14px;overflow:hidden}
+.gp-main{display:grid;gap:14px;min-width:0}
+.gp-facts{display:grid;gap:14px;align-content:start;min-width:0}
+.gp-facts .strip{display:grid;gap:8px}
+.gp-facts .strip span + span::before{content:none}
+.gp-similar{max-width:1100px;margin:0 auto;padding:28px max(20px,env(safe-area-inset-right,0px)) 40px max(20px,env(safe-area-inset-left,0px));display:grid;gap:12px}
+.gp-similar .row{grid-auto-columns:130px}
+@media (max-width:760px){
+  .gp-body{grid-template-columns:1fr;gap:18px}
+  .gp-hero{min-height:44vh}
+  .gp-head{padding-top:60px}
+}
+.gp-hero{overflow:visible;z-index:3}
+.gp-hero .gp-bg{clip-path:inset(0)}
