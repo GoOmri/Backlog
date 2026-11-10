@@ -213,3 +213,9 @@ button.brand{background:none;border:0;padding:0;color:var(--fg)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;gap:12px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:10px 14px;box-shadow:0 8px 24px rgb(0 0 0 / .4);font-size:14px;max-width:calc(100vw - 32px)}
 @media (min-width:761px){.toast{bottom:24px}}
 #simRow{padding-top:10px;grid-auto-columns:110px}
+
+/* keep the game page its own width: wide rows scroll inside, never stretch the window */
+.sheet{grid-template-columns:minmax(0,1fr)}
+.sheet > *,.more,.more > *{min-width:0}
+dialog{overflow-x:hidden}
+#simRow{overflow-x:auto}
