@@ -636,7 +636,7 @@ function findExtrasHTML(){
   };
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
   const fresh = frow("New 2D platformers & MVs", topMV.fresh, when);
-  const mv = fresh + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("You missed these", topMV.missed, yr);
+  const mv = fresh + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
   const wishRow = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3><span class="dim">${wl.length}</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button></div>
