@@ -400,3 +400,8 @@ dialog.full .x{position:static}
 /* stop the page behind from scrolling once the game page reaches its end */
 dialog{overscroll-behavior:contain}
 html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
+
+/* bigger, touch-friendly timeline that the carousel swipe can't steal */
+.vbar{height:28px;bottom:4px;touch-action:none}
+.vbar::before,.vbar span{height:4px}
+.vbar span::after{content:"";position:absolute;right:-6px;top:50%;width:12px;height:12px;border-radius:50%;background:var(--fg);transform:translateY(-50%)}
