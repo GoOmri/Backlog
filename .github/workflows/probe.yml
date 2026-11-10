@@ -5,7 +5,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for q in "In%20Between" "We%20Were%20Here"; do
-            echo "== search $q"; curl -s -H "Origin: https://goomri.github.io" "https://backlog-api.goomric.workers.dev/search?q=$q&debug=1" | head -c 1500; echo
-          done
-          echo "== match"; curl -s -X POST -H "Origin: https://goomri.github.io" -H "Content-Type: application/json" -d '{"titles":["In Between","We Were Here"]}' https://backlog-api.goomric.workers.dev/match | head -c 1500; echo
+          W=https://backlog-api.goomric.workers.dev
+          p(){ echo "== $1"; curl -s -G -H "Origin: https://goomri.github.io" "$W/raw" --data-urlencode "ep=$2" --data-urlencode "b=$3" | head -c 600; echo; }
+          p "search plain" games 'search "In Between"; fields name; limit 5;'
+          p "exact ~" games 'fields name; where name ~ "In Between"; limit 5;'
+          p "exact =" games 'fields name; where name = "In Between"; limit 5;'
+          p "exact ~ sort" games 'fields name; where name ~ "We Were Here" & version_parent = null; sort total_rating_count desc; limit 5;'
+          p "multi" multiquery 'query games "s0" { search "We Were Here"; fields name; limit 3; };
+          query games "e0" { fields name; where name ~ "We Were Here"; limit 3; };'
+          p "multi num" multiquery 'query games "0" { search "We Were Here"; fields name; limit 3; };'
