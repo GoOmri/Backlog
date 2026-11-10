@@ -5,4 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -H "Origin: https://goomri.github.io" https://backlog-api.goomric.workers.dev/steamwish | head -c 300
+          W=https://backlog-api.goomric.workers.dev; O="Origin: https://goomri.github.io"
+          T=$(curl -s -H "$O" $W/trophies)
+          NP=$(echo "$T" | python3 -c "import sys,json; d=json.load(sys.stdin); x=next(x for x in d if x.get('hasPlat')); print(x['npId'], x['svc'], x['title'])")
+          echo "GAME $NP"; set -- $NP
+          echo "RAR $(curl -s -H "$O" "$W/rarity?np=$1&svc=$2")"
