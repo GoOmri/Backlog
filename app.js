@@ -331,10 +331,11 @@ function shelfHTML(wish){
   const srt = wish && sort === "title" ? "sale" : sort;
   shown.sort((a, b) => (srt === "title" ? (b.status === "playing") - (a.status === "playing") : 0) || by[srt](a, b));
   return `<div class="wrap"><div class="filters">
-    <input id="q" type="search" autocomplete="off" placeholder="Search ${scope.length} games" value="${esc(q)}" aria-label="Search">
+    <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
     ${wish ? "" : `<select id="statSel" aria-label="Status"><option value="">Any status</option>${["backlog","playing","done","dropped"].map(k => `<option value="${k}" ${statF === k ? "selected" : ""}>${STAT[k]}</option>`).join("")}</select>`}
     <select id="genreSel" aria-label="Genre"><option value="">All types</option>${nom ? `<option value="__nomatch" ${genreF === "__nomatch" ? "selected" : ""}>Needs a match (${nom})</option>` : ""}${topTags(scope).map(t => `<option ${t === genreF ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
     <select id="sortSel" aria-label="Sort">${[["title", wish ? "Biggest discount" : "A–Z"], ["rating","Best rated"], ["short","Shortest"], ["added","Recently added"], ...(wish ? [] : [["played","Most played (Steam)"]])].map(([k, l]) => `<option value="${k}" ${k === sort ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
     <div class="chips">${plats.map(p => `<button class="chip" aria-pressed="${platF.has(p)}" data-plat="${p}"><span class="dot" style="background:var(${PLAT[p][2]})"></span>${PLAT[p][0]}</button>`).join("")}</div>
   </div><div class="grid">${shown.map(g => cardHTML(g, wish && g.sale?.cut ? `${g.sale.price ?? ""} ${g.sale.currency || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div></div>`;
 }
