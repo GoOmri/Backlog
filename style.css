@@ -391,3 +391,12 @@ dialog:not(.full) .x{position:sticky;top:0;margin-left:auto;margin-bottom:-36px;
 .dchip.vhard{background:#3d1c24;color:#ff6b86}
 .dchip.none{background:var(--raise);color:var(--dim)}
 .ibtn.on-heart{color:#FF6B86}
+
+/* game page top-right: ⋮ edit + close */
+dialog.full .x{position:static}
+.topbtns{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));z-index:7;display:flex;gap:8px}
+.topbtns .x{width:40px;height:40px;border-radius:999px;border:0;background:rgb(14 17 22 / .7);display:grid;place-items:center;color:var(--fg)}
+.editpanel{position:fixed;top:calc(60px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));z-index:8;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 80px);overflow:auto;background:var(--raise);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:12px;box-shadow:0 16px 40px rgb(0 0 0 / .5)}
+/* stop the page behind from scrolling once the game page reaches its end */
+dialog{overscroll-behavior:contain}
+html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
