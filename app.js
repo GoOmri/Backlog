@@ -756,12 +756,13 @@ function inList(x){
   const k = baseKey(x.title);
   return list().find(g => (x.igdbId && g.igdbId === x.igdbId) || baseKey(g.title) === k || baseKey(g.asTyped || "") === k) || null;
 }
-function pageShell(x, {own, actions, facts}){
+function pageShell(x, {own, actions, facts, edit}){
   const yr = new Date().getFullYear();
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
   const meta = [when, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = x.hero || x.cover;
-  return `<button class="x" data-act="close" aria-label="Close">${ic("x")}</button>
+  return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
+  ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
     <div class="gp-head">
       ${x.logo ? `<img class="gp-logo" src="${esc(x.logo)}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
@@ -907,14 +908,17 @@ async function editSheet(id){
     ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
-    <details class="more"><summary>Edit</summary>
+`;
+  const edit = `
       <div class="field"><span class="label">Status</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
-    </details>`;
-  openSheet(pageShell(g, {own: `<div class="pills">${pills}</div>`, actions, facts}), "full");
+`;
+  openSheet(pageShell(g, {own: `<div class="pills">${pills}</div>`, actions, facts, edit}), "full");
+  $("#kebab").onclick = e => { e.stopPropagation(); $("#editPanel").hidden = !$("#editPanel").hidden; };
+  $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !e.target.closest("#editPanel, #kebab")) $("#editPanel").hidden = true; });
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
   const pop = (btn, menu) => { $(btn).onclick = e => { e.stopPropagation(); sh.querySelectorAll(".popmenu").forEach(m => { if (m !== $(menu)) m.hidden = true; }); $(menu).hidden = !$(menu).hidden; }; };
   pop("#rateBtn", "#rateMenu");
