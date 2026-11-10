@@ -796,7 +796,7 @@ async function previewSheet(x){
   try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
-let ytReady, vTimer;
+let ytReady, vTimer, isScrubbing = () => false;
 function loadYT(){ return ytReady ||= new Promise(res => { window.onYouTubeIframeAPIReady = res; const sc = document.createElement("script"); sc.src = "https://www.youtube.com/iframe_api"; document.head.append(sc); }); }
 async function mountTrailer(id){
   await loadYT(); if (!$("#ytp")) return;
@@ -804,7 +804,7 @@ async function mountTrailer(id){
   const pl = new YT.Player("ytp", {videoId: id, playerVars: {autoplay: 1, mute: 1, start: 5, controls: 0, cc_load_policy: 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3, fs: 0},
     events: {onStateChange: e => $("#vctl")?.classList.toggle("paused", e.data === 2), onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($("#vtitle")) $("#vtitle").textContent = t || ""; }}});
   clearInterval(vTimer);
-  vTimer = setInterval(() => { const f = $("#vfill"); if (!f || !pl.getDuration) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
+  vTimer = setInterval(() => { const f = $("#vfill"); if (!f || !pl.getDuration || isScrubbing()) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
   const ctl = $("#vctl");
   ctl.onclick = e => {
     if (e.target.closest("#vbar")) return;
@@ -813,10 +813,15 @@ async function mountTrailer(id){
     else if (x > .65){ pl.seekTo(pl.getCurrentTime() + 10, true); flash("+10s"); }
     else if (pl.getPlayerState() === 1){ pl.pauseVideo(); flash("❚❚"); } else { pl.playVideo(); flash("▶"); }
   };
-  const bar = $("#vbar");
-  const seek = e => { const r = bar.getBoundingClientRect(); pl.seekTo(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (pl.getDuration() || 0), true); };
-  bar.onpointerdown = e => { e.stopPropagation(); bar.setPointerCapture(e.pointerId); seek(e); bar.onpointermove = seek; };
-  bar.onpointerup = () => bar.onpointermove = null;
+  // Drag along the timeline to scrub: the bar follows your finger, the video jumps as you move and settles on release.
+  const bar = $("#vbar"); let scrubbing = false;
+  const frac = e => { const r = bar.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); };
+  const show = f => { $("#vfill").style.width = f * 100 + "%"; };
+  bar.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); scrubbing = true; bar.setPointerCapture(e.pointerId); const f = frac(e); show(f); pl.seekTo(f * (pl.getDuration() || 0), false); };
+  bar.onpointermove = e => { if (!scrubbing) return; const f = frac(e); show(f); pl.seekTo(f * (pl.getDuration() || 0), false); };
+  bar.onpointerup = bar.onpointercancel = e => { if (!scrubbing) return; scrubbing = false; pl.seekTo(frac(e) * (pl.getDuration() || 0), true); };
+  bar.onclick = e => e.stopPropagation();
+  isScrubbing = () => scrubbing;
 }
 // Your progress: Steam achievements and PlayStation trophies.
 let trophyList = null;
