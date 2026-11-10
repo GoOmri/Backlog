@@ -466,7 +466,7 @@ function homeHTML(){
   const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test]) => rowHTML(name, pool.filter(test).sort(byLikely).slice(0, 24), "", undefined, 3));
   if (topMV === null){ topMV = []; api("/topmv").then(r => { topMV = r; if (tab === "home") render(); }, () => {}); }
   const have = new Set(list().map(g => g.igdbId));
-  const mvNew = topMV.filter(x => !have.has(x.igdbId)).slice(0, 24);
+  const mvNew = topMV.filter(x => !inList(x)).slice(0, 24);
   mvNew.forEach(x => previewCache.set(x.igdbId, x));
   const mvNotOwned = mvNew.length >= 3 ? `<section class="section wrap"><div class="row-head"><h3>MV's you don't own</h3></div><div class="row">${mvNew.map(x => `<button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${x.year || ""}</span></span></button>`).join("")}</div></section>` : "";
   return carouselHTML(top)
@@ -575,7 +575,7 @@ function couchHTML(){
   const card = d => `<div class="card"><button class="card" data-preview="${d.igdbId}">${coverHTML({...d, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(d.title)}</span></button>
     <span class="csub"><span>${d.year || ""}</span>${d.rating ? `<span class="score ${d.rating >= 80 ? "hi" : ""}">${d.rating}</span>` : ""}</span>
     <button class="btn ghost small" data-cwish="${d.igdbId}" ${d.added ? "disabled" : ""}>${d.added ? "On wishlist" : "+ Wishlist"}</button></div>`;
-  const row = (t, sub, xs) => { xs = xs.filter(d => !have.has(d.igdbId)); return xs.length ? `<div class="section"><div class="row-head"><h3>${t}</h3><span class="dim">${sub}</span></div><div class="row">${xs.map(card).join("")}</div></div>` : ""; };
+  const row = (t, sub, xs) => { xs = xs.filter(d => !inList(d)); return xs.length ? `<div class="section"><div class="row-head"><h3>${t}</h3><span class="dim">${sub}</span></div><div class="row">${xs.map(card).join("")}</div></div>` : ""; };
   return row("New couch co-op 2D platformers", "released in the last 18 months", couchFinds.fresh) + row("Best couch co-op 2D platformers", "you don't own yet", couchFinds.best);
 }
 let radar = null;
@@ -588,7 +588,7 @@ function radarHTML(){
   [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
   const card = (x, sub) => `<div class="card"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button><span class="csub"><span>${esc(sub)}</span></span>
     <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me" title="Not for me">👎</button></span></div>`;
-  const row = (t, xs, subf) => { xs = xs.filter(x => !have.has(x.igdbId)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
+  const row = (t, xs, subf) => { xs = xs.filter(x => !inList(x)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
   const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
 }
@@ -717,6 +717,10 @@ function nopeSheet(){
 }
 // ---------- Game page: full screen, art behind the title, one status button, icon actions ----------
 const previewCache = new Map();
+function inList(x){
+  const k = baseKey(x.title);
+  return list().find(g => (x.igdbId && g.igdbId === x.igdbId) || baseKey(g.title) === k || baseKey(g.asTyped || "") === k) || null;
+}
 function pageShell(x, {own, actions, facts}){
   const meta = [x.year, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = x.hero || x.cover;
@@ -737,13 +741,18 @@ function pageShell(x, {own, actions, facts}){
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
 }
 async function previewSheet(x){
-  const have = list().find(g => g.igdbId === x.igdbId);
+  const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
   openSheet(pageShell(x, {own: `<div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="btn" id="pvWish">+ Wishlist</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">👎</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
-  $("#pvWish").onclick = async () => { $("#pvWish").disabled = true; $("#pvWish").textContent = "On wishlist";
-    const {because, score, added, date, ...data} = x; await setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()}); };
+  let wid = null;
+  $("#pvWish").onclick = async () => {
+    if (wid){ await del(wid); wid = null; $("#pvWish").textContent = "+ Wishlist"; toast("Removed from wishlist"); return; }
+    wid = newId(); $("#pvWish").textContent = "✓ On wishlist";
+    const {because, score, added, date, ...data} = x; await setDoc(doc(col, wid), {...data, asTyped: x.title, platforms: ["other"], status: "wishlist", added: Date.now()});
+    toast("Added to wishlist");
+  };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
