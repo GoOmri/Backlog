@@ -133,11 +133,16 @@ query games "s" { search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10; };`;
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
-  const cached = await env.KV.get("game:" + id, "json");
+  const cached = await env.KV.get("game2:" + id, "json");
   if (cached) return cached;
   const out = await gameFresh(env, id);
-  await env.KV.put("game:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  await env.KV.put("game2:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
+}
+// Gameplay first; avoid teasers, announcements and cinematic (CG/story) trailers when there's a choice.
+function pickTrailer(videos){
+  const score = v => { const n = v.name || ""; return (/gameplay|walkthrough|playthrough|first \d+ minutes/i.test(n) ? 10 : 0) + (/launch|release|trailer/i.test(n) ? 2 : 0) - (/teaser|announce|reveal|cinematic|\bcg|story|intro|opening|logo|interview|dev diary/i.test(n) ? 5 : 0); };
+  return videos.slice().sort((a, b) => score(b) - score(a))[0]?.video_id || null;
 }
 async function gameFresh(env, id){
   const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
@@ -146,7 +151,7 @@ async function gameFresh(env, id){
     developers: (g.involved_companies || []).filter(c => c.developer).map(c => c.company?.name).filter(Boolean),
     hero: IMG(g.artworks?.[0]?.image_id || g.screenshots?.[0]?.image_id, "1080p"),
     shots: (g.screenshots || []).slice(0, 8).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
-    trailer: ((g.videos || []).find(v => /gameplay/i.test(v.name || "")) || (g.videos || []).find(v => /trailer/i.test(v.name || "")) || (g.videos || [])[0])?.video_id || null};
+    trailer: pickTrailer(g.videos || [])};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
   const sim = (g.similar_games || []).slice(0, 10);
   out.similar = sim.length ? (await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${sim.join(",")}); limit 10;`)).map(x => slim(x)) : [];
