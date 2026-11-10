@@ -333,3 +333,12 @@ dialog.full .x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));righ
 *{-webkit-tap-highlight-color:transparent}
 button,.card,.tab,.chip,.fopt{-webkit-user-select:none;user-select:none}
 img{-webkit-touch-callout:none}
+
+/* star + number centred together; dots sit under the media, not on the video */
+.ibtn .ico-svg{margin:0}
+.ibtn small{line-height:1}
+.gp-main .media{overflow:visible;aspect-ratio:auto;background:none}
+.gp-main .mslides{aspect-ratio:16/9;border-radius:14px;background:var(--raise)}
+.gp-main .mdots{position:static;margin-top:10px}
+.gp-main .dotbtn{background:var(--line)}
+.gp-main .dotbtn[aria-current]{background:var(--fg)}
