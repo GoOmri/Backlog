@@ -462,7 +462,7 @@ function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
   const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "Suggested · pin to keep";
-  return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="" loading="lazy">` : ""}</div>
+  return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(heroSrc(g.hero) || g.cover)}" alt="" loading="lazy">` : ""}</div>
     <div class="hero-in">
       ${g.logo ? `<img class="hero-logo" src="${esc(g.logo)}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
       <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
@@ -760,6 +760,9 @@ function render(){
   watchShelf();
 }
 let rowTab = null;
+// Phones get 720p heroes instead of the 1080p the worker stores.
+const PHONE = matchMedia("(max-width:999px)").matches;
+const heroSrc = u => PHONE && u ? u.replace("/t_1080p/", "/t_720p/") : u;
 // Batch data-driven redraws (background queue writes games one by one): one render per ~500ms,
 // none while a page is open (closing it renders) or while the app is in the background.
 let softT = 0, softPending = false;
@@ -853,7 +856,7 @@ function pageShell(x, {own, actions, facts, edit}){
   const yr = new Date().getFullYear();
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
   const meta = [when, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
-  const art = x.hero || x.cover;
+  const art = heroSrc(x.hero) || x.cover;
   return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
@@ -975,7 +978,7 @@ function fillMedia(d){
   if (!$("#dlg").open || !$("#mslides")) return;
   $("#desc").textContent = d.summary || "";
   if (d.logo && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(d.logo)}" alt="">`;
-  if (d.hero && $(".gp-bg") && !$(".gp-bg").src.includes(d.hero)) $(".gp-bg").src = d.hero;
+  if (d.hero && $(".gp-bg") && !$(".gp-bg").src.includes(heroSrc(d.hero))) $(".gp-bg").src = heroSrc(d.hero);
   const slides = [
     d.trailer && `<div class="mslide vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vtitle" id="vtitle"></div><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
@@ -1227,3 +1230,6 @@ onAuthStateChanged(auth, user => {
     runQueue();
   }, e => { $("#main").innerHTML = `<div class="empty wrap">Couldn't load your games: ${esc(e.message)}</div>`; });
 });
+
+// App shell cache for instant open (sw.js). Not on localhost so dev edits show immediately.
+if ("serviceWorker" in navigator && location.hostname !== "localhost") navigator.serviceWorker.register("sw.js").catch(() => {});
