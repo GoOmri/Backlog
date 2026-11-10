@@ -265,7 +265,7 @@ const SEARCHES = [
   ["soon", ["Metroidvania"], "filter=popularcomingsoon"], ["soon", ["2D Platformer"], "filter=popularcomingsoon"]
 ];
 async function finds(env){
-  const c = await env.KV.get("finds7", "json");
+  const c = await env.KV.get("finds8", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -299,8 +299,8 @@ async function finds(env){
   const elite = h => h.pct >= 94 && h.n >= 10000;
   const items = games.map(g => {
     const h = gameOf.get(g.id), top = (h.tags || []).slice(0, 8);
-    const taste = Math.min(10, top.filter(t => LIKE.includes(t)).length * 2) - (elite(h) ? 0 : top.filter(t => DISLIKE.includes(t)).length * 6);
-    const base = h.pct != null ? (h.pct * h.n + 80 * 50) / (h.n + 50) : 75;
+    const taste = Math.min(6, top.filter(t => LIKE.includes(t)).length * 1.5) - (elite(h) ? 0 : top.filter(t => DISLIKE.includes(t)).length * 6);
+    const base = h.pct != null ? (h.pct * h.n + 80 * 300) / (h.n + 300) : 75;
     const sk = [...new Set((h.tags || []).map(t => STAG[t]).filter(Boolean))];
     const x = {...slim(g), kw: [...new Set([...feel(g), ...sk.filter(t => t !== "Couch co-op")])], ...(sk.includes("Couch co-op") ? {couch: true} : {}),
       date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
@@ -313,7 +313,7 @@ async function finds(env){
   const taste = ["mv", "plat", "walk", "mystery", "cozy", "zelda", "coopPuzzle", "coopPlat"];
   const released = x => x.date && x.date > since && x.date <= now;
   const d = {
-    fresh: pick(["fresh"], x => !x.date || x.date > half, (a, b) => (b.date || 0) - (a.date || 0)),
+    fresh: pick(["fresh"], x => !x.date || x.date > now - 365 * 86400, (a, b) => (b.date || 0) - (a.date || 0)),
     soon: pick(["soon"], x => !x.date || x.date > now, (a, b) => (a.date || 9e12) - (b.date || 9e12)),
     mv: pick(["mv"], released), plat: pick(["plat"], released),
     gems: pick(taste, x => released(x) && x.gem && x.taste >= 0, (a, b) => (b.steamPct + b.taste) - (a.steamPct + a.taste)),
@@ -322,7 +322,7 @@ async function finds(env){
     missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
     classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
   };
-  await env.KV.put("finds7", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds8", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
