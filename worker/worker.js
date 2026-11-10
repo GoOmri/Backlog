@@ -192,15 +192,18 @@ async function couch(env, kind){
 
 /* ---------- New releases radar: 2D platformers and metroidvanias ---------- */
 async function upcoming(env){
-  const c = await env.KV.get("upcoming", "json");
+  const c = await env.KV.get("upcoming2", "json");
   if (c && Date.now() - c.t < 12 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), base = `genres = (8) & player_perspectives = (4) & version_parent = null & parent_game = null`;
-  const [soon, recent] = await Promise.all([
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & first_release_date > ${now} & first_release_date < ${now + 180 * 86400} & hypes > 2; sort first_release_date asc; limit 40;`),
+  // IGDB platform ids: 167 = PS5, 6 = PC (Windows, i.e. Steam).
+  const soonQ = plat => `fields ${MATCH_FIELDS}; where ${base} & platforms = (${plat}) & first_release_date > ${now} & first_release_date < ${now + 180 * 86400}; sort first_release_date asc; limit 40;`;
+  const [soonPs5, soonPc, recent] = await Promise.all([
+    igdb(env, "games", soonQ(167)), igdb(env, "games", soonQ(6)),
     igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & first_release_date > ${now - 90 * 86400} & first_release_date <= ${now}; sort hypes desc; limit 40;`)
   ]);
-  const d = {soon: soon.map(g => ({...slim(g), date: g.first_release_date})), recent: recent.map(g => slim(g))};
-  await env.KV.put("upcoming", JSON.stringify({t: Date.now(), d}));
+  const withDate = gs => gs.map(g => ({...slim(g), date: g.first_release_date}));
+  const d = {soonPs5: withDate(soonPs5), soonPc: withDate(soonPc), recent: recent.map(g => slim(g))};
+  await env.KV.put("upcoming2", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 

@@ -522,17 +522,18 @@ function couchHTML(){
   return row("New couch co-op 2D platformers", "released in the last 18 months", couchFinds.fresh) + row("Best couch co-op 2D platformers", "you don't own yet", couchFinds.best);
 }
 let radar = null;
-const radarItem = id => [...(radar?.soon || []), ...(radar?.recent || [])].find(x => x.igdbId === id);
+const radarItem = id => [...(radar?.soonPs5 || []), ...(radar?.soonPc || []), ...(radar?.recent || [])].find(x => x.igdbId === id);
 function radarHTML(){
   if (radar === null){ radar = {}; api("/upcoming").then(r => { radar = r; if (tab === "disc") render(); }, e => { radar = {error: e.message}; if (tab === "disc") render(); }); return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`; }
   if (radar.error) return `<div class="section"><h3>Coming soon</h3><span class="why">Couldn't load new releases: ${esc(radar.error)}</span></div>`;
-  if (!radar.soon) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
+  if (!radar.soonPs5) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
-  [...(radar.soon || []), ...(radar.recent || [])].forEach(x => previewCache.set(x.igdbId, x));
+  [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
   const card = (x, sub) => `<div class="card"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span></button><span class="csub"><span>${esc(sub)}</span></span>
     <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me">✕</button></span></div>`;
   const row = (t, xs, subf) => { xs = xs.filter(x => !have.has(x.igdbId)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
-  return row("Coming soon", radar.soon, x => new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"})) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
+  const when = x => new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"});
+  return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when) + row("Just released", radar.recent, x => basicTags(x).slice(1, 3).join(" · "));
 }
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
