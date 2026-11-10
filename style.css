@@ -405,3 +405,10 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 .vbar{height:28px;bottom:4px;touch-action:none}
 .vbar::before,.vbar span{height:4px}
 .vbar span::after{content:"";position:absolute;right:-6px;top:50%;width:12px;height:12px;border-radius:50%;background:var(--fg);transform:translateY(-50%)}
+
+/* carousel: logo, info and button share one left edge */
+.hero-in{justify-items:start;text-align:left}
+.hero-logo{object-position:left center;display:block;margin:0}
+.hero-title{margin:0}
+.hero-facts,.hero-actions{justify-content:flex-start;margin:0;padding:0}
+.hero-facts .badges{margin:0}
