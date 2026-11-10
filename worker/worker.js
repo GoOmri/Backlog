@@ -23,6 +23,8 @@ export default {
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
         case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
+        case "/upcoming": out = await upcoming(env); break;
+        case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steam":    out = await steam(env); break;
         case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
@@ -126,7 +128,7 @@ async function game(env, id){
   return out;
 }
 async function gameFresh(env, id){
-  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
+  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
   if (!g) throw new Error("Game not found");
   const out = {...slim(g, await ttbFor(env, [id])), summary: g.summary || "",
     developers: (g.involved_companies || []).filter(c => c.developer).map(c => c.company?.name).filter(Boolean),
@@ -134,6 +136,8 @@ async function gameFresh(env, id){
     shots: (g.screenshots || []).slice(0, 8).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
     trailer: ((g.videos || []).find(v => /gameplay/i.test(v.name || "")) || (g.videos || []).find(v => /trailer/i.test(v.name || "")) || (g.videos || [])[0])?.video_id || null};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
+  const sim = (g.similar_games || []).slice(0, 10);
+  out.similar = sim.length ? (await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${sim.join(",")}); limit 10;`)).map(x => slim(x)) : [];
   return out;
 }
 
@@ -184,6 +188,39 @@ async function couch(env, kind){
   ]);
   const ttb = await ttbFor(env, [...best, ...fresh].map(g => g.id));
   return {best: best.map(g => slim(g, ttb)), fresh: fresh.map(g => slim(g, ttb))};
+}
+
+/* ---------- New releases radar: 2D platformers and metroidvanias ---------- */
+async function upcoming(env){
+  const c = await env.KV.get("upcoming", "json");
+  if (c && Date.now() - c.t < 12 * 3600e3) return c.d;
+  const now = Math.floor(Date.now() / 1000), base = `genres = (8) & player_perspectives = (4) & version_parent = null & parent_game = null`;
+  const [soon, recent] = await Promise.all([
+    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & first_release_date > ${now} & first_release_date < ${now + 180 * 86400} & hypes > 2; sort first_release_date asc; limit 40;`),
+    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & first_release_date > ${now - 90 * 86400} & first_release_date <= ${now}; sort hypes desc; limit 40;`)
+  ]);
+  const d = {soon: soon.map(g => ({...slim(g), date: g.first_release_date})), recent: recent.map(g => slim(g))};
+  await env.KV.put("upcoming", JSON.stringify({t: Date.now(), d}));
+  return d;
+}
+
+/* ---------- Steam Deck compatibility (0 unknown, 1 unsupported, 2 playable, 3 verified) ---------- */
+async function deck(env, items){
+  const out = {};
+  await Promise.all(items.map(async it => {
+    try {
+      let appid = it.appid;
+      if (!appid){
+        const r = await (await fetch(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(it.title)}&cc=us&l=english`)).json();
+        const hit = (r.items || []).find(x => norm(x.name) === norm(it.title)) || (r.items || [])[0];
+        appid = hit?.id;
+      }
+      if (!appid){ out[it.title] = {deck: 0}; return; }
+      const d = await (await fetch(`https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport?nAppID=${appid}&l=english`)).json();
+      out[it.title] = {appid, deck: d?.results?.resolved_category || 0};
+    } catch { out[it.title] = {deck: 0}; }
+  }));
+  return out;
 }
 
 /* ---------- Steam library ---------- */
