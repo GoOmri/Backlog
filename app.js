@@ -523,8 +523,9 @@ function couchHTML(){
 let radar = null;
 const radarItem = id => [...(radar?.soon || []), ...(radar?.recent || [])].find(x => x.igdbId === id);
 function radarHTML(){
-  if (radar === null){ radar = {}; api("/upcoming").then(r => { radar = r; if (tab === "disc") render(); }, e => { radar = {error: e.message}; }); return ""; }
-  if (!radar.soon) return "";
+  if (radar === null){ radar = {}; api("/upcoming").then(r => { radar = r; if (tab === "disc") render(); }, e => { radar = {error: e.message}; if (tab === "disc") render(); }); return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`; }
+  if (radar.error) return `<div class="section"><h3>Coming soon</h3><span class="why">Couldn't load new releases: ${esc(radar.error)}</span></div>`;
+  if (!radar.soon) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
   const card = (x, sub) => `<div class="card">${coverHTML({...x, platforms: [], status: "wishlist"})}<span class="ctitle">${esc(x.title)}</span><span class="csub"><span>${esc(sub)}</span></span>
     <span class="chips"><button class="btn ghost small" data-rwish="${x.igdbId}">+ Wishlist</button><button class="btn ghost small" data-rnope="${x.igdbId}" aria-label="Not for me">✕</button></span></div>`;
