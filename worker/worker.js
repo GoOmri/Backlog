@@ -19,8 +19,7 @@ export default {
       let out;
       switch (url.pathname){
         case "/match":    out = await match(env, (body.titles || []).slice(0, 10)); break;
-        case "/raw":      out = await igdb(env, url.searchParams.get("ep") || "games", await req.clone().text().catch(() => "") || url.searchParams.get("b")); break;
-        case "/search":   globalThis.__debug = url.searchParams.has("debug"); out = await search(env, url.searchParams.get("q") || ""); break;
+        case "/search":   out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
         case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
         case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
@@ -90,26 +89,24 @@ async function ttbFor(env, ids){
   return Object.fromEntries(rows.map(r => [r.game_id, r]));
 }
 
-// Best match for up to 10 titles in one IGDB request.
+// Name lookups. IGDB's free-text search started returning nothing, so match by name instead:
+// exact (case-insensitive), then "starts with", then "contains". Editions/DLC are skipped where possible.
+async function byName(env, t, extra = "& version_parent = null", limit = 6){
+  const n = q(t);
+  for (const cond of [`name ~ "${n}"`, `name ~ "${n}"*`, `name ~ *"${n}"*`]){
+    const rows = await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${cond} ${extra}; sort total_rating_count desc; limit ${limit};`);
+    if (rows.length) return rows;
+  }
+  return [];
+}
+// Best match for up to 10 titles.
 async function match(env, titles){
   if (!titles.length) return {};
-  const picks = {}, lists = {};
-  for (let i = 0; i < titles.length; i += 5){
-    const part = titles.slice(i, i + 5);
-    const mq = part.flatMap((t, j) => [
-      `query games "s${i + j}" { search "${q(t)}"; fields ${MATCH_FIELDS}; where version_parent = null & parent_game = null; limit 10; };`,
-      `query games "e${i + j}" { fields ${MATCH_FIELDS}; where name ~ "${q(t)}" & version_parent = null; sort total_rating_count desc; limit 5; };`
-    ]).join("\n");
-    for (const r of await igdb(env, "multiquery", mq)){
-      const n = +r.name.slice(1);
-      lists[n] = r.name[0] === "e" ? [...(r.result || []), ...(lists[n] || [])] : [...(lists[n] || []), ...(r.result || [])];
-    }
-  }
-  for (const [n, list] of Object.entries(lists)){
-    const t = titles[+n], k = norm(t);
+  const picks = {};
+  for (const t of titles){
+    const k = norm(t), list = await byName(env, t);
+    const exact = list.filter(g => norm(g.name) === k);
     const starts = list.filter(g => norm(g.name).startsWith(k)).sort((a, b) => a.name.length - b.name.length);
-    // Several games can share a name (e.g. a mobile spin-off): take the best known one.
-    const exact = list.filter(g => norm(g.name) === k).sort((a, b) => (b.total_rating_count || 0) - (a.total_rating_count || 0));
     picks[t] = exact[0] || starts[0] || list[0] || null;
   }
   const ttb = await ttbFor(env, Object.values(picks).filter(Boolean).map(g => g.id));
@@ -125,13 +122,14 @@ async function info(env, ids){
 
 async function search(env, text){
   if (!text.trim()) return [];
-  const mq = `query games "e" { fields ${MATCH_FIELDS}; where name ~ "${q(text)}"; sort total_rating_count desc; limit 5; };
-query games "s" { search "${q(text)}"; fields ${MATCH_FIELDS}; limit 10; };`;
-  const res = await igdb(env, "multiquery", mq), seen = new Set();
-  if (globalThis.__debug) return res;
-  const list = [...(res.find(r => r.name === "e")?.result || []), ...(res.find(r => r.name === "s")?.result || [])].filter(g => !seen.has(g.id) && seen.add(g.id));
+  const n = q(text), seen = new Set(), list = [];
+  for (const cond of [`name ~ "${n}"`, `name ~ "${n}"*`, `name ~ *"${n}"*`]){
+    for (const g of await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${cond}; sort total_rating_count desc; limit 8;`))
+      if (!seen.has(g.id)){ seen.add(g.id); list.push(g); }
+    if (list.length >= 8) break;
+  }
   const ttb = await ttbFor(env, list.map(g => g.id));
-  return list.map(g => slim(g, ttb));
+  return list.slice(0, 10).map(g => slim(g, ttb));
 }
 
 async function game(env, id){
