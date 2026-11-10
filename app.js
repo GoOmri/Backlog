@@ -557,9 +557,12 @@ async function editSheet(id){
   let status = g.status, plats = new Set(g.platforms || []), stars = g.myRating || 0, pinned = !!g.upNext, couchV = !!g.couch;
   const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
   const meta = [g.year, ...basicTags(g)].filter(Boolean).join(" · ");
-  const own = (g.platforms || []).filter(p => p !== "psplus");
+  // PS5 only counts when bought; PS Plus games get a single "PS+" pill.
+  const viaPlus = g.ps ? g.ps !== "bought" : (g.platforms || []).includes("psplus");
+  const own = (g.platforms || []).filter(p => p !== "psplus" && !(p === "ps5" && viaPlus));
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
-    : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + ((g.platforms || []).includes("psplus") || g.ps ? `<span class="pill" style="--c:var(--psplus)">${esc(PS_LABEL[g.ps] || "PS Plus")}</span>` : "");
+    : own.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("")
+      + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
   openSheet(`<button class="x" data-act="close" aria-label="Close">×</button>
     <div class="media"><div class="mslides" id="mslides"><div class="mslide">${g.hero || g.cover ? `<img src="${esc(g.hero || g.cover)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
     <div class="ghead">${coverHTML({...g, platforms: [], sale: null, status: "backlog", noMatch: false})}
