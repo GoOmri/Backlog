@@ -545,7 +545,7 @@ function passes(g, skip){
 let shelfScope = [], shelfWish = false;
 // Library renders in chunks: CHUNK cards, more as you scroll. The count survives data redraws, resets when filters change.
 const CHUNK = 60;
-let shelfShown = [], shelfLimit = CHUNK, shelfKey = "", shelfObs = null;
+let shelfShown = [], shelfLimit = CHUNK, shelfKey = "", shelfObs = null, shelfReset = false;
 function moreShelf(){
   const grid = $("#main .grid"); if (!grid || shelfLimit >= shelfShown.length) return;
   const next = shelfShown.slice(shelfLimit, shelfLimit + CHUNK); shelfLimit += next.length;
@@ -590,16 +590,16 @@ function shelfHTML(wish){
   const srt = wish && sort === "title" ? "anticipated" : by[sort] ? sort : "title";
   shown.sort((a, b) => (srt === "title" ? (b.status === "playing") - (a.status === "playing") : 0) || by[srt](a, b));
   const key = JSON.stringify([wish, s, sort, statF, genreF, accessF, deckF, [...platF], ...Object.values(F).map(x => [...x])]);
-  if (key !== shelfKey){ shelfKey = key; shelfLimit = CHUNK; }
+  if (key !== shelfKey){ shelfReset = !!shelfKey; shelfKey = key; shelfLimit = CHUNK; }
   shelfShown = shown;
   const nOn = platF.size + F.type.size + F.view.size + F.coop.size + F.access.size + (deckF ? 1 : 0) + (sort !== "title" ? 1 : 0);
   return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="disc">← Find</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
-    <div class="filters">
+    <div class="libhead"><div class="filters">
       <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
     </div>
-    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}
+    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}</div>
     <div class="grid">${shown.slice(0, shelfLimit).map(g => cardHTML(g, wish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>${shown.length > shelfLimit ? `<div id="shelfMore" style="height:1px"></div>` : ""}
   </div></div>`;
 }
@@ -754,6 +754,9 @@ function render(){
   rowTab = tab;
   m.innerHTML = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
   if (pos.size) for (const el of m.querySelectorAll(".row, #slides")){ const x = pos.get(keyOf(el)); if (x) el.scrollLeft = x; }
+  document.documentElement.style.setProperty("--barH", $(".bar").offsetHeight + "px");
+  // Filters changed while scrolled down: jump back so the new list starts at the top.
+  if (shelfReset){ shelfReset = false; const h = $(".libhead"); if (h && scrollY > h.parentElement.offsetTop) scrollTo(0, h.parentElement.offsetTop); }
   watchShelf();
 }
 let rowTab = null;
