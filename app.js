@@ -625,7 +625,7 @@ function couchHTML(){
 let radar = null;
 const radarItem = id => [...(radar?.soonPs5 || []), ...(radar?.soonPc || []), ...(radar?.recent || [])].find(x => x.igdbId === id);
 function radarHTML(){
-  if (radar === null){ radar = {}; api("/upcoming").then(r => { radar = r; if (tab === "disc") render(); }, e => { radar = {error: e.message}; if (tab === "disc") render(); }); return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`; }
+  if (radar === null) radar = swr("c:upcoming", () => api("/upcoming"), r => radar = r, e => radar = {error: e.message}) || {};
   if (radar.error) return `<div class="section"><h3>Coming soon</h3><span class="why">Couldn't load new releases: ${esc(radar.error)}</span></div>`;
   if (!radar.soonPs5) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
   const have = new Set(list().map(g => g.igdbId));
@@ -637,9 +637,16 @@ function radarHTML(){
 }
 // Find tab extras: wishlist sales and the best metroidvanias you don't own.
 const priceTxt = x => x?.price ? (x.price.d ? `−${x.price.d}% ${x.price.f}` : x.price.f) : "";
+// Show the last saved result instantly, refresh in the background, re-render only if it changed.
+function swr(key, fetcher, set, onErr){
+  let c = null; try { c = JSON.parse(localStorage.getItem(key)); } catch {}
+  fetcher().then(r => { const j = JSON.stringify(r); if (c && JSON.stringify(c) === j) return; try { localStorage.setItem(key, j); } catch {} set(r); if (tab === "disc") render(); },
+    e => { if (!c && onErr){ onErr(e); if (tab === "disc") render(); } });
+  return c;
+}
 function findExtrasHTML(){
   const is2D = g => basicTags(g).includes("2D");
-  if (topMV === null){ topMV = {}; api("/finds").then(r => { topMV = r; if (tab === "disc") render(); }, () => {}); }
+  if (topMV === null) topMV = swr("c:finds", () => api("/finds"), r => topMV = r) || {};
   const seen = new Set();
   const frow = (t, xs, subf, twoD) => {
     xs = (xs || []).filter(x => !inList(x) && !seen.has(x.igdbId));
@@ -650,35 +657,40 @@ function findExtrasHTML(){
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
   const rev = x => x?.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
   const played = x => { const g = inList(x); return g && ["playing", "done", "dropped"].includes(g.status); };
-  const top = (topMV.mvTop || []).filter(x => !played(x)).slice(0, 24); top.forEach(x => previewCache.set(x.igdbId, x));
-  const mvTop = top.length >= 3 ? `<div class="section"><h3>Top rated MVs you haven't played</h3><div class="row">${top.map(x => { const g = inList(x); return g ? cardHTML(g, rev(x)) : suggestCard(x, rev(x)); }).join("")}</div></div>` : "";
-  const mv = mvTop + frow("New 2D platformers & MVs", topMV.fresh, when) + frow("Coming soon: MVs & 2D platformers", topMV.soon, x => x.date ? when(x) : "Coming soon")
-    + frow("MV's you don't own", topMV.mv, yr, true) + frow("2D platformers you don't own", topMV.plat, yr) + frow("Hidden gems", topMV.gems, rev)
+  const top = (topMV.mvTop || []).filter(x => !played(x)).slice(0, 24), topIds = new Set(top.map(x => x.igdbId));
+  // One metroidvania row: top rated first, then MVs you don't own (2D first).
+  top.push(...(topMV.mv || []).filter(x => !inList(x) && !topIds.has(x.igdbId)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 30 - top.length));
+  top.forEach(x => { seen.add(x.igdbId); previewCache.set(x.igdbId, x); });
+  const mvTop = top.length >= 3 ? `<div class="section"><h3>Metroidvanias you haven't played</h3><div class="row">${top.map(x => { const g = inList(x); return g ? cardHTML(g, rev(x)) : suggestCard(x, rev(x)); }).join("")}</div></div>` : "";
+  const mv = mvTop + frow("2D platformers you don't own", topMV.plat, yr) + frow("Hidden gems", topMV.gems, rev)
     + frow("Puzzle co-op", topMV.coopPuzzle, yr) + frow("Couch co-op platformers", topMV.coopPlat, yr)
     + frow("Narrative & walking sims", topMV.walk, yr) + frow("Mystery & deduction", topMV.mystery, yr) + frow("Cozy short indies", topMV.cozy, yr) + frow("Zelda-likes", topMV.zelda, yr)
     + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
-  const wishRow = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3><span class="dim">${wl.length}</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button></div>
-    <div class="row">${wl.slice(0, 24).map(g => cardHTML(g, sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("")}</div></div>` : "";
   const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
-  const onSale = sales.length ? `<div class="section"><h3>On sale from your wishlist</h3><div class="row">${sales.map(g => cardHTML(g, `−${g.sale.cut}% ${g.sale.shop || ""}`)).join("")}</div></div>` : "";
-  return wishRow + onSale + mv;
+  const seeAll = wl.length ? `<span class="dim">${wl.length} on wishlist</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button>` : "";
+  const onSale = sales.length ? `<div class="section"><div class="row-head"><h3>On sale from your wishlist</h3>${seeAll}</div><div class="row">${sales.map(g => cardHTML(g, `−${g.sale.cut}% ${g.sale.shop || ""}`)).join("")}</div></div>`
+    : wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3>${seeAll}</div></div>` : "";
+  return onSale + mv;
 }
 const findPins = () => carouselHTML(list().filter(g => g.status === "wishlist" && g.upNext && !g.hidden).sort((a, b) => a.upNext - b.upNext));
 function discoverHTML(){
   const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
   if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
-  if (discovered === null){ runDiscover(liked); return `<div class="empty wrap">Finding games like the ${liked.length} you enjoyed…</div>`; }
-  if (discovered.error) return `<div class="empty wrap">${esc(discovered.error)}</div>`;
+  if (discovered === null){ try { discovered = JSON.parse(localStorage.getItem("c:disc")); } catch {} discovered = discovered || {loading: 1}; runDiscover(liked); }
+  const body = discovered.loading ? `<span class="why">Finding games like the ${liked.length} you enjoyed…</span>` : discovered.error ? `<span class="why">${esc(discovered.error)}</span>`
+    : `<div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div>`;
   return `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
-    <div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div></div></div>`;
+    ${body}</div></div>`;
 }
 async function runDiscover(liked){
   try {
     const like = liked.sort((a, b) => (b.myRating || 3) - (a.myRating || 3)).slice(0, 60).map(g => g.igdbId);
-    discovered = await api("/discover", {like, exclude: list().map(g => g.igdbId).filter(Boolean)});
-  } catch (e){ discovered = {error: e.message}; }
+    const r = await api("/discover", {like, exclude: list().map(g => g.igdbId).filter(Boolean)}), j = JSON.stringify(r);
+    if (Array.isArray(discovered) && JSON.stringify(discovered) === j) return;
+    discovered = r; try { localStorage.setItem("c:disc", j); } catch {}
+  } catch (e){ if (!Array.isArray(discovered)) discovered = {error: e.message}; }
   if (tab === "disc") render();
 }
 
