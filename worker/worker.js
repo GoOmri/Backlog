@@ -119,6 +119,13 @@ async function search(env, text){
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
+  const cached = await env.KV.get("game:" + id, "json");
+  if (cached) return cached;
+  const out = await gameFresh(env, id);
+  await env.KV.put("game:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
+  return out;
+}
+async function gameFresh(env, id){
   const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
   if (!g) throw new Error("Game not found");
   const out = {...slim(g, await ttbFor(env, [id])), summary: g.summary || "",
