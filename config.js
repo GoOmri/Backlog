@@ -1,7 +1,6 @@
 // Your Cloudflare Worker address, e.g. "https://backlog-api.yourname.workers.dev" (no slash at the end).
 // The game data keys live in Cloudflare, not here.
-export const API = "";
-
+export const API = "https://backlog-api.goomric.workers.dev";
 // Firebase web config (meant to be public; the Firestore rules protect your data).
 export const FIREBASE = {
   apiKey: "AIzaSyA-ph-1LgdNtlZfix1cXDvBOKdL9-eI6DU",
