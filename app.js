@@ -31,6 +31,9 @@ const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated se
 /* ---------- state ---------- */
 let games = new Map(), tab = "home", loaded = false;
 let homeMode = "owned", topMV = null;
+let typeAll = false, openSec = new Set(JSON.parse(localStorage.getItem("openSec") || '["Status","Type"]'));
+document.addEventListener("change", e => { if (e.target.id === "sortSel") toggleFilter("sort", e.target.value); });
+document.addEventListener("toggle", e => { const d = e.target; if (!d.matches?.("details.fsec")) return; d.open ? openSec.add(d.dataset.sec) : openSec.delete(d.dataset.sec); try { localStorage.setItem("openSec", JSON.stringify([...openSec])); } catch {} }, true);
 let q = "", platF = new Set(), statF = "", genreF = "", sort = "title", accessF = "", deckF = false;
 // Library/Wishlist filters (sidebar on desktop, panel on phone). Remembered per device.
 let F = {type: new Set(), view: new Set(), coop: new Set(), access: new Set()};
@@ -38,7 +41,7 @@ const VIEWS = ["2D", "3D", "Top-down", "VR"], COOPS = ["Couch co-op", "Online co
 function saveFilters(){ try { localStorage.setItem("filters:" + tab, JSON.stringify({statF, sort, deckF, plat: [...platF], type: [...F.type], view: [...F.view], coop: [...F.coop], access: [...F.access]})); } catch {} }
 function loadFilters(){
   platF = new Set(); statF = ""; genreF = ""; sort = "title"; deckF = false; F = {type: new Set(), view: new Set(), coop: new Set(), access: new Set()};
-  try { const o = JSON.parse(localStorage.getItem("filters:" + tab)); if (o){ statF = o.statF || ""; sort = o.sort || "title"; deckF = !!o.deckF; platF = new Set(o.plat); F = {type: new Set(o.type), view: new Set(o.view), coop: new Set(o.coop), access: new Set(o.access)}; } } catch {}
+  try { const o = JSON.parse(localStorage.getItem("filters:" + tab)); if (o){ statF = o.statF || ""; sort = o.sort || "title"; deckF = !!o.deckF; platF = new Set(o.plat); F = {type: new Set(o.type), view: new Set(o.view), coop: new Set(o.coop), access: new Set()}; } } catch {}
 }
 let mood = new Set(), time = "";
 let db = null, col = null;
@@ -558,22 +561,28 @@ function sidebarHTML(){
   const scope = shelfScope, wish = shelfWish;
   const count = (skip, test) => scope.filter(g => passes(g, skip) && test(g)).length;
   const opt = (group, val, label, n, on) => n || on ? `<button class="fopt" data-f="${group}|${esc(val)}" aria-pressed="${on}"><span>${esc(label)}</span><span class="n">${n}</span></button>` : "";
-  const sec = (title, body) => body.trim() ? `<div class="fsec"><div class="label">${title}</div>${body}</div>` : "";
+  const sec = (title, body, on = "") => body.trim() ? `<details class="fsec" data-sec="${title}" ${openSec.has(title) ? "open" : ""}><summary class="label">${title}${on ? `<span class="fon"> · ${esc(on)}</span>` : ""}</summary>${body}</details>` : "";
   const typeCounts = {}; scope.filter(g => passes(g, "type")).forEach(g => typesOf(g).forEach(t => typeCounts[t] = (typeCounts[t] || 0) + 1));
   const types = [...new Set([...Object.keys(typeCounts), ...F.type])].sort((a, b) => (typeCounts[b] || 0) - (typeCounts[a] || 0));
   const any = statF || platF.size || F.type.size || F.view.size || F.coop.size || F.access.size || deckF || sort !== "title";
   const SORTS = {title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played (Steam)"})};
+  const STL = {"": "", backlog: "Owned", done: "Finished", dropped: "Dropped", hidden: "Hidden"};
   return `<div class="fhead"><b>Filters</b>${any ? `<button class="linkbtn" data-f="reset|">Reset</button>` : ""}</div>`
     + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
-        .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join("")))
-    + sec("Needs attention", opt("nomatch", "1", "No match found", scope.filter(g => g.noMatch).length, genreF === "__nomatch"))
-    + sec("Type", types.map(t => opt("type", t, t, typeCounts[t] || 0, F.type.has(t))).join(""))
-    + sec("View", VIEWS.map(v => opt("view", v, v, count("view", g => basicTags(g).includes(v)), F.view.has(v))).join(""))
-    + sec("Co-op", COOPS.map(c => opt("coop", c, c.replace(" co-op", ""), count("coop", g => coopOf(g) === c), F.coop.has(c))).join(""))
-    + sec("Platform", Object.keys(PLAT).map(p => opt("plat", p, PLAT[p][0], count("plat", g => (g.platforms || []).includes(p)), platF.has(p))).join(""))
-    + sec("PlayStation", [["bought","Bought"],["claimed","Claimed"],["catalog","Catalog"],["left","Left PS Plus"]].map(([k, l]) => opt("access", k, l, count("access", g => g.ps === k), F.access.has(k))).join(""))
-    + sec("Steam Deck", opt("deck", "1", "Good on Deck", count("deck", g => (g.deck || 0) >= 2), deckF))
-    + sec("Sort", Object.entries(SORTS).map(([k, l]) => `<button class="fopt" data-f="sort|${k}" aria-pressed="${sort === k}"><span>${l}</span></button>`).join(""));
+        .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join(""), STL[statF]))
+    + sec("Type", (typeAll ? types : types.slice(0, 5)).map(t => opt("type", t, t, typeCounts[t] || 0, F.type.has(t))).join("")
+        + (types.length > 5 ? `<button class="linkbtn fmore" data-f="typemore|">${typeAll ? "Show less" : `Show ${types.length - 5} more`}</button>` : ""), [...F.type].join(", "))
+    + sec("View", VIEWS.map(v => opt("view", v, v, count("view", g => basicTags(g).includes(v)), F.view.has(v))).join(""), [...F.view].join(", "))
+    + sec("Co-op", COOPS.map(c => opt("coop", c, c.replace(" co-op", ""), count("coop", g => coopOf(g) === c), F.coop.has(c))).join(""), [...F.coop].join(", "))
+    + sec("Platform", Object.keys(PLAT).map(p => opt("plat", p, PLAT[p][0], count("plat", g => (g.platforms || []).includes(p)), platF.has(p))).join(""), [...platF].map(p => PLAT[p][0]).join(", "))
+    + sec("Steam Deck", opt("deck", "1", "Good on Deck", count("deck", g => (g.deck || 0) >= 2), deckF), deckF ? "Good on Deck" : "");
+}
+// Active filters as removable chips above the list (status lives in its own chips / open section).
+function activeChips(){
+  const c = (f, label) => `<button class="chip on" data-f="${f}">${esc(label)} ✕</button>`;
+  const xs = [...[...platF].map(p => c("plat|" + p, PLAT[p][0])), ...[...F.type].map(t => c("type|" + t, t)), ...[...F.view].map(v => c("view|" + v, v)),
+    ...[...F.coop].map(v => c("coop|" + v, v)), ...(deckF ? [c("deck|1", "Good on Deck")] : []), ...(genreF === "__nomatch" ? [c("nomatch|1", "Unmatched")] : [])];
+  return xs.length ? `<div class="chips activechips">${xs.join("")}${xs.length > 1 ? `<button class="linkbtn" data-f="reset|">Clear all</button>` : ""}</div>` : "";
 }
 function shelfHTML(wish){
   if (!games.size) return emptyHTML();
@@ -595,7 +604,8 @@ function shelfHTML(wish){
       <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
-    </div>
+      <select id="sortSel" class="sortsel" aria-label="Sort">${Object.entries({title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played"})}).map(([k, l]) => `<option value="${k}" ${sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+    </div>${activeChips()}
     ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}</div>
     <div class="grid">${shown.slice(0, shelfLimit).map(g => cardHTML(g)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>${shown.length > shelfLimit ? `<div id="shelfMore" style="height:1px"></div>` : ""}
   </div></div>`;
@@ -609,6 +619,7 @@ function toggleFilter(group, val){
   else if (group === "sort") sort = val;
   else if (group === "deck") deckF = !deckF;
   else if (group === "nomatch") genreF = genreF ? "" : "__nomatch";
+  else if (group === "typemore") typeAll = !typeAll;
   else { const set = group === "plat" ? platF : F[group]; set.has(val) ? set.delete(val) : set.add(val); }
   saveFilters(); render();
   if ($("#sheetSide")) $("#sheetSide").innerHTML = sidebarHTML();
@@ -786,6 +797,7 @@ function menuSheet(){
     <button data-act="steamwish">Import Steam wishlist<small>Adds games from your Steam wishlist</small></button>
     <button data-act="import">Import a file<small>The export from the old Backlog</small></button>
     <button data-act="nope">Not for me<small>Games you dismissed from suggestions</small></button>
+    <button data-act="unmatched">Unmatched games<small>${list().filter(g => g.noMatch).length} games couldn't be matched (often software, soundtracks, demos)</small></button>
     <button data-act="psplus">Update from PlayStation<small>Paste your PS Plus tab: bought, claimed, catalog, left</small></button>
     <button data-act="rematch">Re-check all matches<small>Fixes games matched to the wrong version</small></button>
     <button data-act="signout">Sign out</button></div>
@@ -1255,6 +1267,7 @@ document.addEventListener("click", async e => {
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else switch (d.act){
     case "seeall": { const r = ROWS.find(x => x[1] === t.dataset.row); openSheet(`<h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div>`, "full"); break; }
+    case "unmatched": closeSheet(); statF = ""; genreF = "__nomatch"; tab = "lib"; saveFilters(); render(); break;
     case "upnext": openSheet(`<h2>Up next</h2><div class="grid">${upNextGames().map(g => cardHTML(g)).join("")}</div>`, "full"); break;
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
