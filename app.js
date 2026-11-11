@@ -475,7 +475,11 @@ let rowCache = {};
 function rowItems(key, test, seen){
   const mine = list().filter(g => !seen.has(g.igdbId || g.id) && !g.notNow && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
   const found = ((topMV || {})[key] || []).filter(x => !seen.has(x.igdbId) && !inList(x)).map(x => ({x, q: quality(x)}));
-  const all = [...mine, ...found].sort((a, b) => b.q - a.q);
+  const sorted = [...mine, ...found].sort((a, b) => b.q - a.q);
+  // Daily rotation: the top 20 keep their place in the row but swap order each day, so different great games surface.
+  const day = Math.floor(Date.now() / 864e5), hash = t => { let h = day; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
+  const id = i => String(i.g ? i.g.igdbId || i.g.id : i.x.igdbId);
+  const all = [...sorted.slice(0, 20).sort((a, b) => hash(key + id(a)) - hash(key + id(b))), ...sorted.slice(20)];
   all.forEach(i => seen.add(i.g ? i.g.igdbId || i.g.id : i.x.igdbId));
   return all;
 }
@@ -608,6 +612,7 @@ function suggestCard(x, sub){
   return `<div class="card sugg"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "backlog"})}<span class="ctitle">${esc(x.title)}</span>${sub ? `<span class="csub"><span class="oneline">${esc(sub)}</span></span>` : ""}</button>
     <button class="heartbtn ${on ? "on-heart" : ""}" data-heart="${x.igdbId}" aria-label="${on ? "Remove from wishlist" : "Add to wishlist"}">${ic(on ? "heartf" : "heart", 18)}</button></div>`;
 }
+let radar = null;
 const radarItem = id => [...(radar?.soonPs5 || []), ...(radar?.soonPc || []), ...(radar?.recent || [])].find(x => x.igdbId === id);
 function radarHTML(){
   if (radar === null) radar = swr("c:upcoming", () => api("/upcoming"), r => radar = r, e => radar = {error: e.message}) || {};
