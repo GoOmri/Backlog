@@ -596,3 +596,4 @@ body::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none
   animation:glow 60s ease-in-out infinite alternate;will-change:transform}
 @keyframes glow{to{transform:translate(8%,-6%) rotate(25deg) scale(1.1)}}
 @media (prefers-reduced-motion:reduce){body::before{animation:none}}
+.ownline .tag.sifted{position:static;margin-left:8px;background:rgb(150 80 255 / .2);color:#c7a8ff;border:1px solid rgb(150 80 255 / .4)}
