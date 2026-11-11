@@ -394,7 +394,10 @@ async function importSteam(){
 }
 
 /* ---------- pieces ---------- */
-function badges(ps, g){ return (ps || []).map(p => { const v = PLAT[p] || PLAT.other; const dk = p === "steam" && g?.deck >= 2; return `<span class="plat" style="background:var(${v[2]})" title="${v[0]}${dk ? " · good on Steam Deck" : ""}">${v[1]}${dk ? "✓" : ""}</span>`; }).join(""); }
+function badges(ps, g){
+  // A wishlist game's platform is where you'd buy it, not where you own it: draw it outlined like "available on".
+  if (g?.status === "wishlist") return (ps || []).map(p => `<span class="plat avail" title="Wishlist · ${(PLAT[p] || PLAT.other)[0]}">${(PLAT[p] || PLAT.other)[1]}</span>`).join("");
+  return (ps || []).map(p => { const v = PLAT[p] || PLAT.other; const dk = p === "steam" && g?.deck >= 2; return `<span class="plat" style="background:var(${v[2]})" title="${v[0]}${dk ? " · good on Steam Deck" : ""}">${v[1]}${dk ? "✓" : ""}</span>`; }).join(""); }
 function coverTag(g){
   if (g.noMatch) return `<span class="tag nomatch">No match</span>`;
   if (g.ps === "left") return `<span class="tag">Left P+</span>`;
