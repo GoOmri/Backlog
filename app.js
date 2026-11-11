@@ -530,7 +530,7 @@ const typesOf = g => basicTags(g).filter(t => !VIEWS.includes(t) && !COOPS.inclu
 const coopOf = g => basicTags(g).find(t => COOPS.includes(t)) || "";
 // Each group, given a game: does it pass? `skip` leaves one group out (for live counts).
 function passes(g, skip){
-  return (skip === "stat" || !statF || (statF === "hidden" ? true : g.status === statF))
+  return (skip === "stat" || !statF || (statF === "hidden" ? true : statF === "sifted" ? !!g.sifted : statF === "unsifted" ? !g.sifted : g.status === statF))
     && (skip === "plat" || !platF.size || (g.platforms || []).some(p => platF.has(p)))
     && (skip === "type" || !F.type.size || typesOf(g).some(t => F.type.has(t)))
     && (skip === "view" || !F.view.size || basicTags(g).some(t => F.view.has(t)))
@@ -564,8 +564,8 @@ function sidebarHTML(){
   const any = statF || platF.size || F.type.size || F.view.size || F.coop.size || F.access.size || deckF || sort !== "title";
   const SORTS = {title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played (Steam)"})};
   return `<div class="fhead"><b>Filters</b>${any ? `<button class="linkbtn" data-f="reset|">Reset</button>` : ""}</div>`
-    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
-        .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join("")))
+    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["sifted","Sifted"],["unsifted","Not sifted"],["hidden","Hidden"]]
+        .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || (k === "sifted" ? !!g.sifted : k === "unsifted" ? !g.sifted : g.status === k)), statF === k)).join("")))
     + sec("Needs attention", opt("nomatch", "1", "No match found", scope.filter(g => g.noMatch).length, genreF === "__nomatch"))
     + sec("Type", types.map(t => opt("type", t, t, typeCounts[t] || 0, F.type.has(t))).join(""))
     + sec("View", VIEWS.map(v => opt("view", v, v, count("view", g => basicTags(g).includes(v)), F.view.has(v))).join(""))
@@ -596,7 +596,7 @@ function shelfHTML(wish){
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
     </div>
-    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}</div>
+    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["sifted","Sifted"],["unsifted","Not sifted"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}</div>
     <div class="grid">${shown.slice(0, shelfLimit).map(g => cardHTML(g)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>${shown.length > shelfLimit ? `<div id="shelfMore" style="height:1px"></div>` : ""}
   </div></div>`;
 }
@@ -1012,7 +1012,7 @@ async function editSheet(id){
     : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b class="st no">Not owned</b><span id="ownAvail"></span>`
     : ownP.length ? `<b class="st yes">Owned</b> ${ownP.map(pc).join(" ")}${viaPlus ? ` ${pc("psplus")}` : ""}`
     : `<b class="st yes">Owned</b> ${pc("psplus")} · while subscribed`;
-  openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
+  openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}${g.sifted ? `<span class="tag sifted">Sifted${g.notNow ? " · not now" : ""}</span>` : ""}</div>`, actions, facts, edit}), "full");
   $("#kebab").onclick = e => { e.stopPropagation(); $("#editPanel").hidden = !$("#editPanel").hidden; };
   $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !e.target.closest("#editPanel, #kebab")) $("#editPanel").hidden = true; });
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
