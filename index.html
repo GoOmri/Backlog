@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Backlog</title>
+<title>Game Night</title>
+<meta name="apple-mobile-web-app-title" content="Game Night">
 <meta name="theme-color" content="#0E1116">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,13 +12,16 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=fallback">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Press+Start+2P&display=fallback">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="splash" aria-hidden="true"><img src="splash.jpg" alt="">
+  <div class="splash-title"><span class="t-back">GAME NIGHT</span><span class="t-front">GAME NIGHT</span></div>
+  <div class="splash-load"><span>Loading your games</span><i></i></div></div>
 <header class="bar">
   <div class="bar-in">
-    <button class="brand" data-tab="home" aria-label="Home"><img src="icon-192.png" alt="" width="28" height="28">Backlog</button>
+    <button class="brand" data-tab="home" aria-label="Home"><img src="icon-192.png" alt="" width="28" height="28"><span class="brand-name">Game Night</span></button>
     <nav class="tabs" id="tabs" aria-label="Sections"></nav>
     <span class="mono dim" id="sync"></span>
     <button class="icon-btn" id="addBtn" aria-label="Add games" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></button>

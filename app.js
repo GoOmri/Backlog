@@ -755,6 +755,10 @@ function renderMain(m){
   watchShelf();
 }
 const tabScroll = {};
+// Splash (the couch scene): stays at least ~0.9s so it never just flashes, then fades away. Never longer than 6s.
+function hideSplash(){ const el = $("#splash"); if (!el || el.classList.contains("gone")) return;
+  setTimeout(() => { el.classList.add("gone"); setTimeout(() => el.remove(), 500); }, Math.max(0, 900 - performance.now())); }
+setTimeout(hideSplash, 6000);
 let rowTab = null, lastTabsH = "", eagerLeft = 0, lastRenderAt = 0;
 // Phones get 720p heroes instead of the 1080p the worker stores.
 const PHONE = matchMedia("(max-width:999px)").matches;
@@ -1361,7 +1365,7 @@ onAuthStateChanged(auth, user => {
     games = new Map(); loaded = false;
     ["#addBtn", "#menuBtn"].forEach(s => $(s).hidden = true);
     $("#tabs").innerHTML = "";
-    $("#main").innerHTML = `<div class="empty wrap"><h2>Every game you own, one shelf</h2><p>Sign in with Google to sync between your phone and PC.</p><button class="btn" id="signIn">Sign in with Google</button><span class="status" id="signMsg"></span></div>`;
+    hideSplash(); $("#main").innerHTML = `<div class="empty wrap"><h2>Every game you own, one shelf</h2><p>Sign in with Google to sync between your phone and PC.</p><button class="btn" id="signIn">Sign in with Google</button><span class="status" id="signMsg"></span></div>`;
     $("#signIn").onclick = async () => {
       const prov = new GoogleAuthProvider();
       try { await signInWithPopup(auth, prov); }
@@ -1376,7 +1380,7 @@ onAuthStateChanged(auth, user => {
   unsub = onSnapshot(col, snap => {
     games = new Map(snap.docs.map(d => { const g = {id: d.id, ...d.data()}; if (g.status === "playing") g.status = "backlog"; if (g.hidden && !g.nope){ g.notNow = true; g.hidden = false; } return [d.id, g]; }));
     $("#sync").textContent = navigator.onLine ? "" : "offline";
-    const first = !loaded; loaded = true;
+    const first = !loaded; loaded = true; hideSplash();
     if (first) render(); else if (snap.docChanges().length) softRender();
     runQueue();
   }, e => { $("#main").innerHTML = `<div class="empty wrap">Couldn't load your games: ${esc(e.message)}</div>`; });
