@@ -25,7 +25,7 @@ const ICON = {
   chev: '<path d="m6 9 6 6 6-6"/>'
 };
 const ic = (n, size = 20, fill = false) => `<svg class="ico-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const TABS = [["home","Play","home"],["lib","Library","grid"],["diary","Stats","book"]];
+const TABS = [["home","Play","home"],["sift","Sift","compass"],["lib","Library","grid"],["diary","Stats","book"]];
 const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated server|soundtrack|\bsdk\b|\bdemo\b|benchmark/i;
 
 /* ---------- state ---------- */
@@ -508,7 +508,7 @@ function homeBuild(){
   const pinnedN = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).length;
   const wishN = list().filter(g => g.status === "wishlist" && !g.hidden).length;
   return carouselHTML(top)
-    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}<button class="linkbtn" data-act="sift">Sift</button>${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
+    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
     + (s => ROWS.map(r => playRow(r, s)).join(""))(new Set())
     + `<div class="wrap">${radarHTML()}</div>`;
 }
@@ -720,6 +720,7 @@ function renderTabs(){
   if (tabsH !== lastTabsH){ const old = $("#tabs .tab-pill")?.getAttribute("style") || ""; $("#tabs").innerHTML = `<span class="tab-pill${old ? "" : " now"}" style="${old}"></span>` + tabsH; lastTabsH = tabsH; requestAnimationFrame(movePill); }
 }
 function renderMain(m){
+  if (tab === "sift"){ if (!$("#sift")){ m.innerHTML = `<div class="wrap"><div id="sift" class="sift intab"></div></div>`; if (!sift) siftStart(); siftMount(); } return; }
   // Keep each row's (and the carousel's) scroll position while staying on the same tab.
   const keyOf = el => el.id || el.closest(".section")?.querySelector("h3")?.textContent || "";
   const same = rowTab === tab;
@@ -1096,18 +1097,13 @@ async function editSheet(id){
 /* ---------- Sift: one card at a time. Right = keep, left = not now (off Play, stays in Library), Up next = pin. ---------- */
 // Deck: wishlist, then owned games not sifted yet, then finds from the Play rows. Previous walks back through this session.
 let sift = null;
-function openSift(){
-  const mine = st => list().filter(g => g.status === st && !g.sifted && !g.notNow && !g.hidden && !g.upNext && playable(g)).map(g => ({g}));
+function siftStart(){
+  const mine = st => list().filter(g => g.status === st && !g.sifted && !g.notNow && !g.hidden && !g.upNext && g.igdbId && playable(g)).map(g => ({g}));
   const finds = []; const ids = new Set(list().map(g => g.igdbId));
   for (const items of Object.values(rowCache)) for (const i of items) if (i.x && !ids.has(i.x.igdbId)){ ids.add(i.x.igdbId); finds.push({x: i.x}); }
   sift = {deck: [...mine("wishlist"), ...mine("backlog"), ...finds], i: 0, done: [], batch: 0};
-  openSheet(`<div id="sift" class="sift"></div>`, "full");
-  $("#dlg").addEventListener("close", () => { sift = null; $("#siftBack")?.remove(); render(); }, {once: true});
-  siftMount();
 }
 function siftMount(){
-  $("#siftBack")?.remove();
-  if (!$("#sift")) $("#sheet").innerHTML = `<div id="sift" class="sift"></div>`;
   $("#sift").onclick = e => { const b = e.target.closest("[data-s]"); if (b) siftAct(b.dataset.s); };
   siftShow();
 }
@@ -1115,17 +1111,23 @@ function siftMount(){
 function siftOpen(){
   const it = sift.deck[sift.i]; if (!it) return;
   if (it.g) editSheet(it.g.id); else previewSheet(it.x);
-  $("#dlg").insertAdjacentHTML("beforeend", `<button id="siftBack" class="sift-back">← Back to Sift</button>`);
-  $("#siftBack").onclick = siftMount;
 }
+// Fill the space between the header and the tab bar.
+function siftFit(){
+  const el = $("#sift"); if (!el) return;
+  const tb = getComputedStyle($("#tabs")).position === "fixed" ? $("#tabs").offsetHeight : 0;
+  el.style.height = Math.max(420, innerHeight - el.getBoundingClientRect().top - scrollY - tb - 8) + "px";
+}
+addEventListener("resize", siftFit);
 function siftShow(){
   const el = $("#sift"); if (!el || !sift) return;
+  siftFit();
   const it = sift.deck[sift.i];
   if (it?.g && games.has(it.g.id)) it.g = games.get(it.g.id);
   const prev = `<button class="linkbtn" data-s="prev" ${sift.done.length ? "" : "hidden"}>← Previous</button>`;
-  const close = `<button class="linkbtn" data-s="close" aria-label="Close">✕</button>`;
+  const close = "";
   if (!it || sift.batch >= 20){
-    el.innerHTML = `<div class="sift-top">${prev}<span></span>${close}</div><div class="sift-end"><h2>${it ? "Done for now" : "All sifted"}</h2><p class="dim">${sift.done.length} games sorted this time.</p>${it ? `<button class="chip" data-s="more">Continue</button>` : ""}</div>`;
+    el.innerHTML = `<div class="sift-top">${prev}<span></span>${close}</div><div class="sift-end"><h2>${it ? "Done for now" : "All sifted"}</h2><p class="dim">${sift.done.length} games sorted this time.</p>${it ? `<button class="chip" data-s="more">Continue</button>` : `<button class="chip" data-s="restart">Look for new games</button>`}</div>`;
     return;
   }
   const g = it.g || it.x, q = g.steamPct != null ? `${g.steamPct}% on Steam` : g.rating ? `Rated ${Math.round(g.rating)}` : "";
@@ -1183,10 +1185,10 @@ function siftShow(){
 }
 async function siftAct(a){
   if (!sift) return;
-  if (a === "close") return closeSheet();
   if (a === "open") return siftOpen();
   if (a === "retry") return sift.retry?.();
   if (a === "more"){ sift.batch = 0; return siftShow(); }
+  if (a === "restart"){ siftStart(); return siftShow(); }
   if (a === "prev"){
     const last = sift.done.pop(); if (!last) return;
     if (last.newId) await del(last.newId); else await upd(last.id, last.before);
@@ -1238,7 +1240,6 @@ document.addEventListener("click", async e => {
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else switch (d.act){
     case "seeall": { const r = ROWS.find(x => x[1] === t.dataset.row); openSheet(`<h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div>`, "full"); break; }
-    case "sift": openSift(); break;
     case "upnext": openSheet(`<h2>Up next</h2><div class="grid">${upNextGames().map(g => cardHTML(g)).join("")}</div>`, "full"); break;
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
