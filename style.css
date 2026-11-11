@@ -620,3 +620,14 @@ dialog:has(.sift)::before{content:"";position:fixed;inset:-30%;z-index:-1;pointe
 .sift-next > :not(.sift-bg){position:relative;z-index:1}
 .sift-next-shot{width:100%;aspect-ratio:16/9;border-radius:10px;background:#000 center/cover no-repeat}
 @keyframes siftUp{from{transform:translateY(36px) scale(.94);opacity:.35;filter:brightness(.45)}to{transform:none;opacity:1;filter:none}}
+/* Library filters: collapsible sections, active chips, sort dropdown */
+details.fsec > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:4px}
+details.fsec > summary::-webkit-details-marker{display:none}
+details.fsec > summary::after{content:"▾";margin-left:auto;opacity:.6;transition:transform .2s}
+details.fsec:not([open]) > summary::after{transform:rotate(-90deg)}
+details.fsec:not([open]) > summary{margin-bottom:0}
+.fsec .fon{color:var(--accent);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fmore{justify-self:start;margin:4px 0 0 8px;font-size:13px}
+.activechips{margin-top:8px}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.sortsel{margin-left:auto;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
