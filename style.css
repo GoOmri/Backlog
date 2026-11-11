@@ -686,3 +686,17 @@ img.ok.now{transition:none}
 .gp-body .desc{font-size:16px}
 .gp-head .meta,.gp-facts .strip,.gp-facts .links,.gp-facts .ownline{font-size:15px}
 .gtags span{font-size:13px}
+/* Game page polish */
+.diff:empty{display:none}
+.desc.sizing{overflow:hidden;transition:height var(--d) var(--e-out)}
+.editpanel.panelin{animation:panelin var(--d) var(--e-out)}
+.editpanel.panelout{animation:panelout var(--d-fast) var(--e-in) forwards}
+@keyframes panelin{from{opacity:0;transform:translateY(-8px) scale(.98)}}
+@keyframes panelout{to{opacity:0;transform:translateY(-8px) scale(.98)}}
+.gp-facts .strip{align-items:center}
+.score{line-height:1;display:inline-flex;align-items:center}
+.gp-head{padding-bottom:14px}
+.gp-body{padding-top:6px}
+.gp-body .desc{font-size:17px}
+.gp-head .meta,.gp-facts .strip,.gp-facts .links,.gp-facts .ownline{font-size:16px}
+.gtags span{font-size:14px}

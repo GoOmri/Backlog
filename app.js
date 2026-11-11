@@ -879,7 +879,7 @@ function pageShell(x, {own, actions, facts, edit}){
       <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
       <p class="desc clamp" id="desc"></p>
     </div>
-    <aside class="gp-facts">${own}<div class="gp-plats" id="gpPlats"></div><div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"><span class="dchip none">…</span><span>Difficulty</span></div>${facts || ""}</aside>
+    <aside class="gp-facts">${own}<div class="gp-plats" id="gpPlats"></div><div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"></div>${facts || ""}</aside>
   </div>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
 }
@@ -888,7 +888,7 @@ async function previewSheet(x){
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
   openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to Play carousel" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
-  $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
+  $("#desc").onclick = toggleDesc;
   let wid = null;
   $("#pvWish").onclick = async () => {
     if (wid){ await del(wid); wid = null; $("#pvWish").innerHTML = ic("heart"); $("#pvWish").classList.remove("on-heart"); toast("Removed from wishlist"); return; }
@@ -963,7 +963,7 @@ async function fillDifficulty(g, psRarity){
   let r = psRarity ? await psRarity : null;
   if (!r && g.steamAppId) r = await api("/achrarity?appid=" + g.steamAppId).then(x => x.rarest != null ? [x.rarest, "Rarest achievement"] : null).catch(() => null);
   if ($("#diffBox") !== box) return;
-  if (!r){ box.innerHTML = `<span class="dchip none">Unknown</span><span>No trophy data yet</span>`; return; }
+  if (!r){ box.innerHTML = ""; return; }
   const [pct, what] = r, lvl = pct < 5 ? ["Very hard", "vhard"] : pct < 15 ? ["Hard", "hard"] : pct < 35 ? ["Medium", "med"] : ["Easy", "easy"];
   box.innerHTML = `<span class="dchip ${lvl[1]}">${lvl[0]}</span><span>${what} earned by <b>${pct}%</b> of players</span>`;
 }
@@ -993,6 +993,18 @@ async function fillStrip(g, d){
     if (!r){ try { r = {...await api("/steamrev?appid=" + g.steamAppId), t: Date.now()}; localStorage.setItem("rev:" + g.steamAppId, JSON.stringify(r)); } catch {} }
     if (r?.pct != null){ parts[0] = score(r.pct, `Steam reviews · ${r.label} · ${r.total} reviews`); draw(); }
   }
+}
+// Anything that opens or collapses animates its height (same timing as everything else).
+function toggleDesc(){
+  const el = $("#desc"); if (!el) return;
+  const from = el.offsetHeight; el.classList.toggle("clamp"); const to = el.offsetHeight;
+  el.style.height = from + "px"; void el.offsetHeight; el.classList.add("sizing"); el.style.height = to + "px";
+  setTimeout(() => { el.classList.remove("sizing"); el.style.height = ""; }, 260);
+}
+function setPanel(open){
+  const p = $("#editPanel"); if (!p) return;
+  if (open){ p.hidden = false; anim(p, "panelin"); }
+  else { p.classList.remove("panelin"); anim(p, "panelout"); setTimeout(() => { p.hidden = true; p.classList.remove("panelout"); }, 160); }
 }
 // Trailer (with timeline) + screenshots, description, similar games.
 function fillMedia(d){
@@ -1052,8 +1064,8 @@ async function editSheet(id){
     : ownP.length ? `<b class="st yes">Owned</b> ${ownP.map(pc).join(" ")}${viaPlus ? ` ${pc("psplus")}` : ""}`
     : `<b class="st yes">Owned</b> ${pc("psplus")} · while subscribed`;
   openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
-  $("#kebab").onclick = e => { e.stopPropagation(); $("#editPanel").hidden = !$("#editPanel").hidden; };
-  $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !e.target.closest("#editPanel, #kebab")) $("#editPanel").hidden = true; });
+  $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
+  $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !$("#editPanel").hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
   const pop = (btn, menu) => { $(btn).onclick = e => { e.stopPropagation(); sh.querySelectorAll(".popmenu").forEach(m => { if (m !== $(menu)) m.hidden = true; }); $(menu).hidden = !$(menu).hidden; }; };
   pop("#rateBtn", "#rateMenu");
@@ -1096,7 +1108,7 @@ async function editSheet(id){
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
   $("#nopeBtn").onclick = async () => { closeSheet(); if (g.hidden){ await upd(id, {hidden: false}); toast(`${g.title} is back`); } else notForMe(g); };
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
-  $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
+  $("#desc").onclick = toggleDesc;
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
   $("#logoGo").onclick = async () => {
