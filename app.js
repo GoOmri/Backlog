@@ -1157,7 +1157,7 @@ function siftShow(){
   const per = () => trailer ? 2 : 3;
   // With a trailer: screenshot, video, screenshot. Without: three screenshots. Paging only swaps the screenshots, the video keeps playing.
   const showShots = () => {
-    const set = shots.slice(k, k + per());
+    const set = Array.from({length: Math.min(per(), shots.length)}, (_, n) => shots[(k + n) % shots.length]); // last page wraps to the start, so every page is full
     const imgs = stack.querySelectorAll(".sift-shot:not(.trailer) img");
     if (trailer && stack.querySelector(".trailer") && imgs.length === set.length) imgs.forEach((im, n) => { im.src = set[n]; });
     else {
