@@ -471,6 +471,8 @@ const plat = g => (g.genres || []).includes("Platform");
 // with Find picks from /finds, sorted purely by quality. To split back into Play + Find, give each tab its own part of ROWS.
 const ROWS = [
   ["Metroidvanias", "mv", g => kwOf(g).includes("Metroidvania")],
+  // 2D and 3D platformers you can play on the couch together. Finds come from the couch co-op search, platformers only.
+  ["With Yanshula", "yanshula", g => plat(g) && g.couch, "coop"],
   ["2D platformers", "plat2d", g => plat(g) && has(g, "2D")],
   ["3D platformers", "plat3d", g => plat(g) && has(g, "3D")],
   ["Couch co-op", "coop", g => g.couch],
@@ -480,9 +482,9 @@ const ROWS = [
 const quality = x => x.score ?? (x.steamPct != null ? (x.steamPct * (x.steamN || 0) + 80 * 300) / ((x.steamN || 0) + 300)
   : x.rating ? (x.rating * (x.ratingCount || 0) + 75 * 20) / ((x.ratingCount || 0) + 20) : 70);
 let rowCache = {};
-function rowItems(key, test, seen){
+function rowItems(key, test, seen, src){
   const mine = list().filter(g => !seen.has(g.igdbId || g.id) && !g.notNow && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
-  const found = ((topMV || {})[key] || []).filter(x => !seen.has(x.igdbId) && !inList(x)).map(x => ({x, q: quality(x)}));
+  const found = ((topMV || {})[src || key] || []).filter(x => !seen.has(x.igdbId) && !inList(x) && (!src || plat(x))).map(x => ({x, q: quality(x)}));
   const sorted = [...mine, ...found].sort((a, b) => b.q - a.q);
   // Daily rotation: the top 20 keep their place in the row but swap order each day, so different great games surface.
   const day = Math.floor(Date.now() / 864e5), hash = t => { let h = day; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
@@ -492,8 +494,8 @@ function rowItems(key, test, seen){
   return all;
 }
 const itemCard = i => i.g ? cardHTML(i.g) : suggestCard(i.x, i.x.year || "");
-function playRow([title, key, test], seen){
-  const items = rowCache[key] = rowItems(key, test, seen);
+function playRow([title, key, test, src], seen){
+  const items = rowCache[key] = rowItems(key, test, seen, src);
   if (!items.length) return "";
   const more = items.length > 10 ? `<button class="linkbtn" data-act="seeall" data-row="${key}" style="margin-left:auto">See all</button>` : "";
   return `<section class="section wrap"><div class="row-head"><h3>${title}</h3>${more}</div><div class="row">${items.slice(0, 10).map(itemCard).join("")}</div></section>`;
