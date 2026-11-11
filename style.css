@@ -512,7 +512,10 @@ dialog:not(.full){border-radius:var(--r-l)}
 @keyframes fadein{from{opacity:0}}
 @keyframes fadeout{to{opacity:0}}
 @keyframes pop{40%{transform:scale(1.25)}to{transform:none}}
-#main.tabin{animation:tabin .22s ease-out}
+#main.tabinr{animation:tabinr .26s cubic-bezier(.3,.7,.2,1)}
+#main.tabinl{animation:tabinl .26s cubic-bezier(.3,.7,.2,1)}
+@keyframes tabinr{from{opacity:0;transform:translateX(40px)}}
+@keyframes tabinl{from{opacity:0;transform:translateX(-40px)}}
 dialog[open]{animation:sheetin .24s cubic-bezier(.2,.8,.2,1)}
 dialog[open]::backdrop{animation:fadein .24s ease-out}
 dialog.closing{animation:sheetout .18s ease-in forwards}
