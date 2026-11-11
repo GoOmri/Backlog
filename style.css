@@ -521,7 +521,6 @@ dialog[open]{animation:sheetin .24s cubic-bezier(.2,.8,.2,1)}
 dialog[open]::backdrop{animation:fadein .24s ease-out}
 dialog.closing{animation:sheetout .18s ease-in forwards}
 dialog.closing::backdrop{animation:fadeout .18s ease-in forwards}
-img.imgin{animation:fadein .35s ease-out}
 .btn,.ibtn,.heartbtn,.tab,.linkbtn{transition:transform .12s ease,background-color .15s}
 .btn:active,.ibtn:active,.heartbtn:active,.tab:active,.linkbtn:active{transform:scale(.94)}
 .card:active .cover{transform:scale(.97)}
@@ -657,3 +656,24 @@ details.fsec[open]::details-content{block-size:auto;opacity:1}
 @keyframes taboutr{to{opacity:0;transform:translateX(28px)}}
 @keyframes tabinr{from{opacity:0;transform:translateX(28px)}}
 @keyframes tabinl{from{opacity:0;transform:translateX(-28px)}}
+/* ---------- Motion: one set of durations and curves ---------- */
+:root{--e-out:cubic-bezier(.2,.8,.2,1);--e-in:cubic-bezier(.4,0,1,1);--e-bounce:cubic-bezier(.34,1.56,.64,1);--d-fast:.12s;--d:.22s;--d-slow:.32s}
+#main.tabinr,#main.tabinl{animation-duration:var(--d);animation-timing-function:var(--e-out)}
+#main.taboutl,#main.taboutr{animation-duration:var(--d-fast);animation-timing-function:var(--e-in)}
+dialog[open],dialog[open]::backdrop{animation-duration:var(--d);animation-timing-function:var(--e-out)}
+dialog.closing,dialog.closing::backdrop{animation-duration:var(--d-fast);animation-timing-function:var(--e-in)}
+.tab-pill{transition-duration:var(--d);transition-timing-function:var(--e-out)}
+.sift-card{animation-duration:var(--d);animation-timing-function:var(--e-out)}
+.sift-ghost{transition-duration:var(--d)}
+details.fsec::details-content{transition-duration:var(--d)}
+/* Buttons and cards give a little bouncy press */
+button{transition:transform var(--d-slow) var(--e-bounce),background-color .15s,color .15s,border-color .15s}
+button:active{transform:scale(.95);transition-duration:.08s}
+.tab:active{transform:scale(.92)}
+/* Art: soft shimmering placeholder, then the picture fades in */
+.cover img,.sift-shot img,.mslide img,.sift-thumb img{opacity:0;transition:opacity .3s var(--e-out)}
+.cover img.ok,.sift-shot img.ok,.mslide img.ok,.sift-thumb img.ok{opacity:1}
+img.ok.now{transition:none}
+@keyframes shimmer{to{background-position:-200% 0}}
+.cover:has(> img:not(.ok):not(.bad)),.skel .cover,.sift-shot:has(> img:not(.ok)){background:linear-gradient(100deg,var(--surface) 30%,var(--raise) 50%,var(--surface) 70%);background-size:200% 100%;animation:shimmer 1.3s linear infinite}
+.desc.clamp:empty{background:repeating-linear-gradient(to bottom,var(--raise) 0 1.1em,transparent 1.1em 1.6em);border-radius:6px;opacity:.6}
