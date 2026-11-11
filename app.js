@@ -983,7 +983,7 @@ async function fillStrip(g, d){
   // No PlayStation release (e.g. PC only): drop the PS Store link.
   if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) $(".pslink")?.remove();
   const score = (n, src) => `<span class="score ${n >= 75 ? "good" : n >= 60 ? "mid" : "low"}" title="${esc(src)}">${n}%</span>`;
-  const sp = g.steamPct ?? g.steamPctX;
+  const sp = g.steamPct;
   const parts = [sp != null ? score(sp, "Steam reviews") : d.critic ? score(d.critic, "Critics") : null, null, null, d.developers?.[0] && `<span>by <b>${esc(d.developers[0])}</b></span>`, (d.ttb || g.ttb)?.main && `<span><b>~${(d.ttb || g.ttb).main}h</b> to beat</span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
