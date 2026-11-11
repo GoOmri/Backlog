@@ -77,3 +77,11 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - PS Store prices (would need scraping; ITAD has none).
 - Find caches /finds, /upcoming, /discover in localStorage (c:finds, c:upcoming, c:disc) and refreshes in the background.
 - Couch co-op night, studio follow, monthly recap.
+
+## Feel (2026-11-11)
+- Saves don't wait for the server (Sift, wishlist heart): UI moves on, `saveErr` toasts on failure.
+- Touching a card starts loading its game page (`pointerdown` → `gameDetails`).
+- Each tab remembers its scroll position (`tabScroll`).
+- Motion tokens in style.css (`--d-fast/--d/--d-slow`, `--e-out/--e-in/--e-bounce`); buttons have a bouncy press.
+- Art: shimmer placeholder, fades in on load (`img.ok`); already-loaded art shows instantly (`.now`). Coming soon shows skeleton cards while loading.
+- No vibration, no undo toasts (Omri's choice).

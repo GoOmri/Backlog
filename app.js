@@ -639,7 +639,7 @@ const radarItem = id => [...(radar?.soonPs5 || []), ...(radar?.soonPc || []), ..
 function radarHTML(){
   if (radar === null) radar = swr("c:upcoming", () => api("/upcoming"), r => radar = r, e => radar = {error: e.message}) || {};
   if (radar.error) return `<div class="section"><h3>Coming soon</h3><span class="why">Couldn't load new releases: ${esc(radar.error)}</span></div>`;
-  if (!radar.soonPs5) return `<div class="section"><h3>Coming soon</h3><span class="why">Loading…</span></div>`;
+  if (!radar.soonPs5) return `<div class="section"><h3>Coming soon</h3><div class="row">${'<div class="card skel"><div class="cover"></div><span class="ctitle">&nbsp;</span></div>'.repeat(6)}</div></div>`;
   const have = new Set(list().map(g => g.igdbId));
   [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
   const card = (x, sub) => suggestCard(x, sub);
@@ -747,6 +747,7 @@ function renderMain(m){
   if (shelfReset && !$("#dlg").open){ shelfReset = false; const h = $(".libhead"); if (h){ const y = h.parentElement.getBoundingClientRect().top + scrollY - $(".bar").offsetHeight; if (scrollY > y) scrollTo(0, Math.max(0, y)); } }
   watchShelf();
 }
+const tabScroll = {};
 let rowTab = null, lastTabsH = "", eagerLeft = 0, lastRenderAt = 0;
 // Phones get 720p heroes instead of the 1080p the worker stores.
 const PHONE = matchMedia("(max-width:999px)").matches;
@@ -777,9 +778,16 @@ function movePill(){
   if (p.classList.contains("now")) requestAnimationFrame(() => p.classList.remove("now"));
 }
 addEventListener("resize", () => { const p = $("#tabs .tab-pill"); if (p){ p.classList.add("now"); movePill(); } });
-// Fade covers in the first time an image arrives (cached re-renders stay still, no flicker).
-const seenImg = new Set();
-document.addEventListener("load", e => { const i = e.target; if (i.tagName !== "IMG" || seenImg.has(i.src)) return; seenImg.add(i.src); if (performance.now() > 2500 && performance.now() - lastRenderAt > 250) anim(i, "imgin"); }, true);
+// Art fades in when it arrives (CSS .ok); art that is already loaded shows at once.
+document.addEventListener("pointerdown", e => {
+  const c = e.target.closest?.("[data-edit], [data-preview]"); if (!c) return;
+  const id = c.dataset.edit ? games.get(c.dataset.edit)?.igdbId : +c.dataset.preview;
+  if (id) gameDetails(id).catch(() => {});
+}, {passive: true});
+document.addEventListener("load", e => { const i = e.target; if (i.tagName === "IMG") i.classList.add("ok"); }, true);
+document.addEventListener("error", e => { const i = e.target; if (i.tagName === "IMG") i.classList.add("bad"); }, true);
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1)
+  for (const i of n.tagName === "IMG" ? [n] : n.querySelectorAll("img")) if (i.complete && i.naturalWidth) i.classList.add("ok", "now"); }).observe(document.body, {childList: true, subtree: true});
 function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ if (history.state?.sheet) history.back(); else shut(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
@@ -821,6 +829,7 @@ function addSheet(){
 // Game page: media carousel on top, short facts, quick controls that save as you tap.
 // Not for me: owned games are hidden (Library → Hidden); suggestions are remembered so they never come back.
 let toastTimer;
+const saveErr = e => toast("Couldn't save: " + (e?.message || "offline?"));
 function toast(text, undo){
   let t = $("#toast"); if (!t){ t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.append(t); }
   t.innerHTML = `<span>${esc(text)}</span>${undo ? `<button class="btn ghost small" id="toastUndo">Undo</button>` : ""}`; t.hidden = false;
@@ -1219,18 +1228,18 @@ async function siftAct(a){
   if (a === "restart"){ siftStart(); return siftShow(); }
   if (a === "prev"){
     const last = sift.done.pop(); if (!last) return;
-    if (last.newId) await del(last.newId); else await upd(last.id, last.before);
+    (last.newId ? del(last.newId) : upd(last.id, last.before)).catch(saveErr);
     sift.i--; sift.batch = Math.max(0, sift.batch - 1); return siftShow();
   }
   const it = sift.deck[sift.i]; if (!it) return;
   if (it.g){
     const g = it.g, before = {sifted: g.sifted ?? null, notNow: g.notNow ?? null, upNext: g.upNext ?? null};
     const after = a === "keep" ? {sifted: true} : a === "nope" ? {sifted: true, notNow: true} : {sifted: true, notNow: null, upNext: g.upNext || Date.now()};
-    await upd(g.id, after); sift.done.push({id: g.id, before});
+    upd(g.id, after).catch(saveErr); sift.done.push({id: g.id, before});
   } else {
     const {because, score, added, date, gem, taste, appid, price, ...data} = it.x, nid = newId();
-    await setDoc(doc(col, nid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: it.x.title, platforms: [], status: "wishlist", added: Date.now(), sifted: true,
-      ...(a === "nope" ? {hidden: true, nope: true} : a === "next" ? {upNext: Date.now()} : {})});
+    setDoc(doc(col, nid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: it.x.title, platforms: [], status: "wishlist", added: Date.now(), sifted: true,
+      ...(a === "nope" ? {hidden: true, nope: true} : a === "next" ? {upNext: Date.now()} : {})}).catch(saveErr);
     sift.done.push({newId: nid});
   }
   const c = $("#siftCard");
@@ -1251,11 +1260,11 @@ document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
   if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
-  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tab = d.tab; q = ""; loadFilters(); renderTabs();
+  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tabScroll[tab] = scrollY; tab = d.tab; q = ""; loadFilters(); renderTabs();
     // Old screen slides out the other way (~110ms) while the new one is built, then the new one slides in: no blank frame.
     const m = $("#main"); m.classList.remove("tabinr", "tabinl", "taboutr", "taboutl");
     if (ch){ void m.offsetWidth; m.classList.add(dir === "tabinr" ? "taboutl" : "taboutr"); }
-    setTimeout(() => { render(); scrollTo(0, 0); m.classList.remove("taboutr", "taboutl"); if (ch) anim(m, dir); }, ch ? 110 : 0); }
+    setTimeout(() => { render(); scrollTo(0, tabScroll[tab] || 0); m.classList.remove("taboutr", "taboutl"); if (ch) anim(m, dir); }, ch ? 110 : 0); }
   else if (d.f != null){ const k = d.f.indexOf("|"); toggleFilter(d.f.slice(0, k), d.f.slice(k + 1)); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
@@ -1263,8 +1272,8 @@ document.addEventListener("click", async e => {
   else if (d.edit) editSheet(d.edit);
   else if (d.heart){
     const id = +d.heart, have = list().find(g => g.igdbId === id && g.status === "wishlist");
-    if (have){ await del(have.id); toast("Removed from wishlist"); }
-    else { const x = previewCache.get(id); const {because, score, added, date, ...data} = x; await setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: [], status: "wishlist", added: Date.now()}); toast("Added to wishlist"); }
+    if (have){ del(have.id).catch(saveErr); toast("Removed from wishlist"); }
+    else { const x = previewCache.get(id); const {because, score, added, date, ...data} = x; setDoc(doc(col, newId()), {...data, asTyped: x.title, platforms: [], status: "wishlist", added: Date.now()}).catch(saveErr); toast("Added to wishlist"); }
     render();
   }
   else if (d.preview){ const x = previewCache.get(+d.preview); if (x) previewSheet(x); }
