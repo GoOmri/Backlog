@@ -11,6 +11,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{background:transparent}
 body{font-family:var(--body);font-size:15px;line-height:1.45;padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
 img{max-width:100%}
 [hidden]{display:none!important}
@@ -569,7 +570,7 @@ html,body{overflow-x:clip}
 .sift-thumb .badges,.sift-thumb .tag{display:none}
 .sift-plats{display:flex;gap:3px;margin-top:4px}
 .sift-btns{display:flex;justify-content:space-around;align-items:center;padding:0 12px}
-.sift-round{width:60px;height:60px;border-radius:30px;border:1px solid rgba(255,255,255,.25);font-size:24px;display:grid;place-items:center}
+.sift-round{width:60px;height:60px;border-radius:30px;border:2.5px solid currentColor;background:none;font-size:24px;display:grid;place-items:center;color:var(--fg)}
 .sift-round.pin{width:48px;height:48px}
 .sift-round.no{color:#ff6b6b}.sift-round.yes{color:#5fd38d}
 .sift-labels{display:flex;justify-content:space-around;padding:0 12px;font-size:12px;opacity:.7;margin-top:-4px}
@@ -589,3 +590,9 @@ html,body{overflow-x:clip}
 .sift-stack .sift-shot:only-child{flex:0 1 auto;aspect-ratio:16/9}
 .sift-stack .sift-shot.poster{flex:0 1 auto;max-height:45%}
 .sift-shot.vwrap #vtitle{display:none}
+/* Slow blue/purple glow behind the app. Only transform animates (GPU, no repaint); off for reduced motion. */
+body::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none;
+  background:radial-gradient(40% 35% at 25% 30%,rgb(70 110 255 / .16),transparent 70%),radial-gradient(38% 34% at 75% 65%,rgb(150 80 255 / .14),transparent 70%);
+  animation:glow 60s ease-in-out infinite alternate;will-change:transform}
+@keyframes glow{to{transform:translate(8%,-6%) rotate(25deg) scale(1.1)}}
+@media (prefers-reduced-motion:reduce){body::before{animation:none}}

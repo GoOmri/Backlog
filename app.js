@@ -55,7 +55,9 @@ const KIND = {"Platform":"Platformer","Puzzle":"Puzzle","Shooter":"Shooter","Fig
 const THEME = {"Horror":"Horror","Survival":"Survival","Open world":"Open world","Mystery":"Mystery"};
 // Plain description: 2D/3D, what kind of game, co-op.
 const kwOf = g => [...(g.kw || []), ...(g.stags || [])];
-function basicTags(g){
+const tagMemo = new WeakMap();
+function basicTags(g){ let t = tagMemo.get(g); if (!t){ t = basicTags0(g); tagMemo.set(g, t); } return t; }
+function basicTags0(g){
   const v = [...new Set((g.views || []).map(x => VIEW[x]).filter(Boolean))].slice(0, 1);
   let k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure"));
   if (kwOf(g).includes("Metroidvania")) k = ["Metroidvania", ...k.filter(x => x !== "Platformer")];
@@ -490,10 +492,18 @@ function playRow([title, key, test], seen){
   const more = items.length > 10 ? `<button class="linkbtn" data-act="seeall" data-row="${key}" style="margin-left:auto">See all</button>` : "";
   return `<section class="section wrap"><div class="row-head"><h3>${title}</h3>${more}</div><div class="row">${items.slice(0, 10).map(itemCard).join("")}</div></section>`;
 }
+let homeMemo = {};
 function homeHTML(){
   if (!games.size) return emptyHTML();
   homeMode = "owned";
   if (topMV === null) topMV = swr("c:finds", () => api("/finds"), r => topMV = r) || {};
+  const day = Math.floor(Date.now() / 864e5);
+  if (homeMemo.games === games && homeMemo.finds === topMV && homeMemo.radar === radar && homeMemo.day === day) return homeMemo.html;
+  const html = homeBuild();
+  homeMemo = {games, finds: topMV, radar, day, html};
+  return html;
+}
+function homeBuild(){
   const top = upNextGames();
   const pinnedN = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).length;
   const wishN = list().filter(g => g.status === "wishlist" && !g.hidden).length;
@@ -700,10 +710,16 @@ function patchNode(a, b){
 /* ---------- render ---------- */
 function render(){
   eagerLeft = 12; lastRenderAt = performance.now();
-  const tabsH = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "lib" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
-  if (tabsH !== lastTabsH){ const old = $("#tabs .tab-pill")?.getAttribute("style") || ""; $("#tabs").innerHTML = `<span class="tab-pill${old ? "" : " now"}" style="${old}"></span>` + tabsH; lastTabsH = tabsH; requestAnimationFrame(movePill); }
+  renderTabs();
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
+  renderMain(m);
+}
+function renderTabs(){
+  const tabsH = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "lib" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
+  if (tabsH !== lastTabsH){ const old = $("#tabs .tab-pill")?.getAttribute("style") || ""; $("#tabs").innerHTML = `<span class="tab-pill${old ? "" : " now"}" style="${old}"></span>` + tabsH; lastTabsH = tabsH; requestAnimationFrame(movePill); }
+}
+function renderMain(m){
   // Keep each row's (and the carousel's) scroll position while staying on the same tab.
   const keyOf = el => el.id || el.closest(".section")?.querySelector("h3")?.textContent || "";
   const same = rowTab === tab;
@@ -1196,7 +1212,7 @@ document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
   if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
-  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tab = d.tab; q = ""; loadFilters(); render(); scrollTo(0, 0); if (ch){ $("#main").classList.remove("tabinr", "tabinl"); anim($("#main"), dir); } }
+  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tab = d.tab; q = ""; loadFilters(); renderTabs(); requestAnimationFrame(() => setTimeout(() => { render(); scrollTo(0, 0); if (ch){ $("#main").classList.remove("tabinr", "tabinl"); anim($("#main"), dir); } })); }
   else if (d.f != null){ const k = d.f.indexOf("|"); toggleFilter(d.f.slice(0, k), d.f.slice(k + 1)); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
