@@ -635,3 +635,15 @@ details.fsec:not([open]) > summary{margin-bottom:0}
 .gtags span{font-size:12px;padding:2px 9px;border-radius:999px;background:rgb(255 255 255 / .1);color:var(--fg)}
 .gtags:empty{display:none}
 .gp-facts .strip{display:flex;flex-wrap:wrap;gap:6px 14px}
+/* Library header: search on its own line, then Filters · count · sort */
+#q{flex:1 1 100%}
+.fbreak{flex-basis:100%;height:0}
+/* Filter sheet: fixed height so opening a section doesn't resize (and jump) the sheet */
+dialog:has(#sheetSide){height:min(85dvh,760px)}
+/* Bigger section arrows */
+details.fsec > summary::after{content:"";width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:0 4px 4px auto;opacity:.75;transition:transform .25s}
+details.fsec:not([open]) > summary::after{transform:rotate(-45deg);margin-bottom:0}
+/* Sections slide open and closed (browsers without support just open instantly) */
+:root{interpolate-size:allow-keywords}
+details.fsec::details-content{block-size:0;overflow:hidden;opacity:0;transition:block-size .25s ease,opacity .2s,content-visibility .25s allow-discrete}
+details.fsec[open]::details-content{block-size:auto;opacity:1}

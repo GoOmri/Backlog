@@ -602,6 +602,7 @@ function shelfHTML(wish){
   return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="lib">← Library</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
     <div class="libhead"><div class="filters">
       <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
+      <span class="fbreak"></span>
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
       <select id="sortSel" class="sortsel" aria-label="Sort">${Object.entries({title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played"})}).map(([k, l]) => `<option value="${k}" ${sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
