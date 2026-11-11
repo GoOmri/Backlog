@@ -21,7 +21,7 @@ export default {
         case "/match":    out = await match(env, (body.titles || []).slice(0, 10)); break;
         case "/search":   out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
-        case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
+        case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200), (body.apps || []).filter(Number.isFinite).slice(0, 200)); break;
         case "/upcoming": out = await upcoming(env); break;
         case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
         case "/steamrev": out = await steamReviews(env, +url.searchParams.get("appid")); break;
@@ -34,7 +34,6 @@ export default {
         case "/trophies": out = await trophies(env); break;
         case "/rarity":   out = await rarity(env, url.searchParams.get("np") || "", url.searchParams.get("svc") || "trophy"); break;
         case "/achrarity": out = await achRarity(env, +url.searchParams.get("appid")); break;
-        case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steamwish": out = await steamWishlist(env); break;
         case "/steam":    out = await steam(env); break;
         default: return json({error: "Not found"}, 404, cors);
@@ -122,10 +121,14 @@ async function match(env, titles){
 }
 
 // Extra fields for games already in the list (backfill).
-async function info(env, ids){
+async function info(env, ids, apps = []){
   if (!ids.length) return {};
-  const rows = await igdb(env, "games", `fields player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
-  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g)}]));
+  const steam = {};
+  if (apps.length) for (const it of await getItems(apps, {include_reviews: true}).catch(() => [])){
+    const r = it.reviews?.summary_filtered; if (r?.review_count) steam[it.appid] = {pct: r.percent_positive, n: r.review_count};
+  }
+  const rows = await igdb(env, "games", `fields platforms.abbreviation,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
+  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g), avail: [...new Set((g.platforms || []).map(p => PCODE[p.abbreviation]).filter(Boolean))]}]).concat([["steam", steam]]));
 }
 
 async function search(env, text){
@@ -248,6 +251,7 @@ async function steamTagSearch(tagIds, filter, start = 0){
 }
 // Find rows. Quality decides the order (see NOTES "Plan: simplify"); no taste penalties.
 const SEARCHES = [
+  ["mv", ["Metroidvania"]], ["mv", ["Metroidvania"], 100],
   ["plat2d", ["2D Platformer"]], ["plat2d", ["2D Platformer"], 100],
   ["plat3d", ["3D Platformer"]], ["plat3d", ["3D Platformer"], 100],
   ["coop", ["Local Co-Op"]], ["coop", ["Local Co-Op"], 100],
@@ -257,6 +261,7 @@ const SEARCHES = [
 // "Local Co-Op" is a feature tag, so it may sit anywhere (the search already guarantees it).
 const TOP = 5, UNIQUE = ["Experimental", "Surreal", "Artistic", "Abstract"];
 const MAIN = {
+  mv: (t) => t.includes("Metroidvania"),
   plat2d: (t, g) => t.includes("2D Platformer") && (g.player_perspectives || []).some(p => p.name === "Side view"),
   plat3d: (t) => t.includes("3D Platformer"),
   unique: (t) => t.some(x => UNIQUE.includes(x))
@@ -264,7 +269,7 @@ const MAIN = {
 // Hard no's: these in a game's main tags drop it from every row.
 const NO = ["Sports", "Free to Play", "Massively Multiplayer", "Visual Novel"];
 async function finds(env){
-  const c = await env.KV.get("finds13", "json");
+  const c = await env.KV.get("finds14", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600;
   const clean = `version_parent = null & parent_game = null`;
@@ -299,8 +304,8 @@ async function finds(env){
     return {x, keys, no: main.some(t => NO.includes(t)) || x.genres.includes("Visual Novel")};
   }).filter(i => i.keys.size && !i.no && i.x.date && i.x.date > since && i.x.date <= now);
   const pick = k => items.filter(i => i.keys.has(k)).map(i => i.x).sort((a, b) => b.score - a.score).slice(0, 40);
-  const d = {plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique")};
-  await env.KV.put("finds13", JSON.stringify({t: Date.now(), d}));
+  const d = {mv: pick("mv"), plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique")};
+  await env.KV.put("finds14", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 // One quality number (0–100) for any game: Steam % pulled toward 80 when there are few reviews,
@@ -308,19 +313,6 @@ async function finds(env){
 function quality(pct, n, critics, igdb){
   const base = pct != null ? (pct * n + 80 * 300) / (n + 300) : igdb ? (igdb * 20 + 75 * 20) / 40 : 70;
   return base + (critics ? Math.max(-3, Math.min(3, (critics - 80) / 5)) : 0);
-}
-
-/* ---------- Couch co-op finder ---------- */
-// IGDB ids: genre 8 = Platform, perspective 4 = Side view.
-async function couch(env, kind){
-  const base = `(multiplayer_modes.offlinecoop = true | multiplayer_modes.splitscreen = true)` + (kind === "platformer" ? ` & genres = (8) & player_perspectives = (4)` : "");
-  const yearAgo = Math.floor(Date.now() / 1000) - 540 * 86400, now = Math.floor(Date.now() / 1000);
-  const [best, fresh] = await Promise.all([
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & total_rating_count > 8 & version_parent = null & parent_game = null; sort total_rating desc; limit 40;`),
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where ${base} & first_release_date > ${yearAgo} & first_release_date < ${now} & version_parent = null & parent_game = null; sort hypes desc; limit 40;`)
-  ]);
-  const ttb = await ttbFor(env, [...best, ...fresh].map(g => g.id));
-  return {best: best.map(g => slim(g, ttb)), fresh: fresh.map(g => slim(g, ttb))};
 }
 
 /* ---------- New releases radar: 2D platformers and metroidvanias ---------- */
