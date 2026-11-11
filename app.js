@@ -623,8 +623,7 @@ function radarHTML(){
   const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when);
 }
-// Find tab extras: wishlist sales and the best metroidvanias you don't own.
-const priceTxt = x => x?.price ? (x.price.d ? `−${x.price.d}% ${x.price.f}` : x.price.f) : "";
+// Find tab: wishlist link + four rows from /finds (top 10 each).
 // Show the last saved result instantly, refresh in the background, re-render only if it changed.
 function swr(key, fetcher, set, onErr){
   let c = null; try { c = JSON.parse(localStorage.getItem(key)); } catch {}
@@ -639,21 +638,12 @@ function findExtrasHTML(){
   const frow = (t, xs, subf, twoD) => {
     xs = (xs || []).filter(x => !inList(x) && !seen.has(x.igdbId));
     if (twoD) xs.sort((a, b) => is2D(b) - is2D(a));
-    xs = xs.slice(0, 24); xs.forEach(x => { seen.add(x.igdbId); previewCache.set(x.igdbId, x); });
-    return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, [subf(x), priceTxt(x)].filter(Boolean).join(" · "))).join("")}</div></div>` : "";
+    xs = xs.slice(0, 10); xs.forEach(x => { seen.add(x.igdbId); previewCache.set(x.igdbId, x); });
+    return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, subf(x))).join("")}</div></div>` : "";
   };
-  const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
+  const yr = x => x.year || "";
   const rev = x => x?.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
-  const played = x => { const g = inList(x); return g && ["done", "dropped"].includes(g.status); };
-  const top = (topMV.mvTop || []).filter(x => !played(x)).slice(0, 24), topIds = new Set(top.map(x => x.igdbId));
-  // One metroidvania row: top rated first, then MVs you don't own (2D first).
-  top.push(...(topMV.mv || []).filter(x => !inList(x) && !topIds.has(x.igdbId)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 30 - top.length));
-  top.forEach(x => { seen.add(x.igdbId); previewCache.set(x.igdbId, x); });
-  const mvTop = top.length >= 3 ? `<div class="section"><h3>Metroidvanias you haven't played</h3><div class="row">${top.map(x => { const g = inList(x); return g ? cardHTML(g, rev(x)) : suggestCard(x, rev(x)); }).join("")}</div></div>` : "";
-  const mv = mvTop + frow("2D platformers you don't own", topMV.plat, yr) + frow("Hidden gems", topMV.gems, rev)
-    + frow("Puzzle co-op", topMV.coopPuzzle, yr) + frow("Couch co-op platformers", topMV.coopPlat, yr)
-    + frow("Narrative & walking sims", topMV.walk, yr) + frow("Mystery & deduction", topMV.mystery, yr) + frow("Cozy short indies", topMV.cozy, yr) + frow("Zelda-likes", topMV.zelda, yr)
-    + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
+  const mv = frow("2D platformers", topMV.plat2d, yr) + frow("3D platformers", topMV.plat3d, yr) + frow("Couch co-op", topMV.coop, yr) + frow("Unique", topMV.unique, rev);
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
   const seeAll = wl.length ? `<span class="dim">${wl.length} on wishlist</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button>` : "";
@@ -859,7 +849,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span>${x.price ? `<span class="dim">· ${esc(priceTxt(x))} on Steam</span>` : ""}</div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to Play carousel" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to Play carousel" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = () => $("#desc").classList.toggle("clamp");
   let wid = null;
   $("#pvWish").onclick = async () => {

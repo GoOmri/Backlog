@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating";
+const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating,platforms.abbreviation";
 
 export default {
   async fetch(req, env, ctx){
@@ -67,6 +67,8 @@ async function igdb(env, endpoint, query){
 const q = s => String(s).replace(/\\/g, "").replace(/"/g, '\\"');
 const norm = s => String(s).toLowerCase().replace(/[™®©]/g, "").replace(/[^a-z0-9]+/g, "");
 
+// IGDB platform abbreviations → short codes for "available on".
+const PCODE = {"PS5": "ps5", "PS4": "ps4", "PC": "pc", "Switch": "switch", "Switch 2": "switch", "NS2": "switch", "Series X|S": "xbox", "XONE": "xbox"};
 function slim(g, ttb){
   const t = ttb?.[g.id];
   return {
@@ -77,6 +79,7 @@ function slim(g, ttb){
     themes: (g.themes || []).map(x => x.name),
     modes: (g.game_modes || []).map(x => x.name),
     views: (g.player_perspectives || []).map(x => x.name),
+    avail: [...new Set((g.platforms || []).map(p => PCODE[p.abbreviation]).filter(Boolean))],
     ...coop(g), kw: feel(g),
     rating: Math.round(g.total_rating || g.aggregated_rating || 0) || null,
     ratingCount: g.total_rating_count || 0,
@@ -243,57 +246,42 @@ async function steamTagSearch(tagIds, filter, start = 0){
     return app ? {app, pct: pct ? +pct[1] : null, n: pct ? +pct[2].replace(/,/g, "") : 0} : null;
   }).filter(Boolean);
 }
-// Taste: pushed up / pushed down by Steam tags (only the top tags of a game count).
-const LIKE = ["Puzzle Platformer", "Exploration", "Atmospheric", "Hand-drawn", "Beautiful", "Story Rich", "Precision Platformer", "Relaxing", "Metroidvania", "Great Soundtrack", "Emotional", "Cozy", "Mystery", "Detective", "Walking Simulator", "Short"];
-const DISLIKE = ["Souls-like", "Hack and Slash", "Action Roguelike", "Bullet Hell", "Fighting", "Roguelike", "Roguelite", "Shoot 'Em Up", "Beat 'em up", "Gore", "Character Action Game"];
+// Find rows. Quality decides the order (see NOTES "Plan: simplify"); no taste penalties.
 const SEARCHES = [
-  ["mv", ["Metroidvania"], "sort_by=Reviews_DESC"], ["mv", ["Metroidvania"], "sort_by=Reviews_DESC", 100],
-  ["plat", ["2D Platformer"], "sort_by=Reviews_DESC"], ["plat", ["2D Platformer"], "sort_by=Reviews_DESC", 100],
-  ["walk", ["Walking Simulator"], "sort_by=Reviews_DESC"], ["mystery", ["Mystery"], "sort_by=Reviews_DESC"], ["mystery", ["Detective"], "sort_by=Reviews_DESC"],
-  ["cozy", ["Cozy"], "sort_by=Reviews_DESC"], ["zelda", ["Top-Down", "Action-Adventure"], "sort_by=Reviews_DESC"],
-  ["coopPuzzle", ["Local Co-Op", "Puzzle"], "sort_by=Reviews_DESC"], ["coopPlat", ["Local Co-Op", "Platformer"], "sort_by=Reviews_DESC"]
+  ["plat2d", ["2D Platformer"]], ["plat2d", ["2D Platformer"], 100],
+  ["plat3d", ["3D Platformer"]], ["plat3d", ["3D Platformer"], 100],
+  ["coop", ["Local Co-Op"]], ["coop", ["Local Co-Op"], 100],
+  ["unique", ["Experimental"]], ["unique", ["Surreal"]], ["unique", ["Artistic"]]
 ];
 // A row only counts a game when the row's genre is one of the game's main Steam tags (top 5), never "anywhere in the list".
 // "Local Co-Op" is a feature tag, so it may sit anywhere (the search already guarantees it).
-const TOP = 5, isPlat = t => /Platformer$/.test(t);
+const TOP = 5, UNIQUE = ["Experimental", "Surreal", "Artistic", "Abstract"];
 const MAIN = {
-  mv: (t) => t.includes("Metroidvania"),
-  plat: (t, g) => t.includes("2D Platformer") && (g.player_perspectives || []).some(p => p.name === "Side view"),
-  walk: (t) => t.includes("Walking Simulator"),
-  mystery: (t) => t.includes("Mystery") || t.includes("Detective"),
-  cozy: (t) => t.includes("Cozy"),
-  zelda: (t) => t.includes("Top-Down") && t.includes("Action-Adventure"),
-  coopPuzzle: (t) => t.some(x => /Puzzle/.test(x)),
-  coopPlat: (t) => t.some(isPlat)
+  plat2d: (t, g) => t.includes("2D Platformer") && (g.player_perspectives || []).some(p => p.name === "Side view"),
+  plat3d: (t) => t.includes("3D Platformer"),
+  unique: (t) => t.some(x => UNIQUE.includes(x))
 };
+// Hard no's: these in a game's main tags drop it from every row.
+const NO = ["Sports", "Free to Play", "Massively Multiplayer", "Visual Novel"];
 async function finds(env){
-  const c = await env.KV.get("finds12", "json");
+  const c = await env.KV.get("finds13", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
-  const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
-  const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
+  const now = Math.floor(Date.now() / 1000), since = 1199145600;
+  const clean = `version_parent = null & parent_game = null`;
   const all = await tagList(env), tid = new Map(all.map(t => [t.name, t.tagid])), tname = new Map(all.map(t => [t.tagid, t.name]));
-  const kws = await igdb(env, "keywords", `fields id; where name ~ *"metroidvania"*; limit 20;`);
-  const mvKw = kws.length ? `keywords = (${kws.map(k => k.id).join(",")})` : "id = 0";
-  const [classics, ...res] = await Promise.all([
-    igdb(env, "games", `fields ${MATCH_FIELDS}; where (${side} | ${mvKw}) & ${clean} & first_release_date < ${since} & total_rating_count > 30 & total_rating > 78; sort total_rating_count desc; limit 60;`),
-    ...SEARCHES.map(([k, t, f, st]) => steamTagSearch(t.map(n => tid.get(n)), f, st).then(r => r.map(x => ({...x, k}))).catch(() => []))
-  ]);
+  const res = await Promise.all(SEARCHES.map(([k, t, st]) => steamTagSearch(t.map(n => tid.get(n)), "sort_by=Reviews_DESC", st).then(r => r.map(x => ({...x, k}))).catch(() => [])));
   // Quality bar: well reviewed, or a hidden gem (few reviews but nearly all positive).
   const good = x => (x.pct >= 85 && x.n >= 300) || (x.pct >= 92 && x.n >= 40);
   const hits = new Map();
   for (const x of res.flat()){
-    if (!(x.k === "soon" || (x.k === "fresh" && (x.pct == null || x.pct >= 75)) || good(x))) continue;
+    if (!good(x)) continue;
     const h = hits.get(x.app) || {...x, keys: new Set()};
     h.keys.add(x.k); hits.set(x.app, h);
   }
-  // Steam tags for every candidate.
-  for (const it of await getItems([...hits.keys()], {include_tag_count: 12, include_all_purchase_options: true}, "IL")){
-    const h = hits.get(String(it.appid)); if (!h) continue;
-    h.tags = (it.tags || []).map(t => tname.get(t.tagid)).filter(Boolean);
-    const b = it.best_purchase_option;
-    h.price = it.is_free ? {f: "Free"} : b?.formatted_final_price ? {f: b.formatted_final_price, d: b.discount_pct || 0} : null;
+  for (const it of await getItems([...hits.keys()], {include_tag_count: 12})){
+    const h = hits.get(String(it.appid)); if (h) h.tags = (it.tags || []).map(t => tname.get(t.tagid)).filter(Boolean);
   }
-  // Map Steam app ids to IGDB games (for covers, details and wishlist).
+  // Map Steam app ids to IGDB games (for covers, details, platforms and wishlist).
   const apps = [...hits.keys()], gameOf = new Map();
   for (let i = 0; i < apps.length; i += 200){
     const ext = await igdb(env, "external_games", `fields game,uid,url; where uid = (${apps.slice(i, i + 200).map(a => `"${a}"`).join(",")}); limit 500;`);
@@ -301,33 +289,25 @@ async function finds(env){
   }
   const ids = [...gameOf.keys()], games = [];
   for (let i = 0; i < ids.length; i += 250) games.push(...await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${ids.slice(i, i + 250).join(",")}) & ${clean}; limit 500;`));
-  const elite = h => h.pct >= 94 && h.n >= 10000;
   const items = games.map(g => {
-    const h = gameOf.get(g.id), top = (h.tags || []).slice(0, 8), main = top.slice(0, TOP);
+    const h = gameOf.get(g.id), main = (h.tags || []).slice(0, TOP);
     const keys = new Set([...h.keys].filter(k => !MAIN[k] || MAIN[k](main, g)));
-    const taste = Math.min(6, top.filter(t => LIKE.includes(t)).length * 1.5) - (elite(h) ? 0 : top.filter(t => DISLIKE.includes(t)).length * 6);
-    const base = h.pct != null ? (h.pct * h.n + 80 * 300) / (h.n + 300) : 75;
-    const sk = [...new Set((h.tags || []).map(t => STAG[t]).filter(Boolean))];
-    const x = {...slim(g), kw: [...new Set([...feel(g), ...sk.filter(t => t !== "Couch co-op")])], ...(sk.includes("Couch co-op") ? {couch: true} : {}),
-      date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app, price: h.price};
-    x.score = base + taste + Math.max(0, (x.year || 2008) - 2008) * 0.3;
-    x.gem = h.n < 1500 && h.pct >= 92; x.taste = taste;
-    return {x, keys};
-  }).filter(({x, keys}) => keys.size && !x.genres.includes("Visual Novel"));
-  const pick = (keys, f = () => true, sort = (a, b) => b.score - a.score, n = 40) =>
-    items.filter(i => keys.some(k => i.keys.has(k)) && f(i.x)).map(i => i.x).sort(sort).slice(0, n);
-  const taste = ["mv", "plat", "walk", "mystery", "cozy", "zelda", "coopPuzzle", "coopPlat"];
-  const released = x => x.date && x.date > since && x.date <= now;
-  const d = {
-    mv: pick(["mv"], released), mvTop: pick(["mv"], x => x.steamN >= 3000 && x.steamPct >= 90, (a, b) => b.steamPct - a.steamPct || b.steamN - a.steamN), plat: pick(["plat"], released),
-    gems: pick(taste, x => released(x) && x.gem && x.taste >= 0, (a, b) => (b.steamPct + b.taste) - (a.steamPct + a.taste)),
-    coopPuzzle: pick(["coopPuzzle"], released), coopPlat: pick(["coopPlat"], released),
-    walk: pick(["walk"], released), mystery: pick(["mystery"], released), cozy: pick(["cozy"], released), zelda: pick(["zelda"], released),
-    missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
-    classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
-  };
-  await env.KV.put("finds12", JSON.stringify({t: Date.now(), d}));
+    const x = {...slim(g), date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
+    x.score = quality(h.pct, h.n, g.aggregated_rating, g.total_rating);
+    x.gem = h.n < 1500 && h.pct >= 92;
+    if (x.gem) keys.add("unique");
+    return {x, keys, no: main.some(t => NO.includes(t)) || x.genres.includes("Visual Novel")};
+  }).filter(i => i.keys.size && !i.no && i.x.date && i.x.date > since && i.x.date <= now);
+  const pick = k => items.filter(i => i.keys.has(k)).map(i => i.x).sort((a, b) => b.score - a.score).slice(0, 40);
+  const d = {plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique")};
+  await env.KV.put("finds13", JSON.stringify({t: Date.now(), d}));
   return d;
+}
+// One quality number (0–100) for any game: Steam % pulled toward 80 when there are few reviews,
+// plus a small bonus/penalty from critics; IGDB rating when there is no Steam data.
+function quality(pct, n, critics, igdb){
+  const base = pct != null ? (pct * n + 80 * 300) / (n + 300) : igdb ? (igdb * 20 + 75 * 20) / 40 : 70;
+  return base + (critics ? Math.max(-3, Math.min(3, (critics - 80) / 5)) : 0);
 }
 
 /* ---------- Couch co-op finder ---------- */
