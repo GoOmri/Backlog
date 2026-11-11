@@ -743,6 +743,33 @@ function diaryHTML(){
     <div class="section"><h3>Finished</h3><div class="diary">${entries || `<div class="empty">Games you mark Finished show up here with the date and your stars.</div>`}</div></div></div>`;
 }
 
+/* ---------- patch: update only what changed ----------
+   patch(el, html) makes el's content match html, touching only nodes that differ, so images don't reload,
+   scroll and focus stay put. Children with data-edit / data-key / id are matched by that key (moves, not rebuilds). */
+const keyOf = n => n.nodeType === 1 ? n.getAttribute("data-key") || n.getAttribute("data-edit") || n.id || null : null;
+function patch(el, html){ const t = document.createElement("template"); t.innerHTML = html; patchKids(el, t.content); }
+function patchKids(a, b){
+  const keyed = new Map(); for (const c of a.children){ const k = keyOf(c); if (k && !keyed.has(k)) keyed.set(k, c); }
+  let cur = a.firstChild;
+  for (const nb of [...b.childNodes]){
+    const k = keyOf(nb);
+    const old = k ? keyed.get(k) : cur && !keyOf(cur) && cur.nodeType === nb.nodeType && cur.nodeName === nb.nodeName ? cur : null;
+    if (!old){ a.insertBefore(nb, cur); continue; }
+    if (k) keyed.delete(k);
+    if (old === cur) cur = cur.nextSibling; else a.insertBefore(old, cur);
+    patchNode(old, nb);
+  }
+  while (cur){ const n = cur.nextSibling; cur.remove(); cur = n; }
+}
+function patchNode(a, b){
+  if (a.nodeType !== 1){ if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  if (a.isEqualNode(b)) return;
+  for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for (const at of b.attributes) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(a.nodeName) && document.activeElement !== a){ a.value = b.value; if ("checked" in a) a.checked = b.checked; }
+  patchKids(a, b);
+}
+
 /* ---------- render ---------- */
 function render(){
   eagerLeft = 12;
@@ -752,9 +779,11 @@ function render(){
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
   // Keep each row's (and the carousel's) scroll position while staying on the same tab.
   const keyOf = el => el.id || el.closest(".section")?.querySelector("h3")?.textContent || "";
-  const pos = rowTab === tab ? new Map([...m.querySelectorAll(".row, #slides")].map(el => [keyOf(el), el.scrollLeft])) : new Map();
+  const same = rowTab === tab;
+  const pos = same ? new Map([...m.querySelectorAll(".row, #slides")].map(el => [keyOf(el), el.scrollLeft])) : new Map();
   rowTab = tab;
-  m.innerHTML = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
+  const html = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
+  if (same) patch(m, html); else m.innerHTML = html;
   if (pos.size) for (const el of m.querySelectorAll(".row, #slides")){ const x = pos.get(keyOf(el)); if (x) el.scrollLeft = x; }
   document.documentElement.style.setProperty("--barH", $(".bar").offsetHeight + "px");
   // Filters changed while scrolled down: jump back so the new list starts at the top.
