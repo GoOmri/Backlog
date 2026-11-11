@@ -606,3 +606,9 @@ dialog:has(.sift)::before{content:"";position:fixed;inset:-30%;z-index:-1;pointe
   background:radial-gradient(40% 35% at 25% 30%,rgb(70 110 255 / .16),transparent 70%),radial-gradient(38% 34% at 75% 65%,rgb(150 80 255 / .14),transparent 70%);
   animation:glow 60s ease-in-out infinite alternate;will-change:transform}
 @media (prefers-reduced-motion:reduce){dialog:has(.sift)::before{animation:none}}
+/* Sift: centered column on desktop; snappier card change */
+.sift.intab{max-width:560px;margin:0 auto}
+.sift-genres{font-size:12.5px;color:var(--dim);margin-top:2px}
+.sift-card{animation-duration:.18s}
+@keyframes siftUp{from{transform:translateY(24px);opacity:.2}to{transform:none;opacity:1}}
+.sift-ghost{position:fixed!important;z-index:50;margin:0;pointer-events:none;animation:none!important;transition:transform .24s cubic-bezier(.4,0,.6,1),opacity .24s}

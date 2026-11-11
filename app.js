@@ -946,7 +946,7 @@ async function fillStrip(g, d){
   if (d.available?.length && $("#ownAvail")) $("#ownAvail").textContent = " · available on " + d.available.join(", ");
   // No PlayStation release (e.g. PC only): drop the PS Store link.
   if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) $(".pslink")?.remove();
-  const parts = [null, d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
+  const parts = [null, d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, (d.ttb || g.ttb)?.main && `<span>Time to beat <b>~${(d.ttb || g.ttb).main}h</b>${(d.ttb || g.ttb).full > (d.ttb || g.ttb).main ? ` · 100% ~${(d.ttb || g.ttb).full}h` : ""}</span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
   if (g.steamAppId){
@@ -1139,7 +1139,7 @@ function siftShow(){
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
       <div class="sift-hint yes">✓</div><div class="sift-hint no">✕</div>
-      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div><div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
+      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div>${(g.genres || []).length ? `<div class="sift-genres">${g.genres.slice(0, 4).map(esc).join(" · ")}</div>` : ""}<div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
     </div>
     <div class="sift-btns"><button class="sift-round no" data-s="nope" aria-label="Not now">✕</button><button class="sift-round pin" data-s="next" aria-label="Up next">${ic("pin", 20)}</button><button class="sift-round yes" data-s="keep" aria-label="Keep">✓</button></div>
     <div class="sift-labels"><span>Not now</span><span>Up next</span><span>Keep</span></div>`;
@@ -1172,8 +1172,8 @@ function siftShow(){
     if (shots.length || trailer) showShots(); else fail("No gameplay found.");
   }).catch(e => { if (sift && sift.i === me) fail("Couldn't load gameplay."); console.warn("sift details", g.title, e); });
   else fail("This game isn't matched, so there's no gameplay.");
-  const nx = sift.deck[sift.i + 1], ng = nx && (nx.g || nx.x);
-  if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 3).forEach(u => { new Image().src = med(u); })).catch(() => {});
+  for (const nx of sift.deck.slice(sift.i + 1, sift.i + 3)){ const ng = nx.g || nx.x;
+    if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 3).forEach(u => { new Image().src = med(u); })).catch(() => {}); }
   const c = $("#siftCard"); let x0 = null, dx = 0, downOn = null;
   c.onpointerdown = e => { if (e.target.closest("button, iframe, [data-s], .vwrap")) return; downOn = e.target.closest("#siftStack") ? "shots" : null; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
   const hint = d => { c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
@@ -1206,7 +1206,16 @@ async function siftAct(a){
     sift.done.push({newId: nid});
   }
   const c = $("#siftCard");
-  if (c){ c.classList.remove("dragging"); const h = c.querySelector(a === "nope" ? ".sift-hint.no" : ".sift-hint.yes"); if (h && a !== "next") h.style.opacity = 1; c.style.transform = `translateX(${a === "nope" ? -130 : 130}%) rotate(${a === "nope" ? -12 : 12}deg)`; c.style.opacity = "0"; await new Promise(r => setTimeout(r, 180)); }
+  if (c){
+    const r = c.getBoundingClientRect(), gh = c.cloneNode(true), cur = c.style.transform;
+    gh.querySelectorAll(".vwrap").forEach(v => { v.innerHTML = ""; });
+    gh.removeAttribute("id"); gh.classList.add("sift-ghost"); gh.classList.remove("dragging");
+    Object.assign(gh.style, {left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", transform: cur});
+    const h = gh.querySelector(a === "nope" ? ".sift-hint.no" : ".sift-hint.yes"); if (h && a !== "next") h.style.opacity = 1;
+    document.body.append(gh);
+    requestAnimationFrame(() => { gh.style.transform = `translateX(${a === "nope" ? -120 : 120}%) rotate(${a === "nope" ? -10 : 10}deg)`; gh.style.opacity = "0"; });
+    setTimeout(() => gh.remove(), 260);
+  }
   sift.i++; sift.batch++; siftShow();
 }
 
