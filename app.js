@@ -699,7 +699,9 @@ function diaryHTML(){
    patch(el, html) makes el's content match html, touching only nodes that differ, so images don't reload,
    scroll and focus stay put. Children with data-edit / data-key / id are matched by that key (moves, not rebuilds). */
 const keyOf = n => n.nodeType === 1 ? n.getAttribute("data-key") || n.getAttribute("data-edit") || n.id || null : null;
-function patch(el, html){ const t = document.createElement("template"); t.innerHTML = html; patchKids(el, t.content); }
+function patch(el, html){ const t = document.createElement("template"); t.innerHTML = html; patchKids(el, t.content);
+  // Patching copies attributes from fresh HTML, which drops the "loaded" mark on art that's already there: put it back.
+  for (const i of el.querySelectorAll("img:not(.ok)")) if (i.complete && i.naturalWidth) i.classList.add("ok", "now"); }
 function patchKids(a, b){
   const keyed = new Map(); for (const c of a.children){ const k = keyOf(c); if (k && !keyed.has(k)) keyed.set(k, c); }
   let cur = a.firstChild;
