@@ -858,6 +858,7 @@ function pageShell(x, {own, actions, facts, edit}){
     <div class="gp-head">
       ${x.logo ? `<img class="gp-logo" src="${esc(x.logo)}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
       ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
+      <div class="gtags" id="gtags">${genresOf(x).filter(t => t !== "Indie").slice(0, 5).map(t => `<span>${esc(t)}</span>`).join("")}</div>
       <div class="gp-actions">${actions}</div>
     </div></header>
   <div class="gp-body">
@@ -954,7 +955,15 @@ async function fillDifficulty(g, psRarity){
   box.innerHTML = `<span class="dchip ${lvl[1]}">${lvl[0]}</span><span>${what} earned by <b>${pct}%</b> of players</span>`;
 }
 // Critics · Steam % · Developer · Your hours.
+// Steam's top 5 player tags replace the IGDB genres when the game is on Steam (saved on this device for 30 days).
+async function fillTags(g){
+  const app = g.steamAppId || g.appid; if (!app) return;
+  let t = null; try { const c = JSON.parse(localStorage.getItem("tt:" + app)); if (c && Date.now() - c.at < 30 * 864e5) t = c.t; } catch {}
+  if (!t){ t = await api("/toptags?appid=" + app).catch(() => null); if (t?.length) try { localStorage.setItem("tt:" + app, JSON.stringify({at: Date.now(), t})); } catch {} }
+  const el = $("#gtags"); if (el && t?.length) el.innerHTML = t.map(x => `<span>${esc(x)}</span>`).join("");
+}
 async function fillStrip(g, d){
+  fillTags(g);
   const box = $("#strip"); if (!box) return;
   if (d.available?.length && $("#ownAvail")) $("#ownAvail").textContent = " · available on " + d.available.join(", ");
   // No PlayStation release (e.g. PC only): drop the PS Store link.
