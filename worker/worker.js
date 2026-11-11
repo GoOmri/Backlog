@@ -154,12 +154,17 @@ function pickTrailer(videos){
   return videos.slice().sort((a, b) => score(b) - score(a))[0]?.video_id || null;
 }
 async function gameFresh(env, id){
-  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,platforms.abbreviation,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
+  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,version_parent,involved_companies.company.name,involved_companies.developer,url; where id = ${id};`);
   if (!g) throw new Error("Game not found");
+  // Some entries (editions, ports) have no screenshots or videos of their own: borrow the original game's.
+  if (!g.screenshots?.length && g.version_parent){
+    const [p] = await igdb(env, "games", `fields screenshots.image_id,videos.video_id,videos.name; where id = ${g.version_parent};`).catch(() => []);
+    if (p){ g.screenshots = p.screenshots; if (!g.videos?.length) g.videos = p.videos; }
+  }
   const out = {...slim(g, await ttbFor(env, [id])), summary: g.summary || "",
     developers: (g.involved_companies || []).filter(c => c.developer).map(c => c.company?.name).filter(Boolean),
     hero: IMG(g.artworks?.[0]?.image_id || g.screenshots?.[0]?.image_id, "1080p"),
-    shots: (g.screenshots || []).slice(0, 8).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
+    shots: (g.screenshots?.length ? g.screenshots : g.artworks || []).slice(0, 9).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
     trailer: pickTrailer(g.videos || []), critic: Math.round(g.aggregated_rating || 0) || null,
     available: [...new Set((g.platforms || []).map(p => ({PS5: "PS5", PS4: "PS4", PC: "PC", Switch: "Switch", "Switch 2": "Switch 2", "Series X|S": "Xbox", XONE: "Xbox"})[p.abbreviation]).filter(Boolean))]};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
