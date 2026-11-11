@@ -694,9 +694,9 @@ function patchNode(a, b){
 
 /* ---------- render ---------- */
 function render(){
-  eagerLeft = 12;
+  eagerLeft = 12; lastRenderAt = performance.now();
   const tabsH = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "lib" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
-  if (tabsH !== lastTabsH){ $("#tabs").innerHTML = tabsH; lastTabsH = tabsH; }
+  if (tabsH !== lastTabsH){ const old = $("#tabs .tab-pill")?.getAttribute("style") || ""; $("#tabs").innerHTML = `<span class="tab-pill${old ? "" : " now"}" style="${old}"></span>` + tabsH; lastTabsH = tabsH; requestAnimationFrame(movePill); }
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
   // Keep each row's (and the carousel's) scroll position while staying on the same tab.
@@ -713,7 +713,7 @@ function render(){
   if (shelfReset && !$("#dlg").open){ shelfReset = false; const h = $(".libhead"); if (h){ const y = h.parentElement.getBoundingClientRect().top + scrollY - $(".bar").offsetHeight; if (scrollY > y) scrollTo(0, Math.max(0, y)); } }
   watchShelf();
 }
-let rowTab = null, lastTabsH = "", eagerLeft = 0;
+let rowTab = null, lastTabsH = "", eagerLeft = 0, lastRenderAt = 0;
 // Phones get 720p heroes instead of the 1080p the worker stores.
 const PHONE = matchMedia("(max-width:999px)").matches;
 const heroSrc = u => PHONE && u ? u.replace("/t_1080p/", "/t_720p/") : u;
@@ -735,9 +735,17 @@ function shut(){ const g = $("#dlg"); if (!g.open || g.classList.contains("closi
 $("#dlg").addEventListener("cancel", e => { e.preventDefault(); closeSheet(); });
 // Restart a one-shot CSS animation class on an element.
 function anim(el, c){ if (!el) return; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
+// The active tab's background is one pill that slides between tabs.
+function movePill(){
+  const p = $("#tabs .tab-pill"), a = $("#tabs .tab[aria-current]"); if (!p) return;
+  if (!a){ p.style.opacity = 0; return; }
+  p.style.cssText = `opacity:1;width:${a.offsetWidth}px;height:${a.offsetHeight}px;transform:translate(${a.offsetLeft}px,${a.offsetTop}px);border-radius:${getComputedStyle(a).borderRadius}`;
+  if (p.classList.contains("now")) requestAnimationFrame(() => p.classList.remove("now"));
+}
+addEventListener("resize", () => { const p = $("#tabs .tab-pill"); if (p){ p.classList.add("now"); movePill(); } });
 // Fade covers in the first time an image arrives (cached re-renders stay still, no flicker).
 const seenImg = new Set();
-document.addEventListener("load", e => { const i = e.target; if (i.tagName !== "IMG" || seenImg.has(i.src)) return; seenImg.add(i.src); anim(i, "imgin"); }, true);
+document.addEventListener("load", e => { const i = e.target; if (i.tagName !== "IMG" || seenImg.has(i.src)) return; seenImg.add(i.src); if (performance.now() - lastRenderAt > 250) anim(i, "imgin"); }, true);
 function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ if (history.state?.sheet) history.back(); else shut(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
