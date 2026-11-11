@@ -396,9 +396,17 @@ function coverTag(g){
   if (g.status === "dropped") return `<span class="tag">Dropped</span>`;
   return "";
 }
+// "Available on" (outlined) for platforms you don't own it on. Owned platforms stay filled; PS Plus/PS5 cover PS, Steam/Epic/itch cover PC.
+const AVAIL = {ps5: "PS5", ps4: "PS4", pc: "PC", switch: "NS", xbox: "XB"};
+function availBadges(g){
+  const own = g.platforms || [], hasPS = own.some(p => p === "ps5" || p === "psplus"), hasPC = own.some(p => ["steam", "epic", "itch"].includes(p));
+  const av = (g.avail || []).filter(c => AVAIL[c] && !(hasPS && (c === "ps5" || c === "ps4")) && !(hasPC && c === "pc"));
+  if (av.includes("ps5")) av.splice(av.indexOf("ps4") >>> 0, av.includes("ps4") ? 1 : 0);
+  return av.map(c => `<span class="plat avail" title="Available on ${AVAIL[c]}">${AVAIL[c]}</span>`).join("");
+}
 function coverHTML(g){
   return `<div class="cover">${g.cover ? `<img src="${esc(g.cover)}" alt="" loading="${eagerLeft-- > 0 ? "eager" : "lazy"}">` : `<span class="ph">${esc(g.title)}</span>`}
-    <span class="badges">${badges(g.platforms, g)}</span>${coverTag(g)}</div>`;
+    <span class="badges">${badges(g.platforms, g)}${availBadges(g)}</span>${coverTag(g)}</div>`;
 }
 function cardHTML(g, sub){
   const right = g.myRating ? `<span class="stars">${"★".repeat(g.myRating)}</span>` : "";
