@@ -1087,14 +1087,28 @@ function siftShow(){
   const g = it.g || it.x, q = g.steamPct != null ? `${g.steamPct}% on Steam` : g.rating ? `Rated ${Math.round(g.rating)}` : "";
   const where = it.g ? (it.g.status === "wishlist" ? "Wishlist" : "Owned") : "New find";
   el.innerHTML = `<div class="dim">${where} · ${sift.deck.length - sift.i} left</div>
-    <div id="siftCard" class="sift-card">${coverHTML(it.g || {...it.x, platforms: [], status: "backlog"})}</div>
-    <div class="sift-meta"><b>${esc(g.title)}</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div></div>
+    <div id="siftCard" class="sift-card"><div id="siftMedia" class="sift-media"><span class="dim">Loading gameplay…</span></div><div id="siftDots" class="sift-dots"></div><button id="siftPlay" class="sift-play" hidden aria-label="Play trailer">▶</button></div>
+    <div class="sift-meta"><div class="sift-thumb">${coverHTML(it.g || {...it.x, platforms: [], status: "backlog"})}</div><div><b>${esc(g.title)}</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div><div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
     <div class="sift-btns">${prev}<button class="chip" data-s="nope">✕ Not now</button><button class="chip" data-s="next">Up next</button><button class="chip" data-s="keep">Keep ✓</button></div>`;
+  // Gameplay first: screenshots (tap left/right half to step), ▶ plays the gameplay trailer muted. Next card's details load in the background.
+  const media = $("#siftMedia"), dots = $("#siftDots"), playB = $("#siftPlay"), me = sift.i, med = u => u.replace("t_screenshot_huge", "t_screenshot_med");
+  let shots = [], k = 0;
+  const showShot = () => { media.innerHTML = `<img src="${shots[k]}" alt="">`; dots.innerHTML = shots.length > 1 ? shots.map((_, n) => `<i class="${n === k ? "on" : ""}"></i>`).join("") : ""; };
+  const noMedia = () => { media.innerHTML = coverHTML(it.g || {...it.x, platforms: [], status: "backlog"}); media.classList.add("poster"); };
+  if (g.igdbId) gameDetails(g.igdbId).then(d => {
+    if (!sift || sift.i !== me || !$("#siftMedia")) return;
+    shots = (d.shots || []).map(med); if (shots.length) showShot(); else noMedia();
+    if (d.trailer){ playB.hidden = false; playB.onclick = () => { media.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`; dots.innerHTML = ""; shots = []; playB.hidden = true; }; }
+  }).catch(noMedia); else noMedia();
+  const nx = sift.deck[sift.i + 1], ng = nx && (nx.g || nx.x);
+  if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 2).forEach(u => { new Image().src = med(u); })).catch(() => {});
   const c = $("#siftCard"); let x0 = null, dx = 0;
-  c.onpointerdown = e => { x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
+  c.onpointerdown = e => { if (e.target.closest("button, iframe")) return; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
   c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`; };
-  c.onpointerup = c.onpointercancel = () => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
-    if (Math.abs(dx) > 90) siftAct(dx > 0 ? "keep" : "nope"); else c.style.transform = ""; };
+  c.onpointerup = c.onpointercancel = e => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
+    if (Math.abs(dx) > 90) return siftAct(dx > 0 ? "keep" : "nope");
+    c.style.transform = "";
+    if (Math.abs(dx) < 8 && shots.length > 1 && e.type === "pointerup"){ const r = c.getBoundingClientRect(); k = (k + (e.clientX - r.left > r.width / 2 ? 1 : shots.length - 1)) % shots.length; showShot(); } };
 }
 async function siftAct(a){
   if (!sift) return;
