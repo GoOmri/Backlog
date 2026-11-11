@@ -547,6 +547,9 @@ html,body{overflow-x:clip}
 .sift-top [data-s="close"]{font-size:18px;padding:4px 8px}
 .sift-card{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y;user-select:none;cursor:grab;transition:transform .18s ease-in,opacity .18s;animation:siftUp .28s ease-out}
 .sift-card.dragging{transition:none;cursor:grabbing}
+.sift-card{position:relative;border-radius:14px;overflow:hidden;padding:8px}
+.sift-bg{position:absolute;inset:-30px;background:center/cover no-repeat;filter:blur(28px) brightness(.45) saturate(1.2);transform:scale(1.1);z-index:0;pointer-events:none}
+.sift-card > :not(.sift-bg){position:relative;z-index:1}
 @keyframes siftUp{from{transform:translateY(48px);opacity:0}to{transform:none;opacity:1}}
 .sift-stack{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;justify-content:space-evenly}
 .sift-shot{position:relative;flex:0 1 auto;min-height:0;max-height:33%;aspect-ratio:16/9;width:100%;margin:0 auto;border-radius:10px;overflow:hidden;background:#000;display:grid;place-items:center}

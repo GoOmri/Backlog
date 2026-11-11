@@ -1091,6 +1091,7 @@ function siftShow(){
   const poster = coverHTML(it.g || {...it.x, platforms: [], status: "backlog"});
   el.innerHTML = `<div class="sift-top">${prev}<span class="dim">${where} · ${sift.deck.length - sift.i} left</span>${close}</div>
     <div id="siftCard" class="sift-card">
+      ${g.cover ? `<div class="sift-bg" style="background-image:url('${esc(g.cover)}')"></div>` : ""}
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
       <div class="sift-meta"><div class="sift-thumb">${poster}</div><div><b>${esc(g.title)}</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div><div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
