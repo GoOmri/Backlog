@@ -680,3 +680,9 @@ img.ok.now{transition:none}
 .gp-plats{display:flex;gap:4px;flex-wrap:wrap;min-height:20px}
 .gp-plats:empty{display:none}
 .gp-facts .strip span{white-space:nowrap}
+/* Game page score + bigger reading text */
+.score{font-weight:700;font-variant-numeric:tabular-nums}
+.score.good{color:#5fd38d}.score.mid{color:var(--gold)}.score.low{color:#ff6b6b}
+.gp-body .desc{font-size:16px}
+.gp-head .meta,.gp-facts .strip,.gp-facts .links,.gp-facts .ownline{font-size:15px}
+.gtags span{font-size:13px}
