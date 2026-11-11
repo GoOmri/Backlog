@@ -597,3 +597,8 @@ body::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none
 @keyframes glow{to{transform:translate(8%,-6%) rotate(25deg) scale(1.1)}}
 @media (prefers-reduced-motion:reduce){body::before{animation:none}}
 .ownline .tag.sifted{position:static;margin-left:8px;background:rgb(150 80 255 / .2);color:#c7a8ff;border:1px solid rgb(150 80 255 / .4)}
+/* Game page: reserve space for what arrives later (logo, slide dots, description) so the layout doesn't jump */
+.gp-logo{height:96px;max-height:96px}
+.gp-title{min-height:96px;display:flex;align-items:flex-end}
+.gp-main .mdots{min-height:8px}
+.desc.clamp:empty{min-height:4.8em}
