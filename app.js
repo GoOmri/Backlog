@@ -514,7 +514,7 @@ function homeBuild(){
   const pinnedN = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).length;
   const wishN = list().filter(g => g.status === "wishlist" && !g.hidden).length;
   return carouselHTML(top)
-    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
+    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">See all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
     + (s => ROWS.map(r => playRow(r, s)).join(""))(new Set())
     + `<div class="wrap">${radarHTML()}</div>`;
 }
@@ -569,10 +569,10 @@ function sidebarHTML(){
   const types = [...new Set([...Object.keys(typeCounts), ...F.type])].sort((a, b) => (typeCounts[b] || 0) - (typeCounts[a] || 0));
   const any = statF || platF.size || F.type.size || F.view.size || F.coop.size || F.access.size || deckF || sort !== "title";
   const SORTS = {title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played (Steam)"})};
-  const STL = {"": "", backlog: "Owned", done: "Finished", dropped: "Dropped", hidden: "Hidden"};
+  const STL = {"": "", backlog: "Owned", done: "Finished", dropped: "Dropped", hidden: "Not now"};
   return `<div class="fhead"><b>Filters</b>${any ? `<button class="linkbtn" data-f="reset|">Reset</button>` : ""}</div>`
-    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
-        .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join(""), STL[statF]))
+    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["hidden","Not now"]]
+        .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.notNow && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join(""), STL[statF]))
     + sec("Type", (typeAll ? types : types.slice(0, 5)).map(t => opt("type", t, t, typeCounts[t] || 0, F.type.has(t))).join("")
         + (types.length > 5 ? `<button class="linkbtn fmore" data-f="typemore|">${typeAll ? "Show less" : `Show ${types.length - 5} more`}</button>` : ""), [...F.type].join(", "))
     + sec("View", VIEWS.map(v => opt("view", v, v, count("view", g => basicTags(g).includes(v)), F.view.has(v))).join(""), [...F.view].join(", "))
@@ -589,7 +589,7 @@ function activeChips(){
 }
 function shelfHTML(wish){
   if (!games.size) return emptyHTML();
-  const scope = list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.hidden && !g.nope : !g.hidden));
+  const scope = list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.notNow : !g.hidden));
   shelfScope = scope; shelfWish = wish;
   const s = q.toLowerCase();
   const shown = scope.filter(g => passes(g) && (!s || g.title.toLowerCase().includes(s)));
@@ -810,7 +810,7 @@ function menuSheet(){
     <button data-act="steam">Import from Steam<small>Adds your Steam games with hours played</small></button>
     <button data-act="steamwish">Import Steam wishlist<small>Adds games from your Steam wishlist</small></button>
     <button data-act="import">Import a file<small>The export from the old Backlog</small></button>
-    <button data-act="nope">Not for me<small>Games you dismissed from suggestions</small></button>
+    <button data-act="nope">Not now: suggestions<small>Suggestions you turned down — they won't come back</small></button>
     <button data-act="unmatched">Unmatched games<small>${list().filter(g => g.noMatch).length} games couldn't be matched (often software, soundtracks, demos)</small></button>
     <button data-act="psplus">Update from PlayStation<small>Paste your PS Plus tab: bought, claimed, catalog, left</small></button>
     <button data-act="rematch">Re-check all matches<small>Fixes games matched to the wrong version</small></button>
@@ -832,7 +832,7 @@ function addSheet(){
   };
 }
 // Game page: media carousel on top, short facts, quick controls that save as you tap.
-// Not for me: owned games are hidden (Library → Hidden); suggestions are remembered so they never come back.
+// Not now: your games leave Play (still in the Library, filter "Not now"); suggestions are remembered so they never come back.
 let toastTimer;
 const saveErr = e => toast("Couldn't save: " + (e?.message || "offline?"));
 function toast(text, undo){
@@ -843,7 +843,7 @@ function toast(text, undo){
 }
 async function notForMe(g){
   if (g.id && games.has(g.id)){
-    await upd(g.id, {hidden: true}); toast(`${g.title} hidden`, () => upd(g.id, {hidden: false}));
+    upd(g.id, {notNow: true, sifted: true, hidden: false}).catch(saveErr); toast(`${g.title}: not now`, () => upd(g.id, {notNow: null}));
   } else {
     const nid = newId(); const {because, score, added, ...data} = g;
     await setDoc(doc(col, nid), {...data, asTyped: g.title, platforms: [], status: "wishlist", hidden: true, nope: true, added: Date.now()});
@@ -852,7 +852,7 @@ async function notForMe(g){
 }
 function nopeSheet(){
   const nope = list().filter(g => g.nope);
-  openSheet(`<h2>Not for me</h2>${nope.length ? `<div class="matches">${nope.map(g => `<div class="match">${g.cover ? `<img src="${esc(g.cover)}" alt="">` : "<span></span>"}<span><b>${esc(g.title)}</b> <button class="btn ghost small" data-unnope="${g.id}">Bring back</button></span></div>`).join("")}</div>` : `<p class="why">Nothing dismissed yet.</p>`}
+  openSheet(`<h2>Not now: suggestions</h2>${nope.length ? `<div class="matches">${nope.map(g => `<div class="match">${g.cover ? `<img src="${esc(g.cover)}" alt="">` : "<span></span>"}<span><b>${esc(g.title)}</b> <button class="btn ghost small" data-unnope="${g.id}">Bring back</button></span></div>`).join("")}</div>` : `<p class="why">Nothing dismissed yet.</p>`}
     <div class="actions"><button class="btn" data-act="close">Close</button></div>`);
   $("#sheet").querySelectorAll("[data-unnope]").forEach(b => b.onclick = async () => { await del(b.dataset.unnope); b.closest(".match").remove(); });
 }
@@ -889,7 +889,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Pin to Play carousel" aria-label="Pin">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not for me" aria-label="Not for me">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = toggleDesc;
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -1048,7 +1048,7 @@ async function editSheet(id){
     <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">${ic("star", 20, !!g.myRating)}${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
       <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">${ic("star", 26)}</button>`).join("")}</div></div>
     <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Up next" aria-label="Up next" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
-    <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? ic("undo") : ic("down")}</button>`;
+    <button class="ibtn" id="nopeBtn" title="${g.notNow ? "Back on Play" : "Not now"}" aria-label="${g.notNow ? "Back on Play" : "Not now"}">${g.notNow ? ic("undo") : ic("down")}</button>`;
   const facts = `
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
@@ -1108,7 +1108,7 @@ async function editSheet(id){
   };
   let pinned = !!g.upNext;
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
-  $("#nopeBtn").onclick = async () => { closeSheet(); if (g.hidden){ await upd(id, {hidden: false}); toast(`${g.title} is back`); } else notForMe(g); };
+  $("#nopeBtn").onclick = () => { closeSheet(); if (g.notNow){ upd(id, {notNow: null, hidden: false}).catch(saveErr); toast(`${g.title} is back on Play`); } else notForMe(g); };
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
   $("#desc").onclick = toggleDesc;
   let armed = false;
@@ -1372,7 +1372,7 @@ onAuthStateChanged(auth, user => {
   if (!API) progress(0, 0, "Covers and info will load once the Worker address is in config.js.", true);
   render();
   unsub = onSnapshot(col, snap => {
-    games = new Map(snap.docs.map(d => { const g = {id: d.id, ...d.data()}; if (g.status === "playing") g.status = "backlog"; return [d.id, g]; }));
+    games = new Map(snap.docs.map(d => { const g = {id: d.id, ...d.data()}; if (g.status === "playing") g.status = "backlog"; if (g.hidden && !g.nope){ g.notNow = true; g.hidden = false; } return [d.id, g]; }));
     $("#sync").textContent = navigator.onLine ? "" : "offline";
     const first = !loaded; loaded = true;
     if (first) render(); else if (snap.docChanges().length) softRender();
