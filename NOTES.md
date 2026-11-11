@@ -30,7 +30,8 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - No cron (wrangler `crons = []`). ITAD_KEY secret is unused and can be deleted in Cloudflare.
 
 ## Tabs (app.js)
-- **Play** `homeHTML()` — Up next carousel (pinned owned + wishlist, `upNextGames`) + Show all sheet + Wishlist link, then `ROWS` (2D platformers, 3D platformers, Couch co-op, Unique) via `playRow()`: your Owned/Wishlist games (not finished, dropped or pinned) mixed with `/finds` picks, sorted by `quality()`, top 10 + See all sheet (`rowCache`). Then `radarHTML()` (Coming soon PS5 / Steam, top 10). No Find tab (old `disc` tab id falls back to Play). Unique = Find picks only (owned games have no tags for it).
+- **Play** `homeHTML()` — Up next carousel (pinned owned + wishlist, `upNextGames`) + Show all sheet + Wishlist link, then `ROWS` (Metroidvanias, 2D platformers, 3D platformers, Couch co-op, Unique) via `playRow()`: your Owned/Wishlist games (not finished, dropped or pinned) mixed with `/finds` picks, sorted by `quality()`, top 10 + See all sheet (`rowCache`). Then `radarHTML()` (Coming soon PS5 / Steam, top 10). No Find tab (old `disc` tab id falls back to Play). Unique = Find picks only (owned games have no tags for it). A game shows in one row only (earlier rows win).
+- Backfill: `/info` also returns `avail` and, for Steam app ids, Steam review % (`steamPct`/`steamN`, via GetItems include_reviews) — owned games then rank by Steam % like finds. Couch finder (`/couch`) removed.
 - **Library** `shelfHTML()` with sidebar filters. **Stats** (`diaryHTML()`, tab id `diary`). **Wishlist** view = tab `wish`.
 - Game page: `pageShell` + `editSheet(id)` (owned/wishlist) or `previewSheet(x)` (not in list: pin, heart, 👎). Ownership line: green Owned + platform chips / red Not owned.
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers.
@@ -40,7 +41,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 
 ## Worker routes (worker.js)
 /match /search /game /info /grids /logos /steam /steamwish /upcoming /deck /couch /topmv /finds /steamtags /steamrev /achievements /achrarity /trophies /rarity
-- `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds13) — bump N when the output shape changes.
+- `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds14) — bump N when the output shape changes.
 - KV is only for shared lists (finds, upcoming, psplus, topmv, trophies, tokens). No per-game KV caching (free tier = 1,000 writes/day); the client caches per-game data (localStorage gd5:/rev:, Firestore hero/logo). No hover prefetch.
 - IGDB text `search` is broken; use name lookups (`name ~ "x"`).
 

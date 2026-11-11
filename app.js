@@ -212,12 +212,12 @@ async function mergeEditions(){
 }
 async function backfill(){
   await mergeEditions();
-  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined || g.kw === undefined));
+  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined || g.kw === undefined || g.avail === undefined));
   for (let i = 0; i < need.length; i += 200){
     const chunk = need.slice(i, i + 200);
     progress(i, need.length, "Adding game details");
-    const res = await api("/info", {ids: chunk.map(g => g.igdbId)});
-    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: g.couchSet ? !!g.couch : !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop, kw: res[g.igdbId]?.kw || []})));
+    const res = await api("/info", {ids: chunk.map(g => g.igdbId), apps: chunk.map(g => +g.steamAppId).filter(Boolean)}), st = res.steam || {};
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: g.couchSet ? !!g.couch : !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop, kw: res[g.igdbId]?.kw || [], avail: res[g.igdbId]?.avail || [], ...(st[g.steamAppId] ? {steamPct: st[g.steamAppId].pct, steamN: st[g.steamAppId].n} : {})})));
   }
   const odd = list().filter(g => g.igdbId && g.asTyped && !g.rechecked && key(g.title) !== key(g.asTyped));
   for (const [i, g] of odd.entries()){
@@ -462,6 +462,7 @@ const plat = g => (g.genres || []).includes("Platform");
 // Play = Up next carousel, then rows. Each row mixes your games (owned or wishlist; not finished, dropped or pinned)
 // with Find picks from /finds, sorted purely by quality. To split back into Play + Find, give each tab its own part of ROWS.
 const ROWS = [
+  ["Metroidvanias", "mv", g => kwOf(g).includes("Metroidvania")],
   ["2D platformers", "plat2d", g => plat(g) && has(g, "2D")],
   ["3D platformers", "plat3d", g => plat(g) && has(g, "3D")],
   ["Couch co-op", "coop", g => g.couch],
@@ -471,14 +472,16 @@ const ROWS = [
 const quality = x => x.score ?? (x.steamPct != null ? (x.steamPct * (x.steamN || 0) + 80 * 300) / ((x.steamN || 0) + 300)
   : x.rating ? (x.rating * (x.ratingCount || 0) + 75 * 20) / ((x.ratingCount || 0) + 20) : 70);
 let rowCache = {};
-function rowItems(key, test){
-  const mine = list().filter(g => playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
-  const found = ((topMV || {})[key] || []).filter(x => !inList(x)).map(x => ({x, q: quality(x)}));
-  return [...mine, ...found].sort((a, b) => b.q - a.q);
+function rowItems(key, test, seen){
+  const mine = list().filter(g => !seen.has(g.igdbId || g.id) && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
+  const found = ((topMV || {})[key] || []).filter(x => !seen.has(x.igdbId) && !inList(x)).map(x => ({x, q: quality(x)}));
+  const all = [...mine, ...found].sort((a, b) => b.q - a.q);
+  all.forEach(i => seen.add(i.g ? i.g.igdbId || i.g.id : i.x.igdbId));
+  return all;
 }
 const itemCard = i => i.g ? cardHTML(i.g) : suggestCard(i.x, i.x.year || "");
-function playRow([title, key, test]){
-  const items = rowCache[key] = rowItems(key, test);
+function playRow([title, key, test], seen){
+  const items = rowCache[key] = rowItems(key, test, seen);
   if (!items.length) return "";
   const more = items.length > 10 ? `<button class="linkbtn" data-act="seeall" data-row="${key}" style="margin-left:auto">See all</button>` : "";
   return `<section class="section wrap"><div class="row-head"><h3>${title}</h3>${more}</div><div class="row">${items.slice(0, 10).map(itemCard).join("")}</div></section>`;
@@ -492,7 +495,7 @@ function homeHTML(){
   const wishN = list().filter(g => g.status === "wishlist" && !g.hidden).length;
   return carouselHTML(top)
     + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
-    + ROWS.map(playRow).join("")
+    + (s => ROWS.map(r => playRow(r, s)).join(""))(new Set())
     + `<div class="wrap">${radarHTML()}</div>`;
 }
 function topTags(gs){
@@ -605,21 +608,6 @@ function suggestCard(x, sub){
   return `<div class="card sugg"><button class="card" data-preview="${x.igdbId}">${coverHTML({...x, platforms: [], status: "backlog"})}<span class="ctitle">${esc(x.title)}</span>${sub ? `<span class="csub"><span class="oneline">${esc(sub)}</span></span>` : ""}</button>
     <button class="heartbtn ${on ? "on-heart" : ""}" data-heart="${x.igdbId}" aria-label="${on ? "Remove from wishlist" : "Add to wishlist"}">${ic(on ? "heartf" : "heart", 18)}</button></div>`;
 }
-let couchFinds = null;
-async function loadCouch(){
-  try { couchFinds = await api("/couch?kind=platformer"); } catch (e){ couchFinds = {error: e.message}; }
-  if (tab === "disc") render();
-}
-function couchHTML(){
-  if (couchFinds === null){ loadCouch(); return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">Looking…</span></div>`; }
-  if (couchFinds.error) return `<div class="section"><h3>Couch co-op 2D platformers</h3><span class="why">${esc(couchFinds.error)}</span></div>`;
-  const have = new Set(list().map(g => g.igdbId));
-  [...(couchFinds.fresh || []), ...(couchFinds.best || [])].forEach(x => previewCache.set(x.igdbId, x));
-  const card = d => suggestCard(d, d.year || "");
-  const row = (t, sub, xs) => { xs = xs.filter(d => !inList(d)); return xs.length ? `<div class="section"><div class="row-head"><h3>${t}</h3><span class="dim">${sub}</span></div><div class="row">${xs.map(card).join("")}</div></div>` : ""; };
-  return row("New couch co-op 2D platformers", "released in the last 18 months", couchFinds.fresh) + row("Best couch co-op 2D platformers", "you don't own yet", couchFinds.best);
-}
-let radar = null;
 const radarItem = id => [...(radar?.soonPs5 || []), ...(radar?.soonPc || []), ...(radar?.recent || [])].find(x => x.igdbId === id);
 function radarHTML(){
   if (radar === null) radar = swr("c:upcoming", () => api("/upcoming"), r => radar = r, e => radar = {error: e.message}) || {};
@@ -1096,11 +1084,6 @@ document.addEventListener("click", async e => {
     el.scrollTo({left: Math.max(0, i) * el.clientWidth, behavior: "smooth"});
   }
   else if (d.finish){ await upd(d.finish, {status: "done", finishedAt: Date.now(), touched: Date.now()}); editSheet(d.finish); }
-  else if (d.cwish){
-    const it = [...(couchFinds.fresh || []), ...(couchFinds.best || [])].find(x => x.igdbId === +d.cwish); t.disabled = true;
-    await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()});
-    it.added = true; render();
-  }
   else if (d.rwish){ const it = radarItem(+d.rwish); t.disabled = true; t.textContent = "On wishlist";
     await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()}); }
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
