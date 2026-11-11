@@ -1145,7 +1145,7 @@ function siftShow(){
   c.onpointerup = c.onpointercancel = e => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
     if (Math.abs(dx) > 90) return siftAct(dx > 0 ? "keep" : "nope");
     c.style.transform = ""; hint(0);
-    if (Math.abs(dx) < 8 && e.type === "pointerup"){ if (downOn === "trailer") sift.play(); else if (downOn === "shots" && shots.length > per()){ k = (k + per()) % shots.length; showShots(); } } };
+    if (Math.abs(dx) < 8 && e.type === "pointerup"){ if (downOn === "trailer") sift.play(); else if (downOn === "shots" && shots.length > per()){ const r = c.getBoundingClientRect(), n = Math.ceil(shots.length / per()), back = e.clientX < r.left + r.width / 2; k = ((k / per() + (back ? n - 1 : 1)) % n) * per(); showShots(); } } };
 }
 async function siftAct(a){
   if (!sift) return;
