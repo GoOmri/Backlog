@@ -41,7 +41,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 
 ## Worker routes (worker.js)
 /match /search /game /info /grids /logos /steam /steamwish /upcoming /deck /couch /topmv /finds /steamtags /steamrev /achievements /achrarity /trophies /rarity
-- `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds12) — bump N when the output shape changes.
+- `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds13) — bump N when the output shape changes.
 - KV is only for shared lists (finds, upcoming, psplus, topmv, trophies, tokens). No per-game KV caching (free tier = 1,000 writes/day); the client caches per-game data (localStorage gd5:/rev:, Firestore hero/logo). No hover prefetch.
 - IGDB text `search` is broken; use name lookups (`name ~ "x"`).
 
@@ -60,7 +60,7 @@ Decided: one Play tab (Find merged in), mixed purely by quality, Library = stora
 0. ✅ Mission in NOTES.
 1. ✅ Chop: prices + ITAD (/prices, sale badges/row, price check), Leaving PS Plus (/psplus, cron, tags), "Because you liked…" (/discover), Playing status; Diary tab renamed Stats.
 2. ✅ Up next = Play carousel of pinned games (owned + wishlist), "Show all" opens a sheet. No limit.
-3. Worker /finds: only 2D platformers, 3D platformers, couch co-op, unique (gems + Experimental/Surreal/Artistic tags) + coming soon. Add IGDB platforms for "available on".
+3. ✅ Worker /finds (finds13): only 2D platformers, 3D platformers, couch co-op, unique (gems + Experimental/Surreal/Artistic tags) + coming soon (still /upcoming). `quality()` = Steam % pulled to 80 + critics ±3, IGDB fallback. Hard no's in top tags: Sports, F2P, MMO, Visual Novel. `slim()` now has `avail` (ps5/ps4/pc/switch/xbox). Find shows the 4 rows, top 10 each (See all comes in step 4).
 4. One Play tab: Up next carousel, then rows 2D platformers / 3D platformers / Couch co-op / Unique / Coming soon — top 10 + See all, owned + found mixed by quality. Rows defined as one list so splitting back into Play + Find is a small change.
    Quality: Steam % (pulled toward average when few reviews) + small critics bonus; IGDB rating as fallback for PS-only. Owned games: Steam % only if already stored, no new lookups. Genre for owned games: IGDB genre + perspective (no Steam tag backfill). Rows skip Finished/Dropped.
 5. Platform badges: owned (filled) vs available (outlined), Steam Deck next to Steam.
