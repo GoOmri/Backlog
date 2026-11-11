@@ -30,8 +30,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - No cron (wrangler `crons = []`). ITAD_KEY secret is unused and can be deleted in Cloudflare.
 
 ## Tabs (app.js)
-- **Play** `homeHTML()` — owned games only. Carousel = Up next (pinned owned + wishlist, `upNextGames`) + Show all sheet, then rows: MV's you own, 2D platformers, Couch co-op platformers, Puzzle-platformers, 3D games for you.
-- **Find** `discoverHTML()` → `findExtrasHTML()` (Your wishlist with a See all link, then rows from `/finds`: Metroidvanias you haven't played (top rated + not owned), 2D platformers, Hidden gems, Puzzle co-op, Couch co-op platformers, Narrative, Mystery, Cozy, Zelda-likes, You missed these, Classics), then `radarHTML()` (Coming soon on PS5 / Steam).
+- **Play** `homeHTML()` — Up next carousel (pinned owned + wishlist, `upNextGames`) + Show all sheet + Wishlist link, then `ROWS` (2D platformers, 3D platformers, Couch co-op, Unique) via `playRow()`: your Owned/Wishlist games (not finished, dropped or pinned) mixed with `/finds` picks, sorted by `quality()`, top 10 + See all sheet (`rowCache`). Then `radarHTML()` (Coming soon PS5 / Steam, top 10). No Find tab (old `disc` tab id falls back to Play). Unique = Find picks only (owned games have no tags for it).
 - **Library** `shelfHTML()` with sidebar filters. **Stats** (`diaryHTML()`, tab id `diary`). **Wishlist** view = tab `wish`.
 - Game page: `pageShell` + `editSheet(id)` (owned/wishlist) or `previewSheet(x)` (not in list: pin, heart, 👎). Ownership line: green Owned + platform chips / red Not owned.
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers.
@@ -61,7 +60,7 @@ Decided: one Play tab (Find merged in), mixed purely by quality, Library = stora
 1. ✅ Chop: prices + ITAD (/prices, sale badges/row, price check), Leaving PS Plus (/psplus, cron, tags), "Because you liked…" (/discover), Playing status; Diary tab renamed Stats.
 2. ✅ Up next = Play carousel of pinned games (owned + wishlist), "Show all" opens a sheet. No limit.
 3. ✅ Worker /finds (finds13): only 2D platformers, 3D platformers, couch co-op, unique (gems + Experimental/Surreal/Artistic tags) + coming soon (still /upcoming). `quality()` = Steam % pulled to 80 + critics ±3, IGDB fallback. Hard no's in top tags: Sports, F2P, MMO, Visual Novel. `slim()` now has `avail` (ps5/ps4/pc/switch/xbox). Find shows the 4 rows, top 10 each (See all comes in step 4).
-4. One Play tab: Up next carousel, then rows 2D platformers / 3D platformers / Couch co-op / Unique / Coming soon — top 10 + See all, owned + found mixed by quality. Rows defined as one list so splitting back into Play + Find is a small change.
+4. ✅ One Play tab: Up next carousel, then rows 2D platformers / 3D platformers / Couch co-op / Unique / Coming soon — top 10 + See all, owned + found mixed by quality. Rows defined as one list so splitting back into Play + Find is a small change.
    Quality: Steam % (pulled toward average when few reviews) + small critics bonus; IGDB rating as fallback for PS-only. Owned games: Steam % only if already stored, no new lookups. Genre for owned games: IGDB genre + perspective (no Steam tag backfill). Rows skip Finished/Dropped.
 5. Platform badges: owned (filled) vs available (outlined), Steam Deck next to Steam.
 Old "curation rebuild" (taste score with many penalties) dropped: rules kept breaking on exceptions; quality decides.
