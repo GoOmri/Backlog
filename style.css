@@ -699,3 +699,19 @@ img.ok.now{transition:none}
 .ibtn,.sift-round{background:rgb(14 17 22 / .35);border:2px solid rgb(255 255 255 / .28)}
 .sift-round{border-color:currentColor}
 .ibtn.on{border-color:var(--accent);color:var(--accent)}
+/* ---------- Splash: the couch scene, pixels kept sharp, centred on the two of you ---------- */
+#splash{position:fixed;inset:0;z-index:2000;background:#0E1116;overflow:hidden;transition:opacity .45s var(--e-out)}
+#splash.gone{opacity:0;pointer-events:none}
+#splash img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:41% 60%;image-rendering:pixelated}
+#splash::after{content:"";position:absolute;left:0;right:0;bottom:0;height:22%;background:linear-gradient(to top,#0E1116,transparent)}
+.splash-title{position:absolute;left:0;right:0;top:45%;transform:translateY(-50%);display:grid;place-items:center;font:400 clamp(22px,7.6vw,40px)/1 "Press Start 2P",monospace;letter-spacing:.02em;z-index:1}
+.splash-title span{grid-area:1/1;white-space:nowrap}
+.t-back{color:#FFECDC;-webkit-text-stroke:.28em #FFECDC;paint-order:stroke fill;
+  filter:drop-shadow(1px 1px 0 #0C0920) drop-shadow(1px 1px 0 #0C0920) drop-shadow(1px 1px 0 #0C0920) drop-shadow(1px 1px 0 #0C0920) drop-shadow(1px 1px 0 #0C0920) drop-shadow(0 0 14px rgb(12 9 32 / .85))}
+.t-front{background:linear-gradient(#A78BFA 15%,#161C5C 95%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.splash-load{position:absolute;left:0;right:0;bottom:max(48px,env(safe-area-inset-bottom));display:grid;justify-items:center;gap:12px;color:#BEC4CE;font-size:15px;z-index:1}
+.splash-load i{width:120px;height:4px;border-radius:999px;background:rgb(255 255 255 / .2);overflow:hidden;position:relative}
+.splash-load i::after{content:"";position:absolute;inset:0;width:40%;border-radius:999px;background:var(--accent);animation:splashbar 1.1s ease-in-out infinite}
+@keyframes splashbar{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+/* Header name in the same pixel font */
+.brand-name{font:400 13px/1 "Press Start 2P",monospace;letter-spacing:.02em;background:linear-gradient(#C4B2FF,#A78BFA);-webkit-background-clip:text;background-clip:text;color:transparent}

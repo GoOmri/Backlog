@@ -1,4 +1,4 @@
-# Backlog — notes for Claude
+# Game Night (repo: Backlog) — notes for Claude
 
 ## Mission (read first)
 A short list of the best games I want to play next, owned or not, so picking the next one is easy.
@@ -85,3 +85,7 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - Motion tokens in style.css (`--d-fast/--d/--d-slow`, `--e-out/--e-in/--e-bounce`); buttons have a bouncy press.
 - Art: shimmer placeholder, fades in on load (`img.ok`); already-loaded art shows instantly (`.now`). Coming soon shows skeleton cards while loading.
 - No vibration, no undo toasts (Omri's choice).
+
+## Name, icon, splash (2026-11-11)
+- App name **Game Night** (header, tab title, manifest). Repo/URL still Backlog.
+- Icon = Omri's pixel couch scene cropped on the cat's head (icon-192/512.png). Splash = splash.jpg (left part of the same scene), `#splash` in index.html, pixel font Press Start 2P; title = two stacked spans (`.t-back` cream stroke + dark extrusion, `.t-front` purple→navy gradient). `hideSplash()` after first load (min ~0.9s, max 6s).
