@@ -585,3 +585,4 @@ html,body{overflow-x:clip}
 .sift-stack .sift-shot{flex:1 1 0;aspect-ratio:auto;max-height:none}
 .sift-stack .sift-shot:only-child{flex:0 1 auto;aspect-ratio:16/9}
 .sift-stack .sift-shot.poster{flex:0 1 auto;max-height:45%}
+.sift-shot.vwrap #vtitle{display:none}
