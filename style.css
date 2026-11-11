@@ -715,3 +715,6 @@ img.ok.now{transition:none}
 @keyframes splashbar{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
 /* Header name in the same pixel font */
 .brand-name{font:400 13px/1 "Press Start 2P",monospace;letter-spacing:.02em;background:linear-gradient(#C4B2FF,#A78BFA);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* Splash title fix: the back layer has a filter, which paints it above a plain sibling, so lift the gradient layer; thinner outline so the pixel letters stay open */
+.t-front{position:relative;z-index:1}
+.t-back{-webkit-text-stroke-width:.2em}
