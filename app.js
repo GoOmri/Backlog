@@ -887,7 +887,7 @@ async function mountTrailer(id){
   await loadYT(); if (!$("#ytp")) return;
   const flash = t => { const f = $("#vflash"); if (!f) return; f.textContent = t; f.classList.remove("show"); void f.offsetWidth; f.classList.add("show"); };
   const pl = new YT.Player("ytp", {videoId: id, playerVars: {autoplay: 1, mute: 1, start: 5, controls: 0, cc_load_policy: 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3, fs: 0},
-    events: {onStateChange: e => { $("#vctl")?.classList.toggle("paused", e.data === 2); if (e.data === 1) setTimeout(() => e.target.getIframe?.()?.classList.add("live"), 2500); }, onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($("#vtitle")) $("#vtitle").textContent = t || ""; }}});
+    events: {onStateChange: e => $("#vctl")?.classList.toggle("paused", e.data === 2), onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($("#vtitle")) $("#vtitle").textContent = t || ""; }}});
   clearInterval(vTimer);
   vTimer = setInterval(() => { const f = $("#vfill"); if (!f || !pl.getDuration || isScrubbing()) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
   const ctl = $("#vctl");
