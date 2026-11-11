@@ -56,7 +56,7 @@ Loves: metroidvanias, 2D/puzzle/precision platformers (Hollow Knight, Ori, Celes
 Skip: style.css cleanup, bundling/minifying.
 
 ## Sift (`openSift()`)
-Swipe mode, opened from the Up next bar on Play. Deck: wishlist → owned not yet sifted → finds from the Play rows (`rowCache`). Right/Keep = `sifted: true` (a find goes to the wishlist). Left/Not now = `notNow: true` (off Play rows + carousel, still in Library; a find is hidden as `nope`). Up next = pin. Card = gameplay screenshots from `gameDetails()` (medium size; tap left/right half to step) + ▶ gameplay trailer (muted YouTube), poster as a small thumbnail; next card prefetched. Previous undoes any step this session (stack in `sift.done`); batches of 20; closing resets.
+Swipe mode, opened from the Up next bar on Play. Deck: wishlist → owned not yet sifted → finds from the Play rows (`rowCache`). Right/Keep = `sifted: true` (a find goes to the wishlist). Left/Not now = `notNow: true` (off Play rows + carousel, still in Library; a find is hidden as `nope`). Up next = pin. Layout (full height): top bar (Previous · source · left · close), 3 stacked gameplay screenshots from `gameDetails()` (medium size; tap the stack for the next 3) with ▶ gameplay trailer on the top one, info row (poster thumb, meta, badges), round ✕ / pin / ✓ buttons at the bottom. Cards enter from the bottom, fly out left/right. Failed details show the poster + Retry. Previous undoes any step this session (stack in `sift.done`); batches of 20; closing resets.
 
 ## Plan: simplify (2026-11-11)
 Decided: one Play tab (Find merged in), mixed purely by quality, Library = storage, Stats tab. Statuses: Wishlist / Owned / Finished / Dropped (Playing removed; stored "playing" reads as Owned).

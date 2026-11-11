@@ -540,20 +540,32 @@ html,body{overflow-x:clip}
 /* Available-on badges: outlined, for platforms you don't own the game on */
 .plat.avail{background:rgba(14,17,22,.6);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
 
-/* Sift */
-.sift{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0 20px;text-align:center}
-.sift-card{position:relative;width:min(94vw,560px);touch-action:pan-y;user-select:none;cursor:grab;transition:transform .2s}
+/* Sift: full height. Top bar, stacked gameplay (fills the free height), info row, round buttons fixed at the bottom. Cards enter from the bottom. */
+.sift{display:flex;flex-direction:column;gap:10px;height:calc(100dvh - 72px);min-height:420px}
+.sift-top{display:flex;align-items:center;gap:8px}
+.sift-top > span{margin:0 auto;font-size:14px}
+.sift-top [data-s="close"]{font-size:18px;padding:4px 8px}
+.sift-card{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;touch-action:pan-y;user-select:none;cursor:grab;transition:transform .18s ease-in,opacity .18s;animation:siftUp .28s ease-out}
 .sift-card.dragging{transition:none;cursor:grabbing}
-.sift-media{aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;display:grid;place-items:center}
-.sift-media img,.sift-media iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
-.sift-media img{pointer-events:none}
-.sift-media.poster .cover{height:100%;width:auto;aspect-ratio:3/4}
-.sift-dots{position:absolute;top:8px;left:0;right:0;display:flex;gap:4px;justify-content:center;pointer-events:none}
-.sift-dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.45)}
+@keyframes siftUp{from{transform:translateY(48px);opacity:0}to{transform:none;opacity:1}}
+.sift-stack{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;justify-content:space-evenly}
+.sift-shot{position:relative;flex:0 1 auto;min-height:0;max-height:33%;aspect-ratio:16/9;width:100%;margin:0 auto;border-radius:10px;overflow:hidden;background:#000;display:grid;place-items:center}
+.sift-shot img,.sift-shot iframe{width:100%;height:100%;object-fit:cover;border:0;display:block;pointer-events:none}
+.sift-shot iframe{pointer-events:auto}
+.sift-shot.poster{max-height:100%;aspect-ratio:auto;background:none}
+.sift-shot.poster .cover{height:100%;width:auto;aspect-ratio:3/4}
+.sift-play{position:absolute;right:8px;bottom:8px;width:44px;height:44px;border-radius:22px;background:rgba(0,0,0,.65);color:#fff;font-size:17px}
+.sift-dots{display:flex;gap:4px;justify-content:center;min-height:6px}
+.sift-dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.3)}
 .sift-dots i.on{background:#fff}
-.sift-play{position:absolute;right:10px;bottom:10px;width:46px;height:46px;border-radius:23px;background:rgba(0,0,0,.65);color:#fff;font-size:18px}
-.sift-meta{display:flex;gap:12px;align-items:center;text-align:left;width:min(94vw,560px)}
-.sift-thumb{width:52px;flex:none}
+.sift-meta{display:flex;gap:12px;align-items:center;text-align:left}
+.sift-thumb{width:44px;flex:none}
 .sift-thumb .badges,.sift-thumb .tag{display:none}
 .sift-plats{display:flex;gap:3px;margin-top:4px}
-.sift-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.sift-btns{display:flex;justify-content:space-around;align-items:center;padding:0 12px}
+.sift-round{width:60px;height:60px;border-radius:30px;border:1px solid rgba(255,255,255,.25);font-size:24px;display:grid;place-items:center}
+.sift-round.pin{width:48px;height:48px}
+.sift-round.no{color:#ff6b6b}.sift-round.yes{color:#5fd38d}
+.sift-labels{display:flex;justify-content:space-around;padding:0 12px;font-size:12px;opacity:.7;margin-top:-4px}
+.sift-labels span{width:60px;text-align:center}
+.sift-end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
