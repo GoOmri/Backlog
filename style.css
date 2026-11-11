@@ -647,3 +647,7 @@ details.fsec:not([open]) > summary::after{transform:rotate(-45deg);margin-bottom
 :root{interpolate-size:allow-keywords}
 details.fsec::details-content{block-size:0;overflow:hidden;opacity:0;transition:block-size .25s ease,opacity .2s,content-visibility .25s allow-discrete}
 details.fsec[open]::details-content{block-size:auto;opacity:1}
+/* Selected filters: one style everywhere — the app's purple, dark text (like + and Done) */
+.chip.on,.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#0E1116}
+.fopt[aria-pressed="true"]{background:rgb(167 139 250 / .16);color:var(--accent)}
+.fopt[aria-pressed="true"] .n{color:var(--accent)}
