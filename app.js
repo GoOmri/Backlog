@@ -420,7 +420,7 @@ const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
   const pinned = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
   const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
-  const rest = pool.filter(g => !g.upNext).sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  const rest = pool.filter(g => !g.upNext && !g.notNow).sort((a, b) => (b.rating || 0) - (a.rating || 0));
   // The carousel is the shortlist. Suggestions only fill it while nothing is pinned.
   return pinned.length ? pinned : rest.slice(0, 5);
 }
@@ -473,7 +473,7 @@ const quality = x => x.score ?? (x.steamPct != null ? (x.steamPct * (x.steamN ||
   : x.rating ? (x.rating * (x.ratingCount || 0) + 75 * 20) / ((x.ratingCount || 0) + 20) : 70);
 let rowCache = {};
 function rowItems(key, test, seen){
-  const mine = list().filter(g => !seen.has(g.igdbId || g.id) && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
+  const mine = list().filter(g => !seen.has(g.igdbId || g.id) && !g.notNow && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
   const found = ((topMV || {})[key] || []).filter(x => !seen.has(x.igdbId) && !inList(x)).map(x => ({x, q: quality(x)}));
   const all = [...mine, ...found].sort((a, b) => b.q - a.q);
   all.forEach(i => seen.add(i.g ? i.g.igdbId || i.g.id : i.x.igdbId));
@@ -494,7 +494,7 @@ function homeHTML(){
   const pinnedN = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).length;
   const wishN = list().filter(g => g.status === "wishlist" && !g.hidden).length;
   return carouselHTML(top)
-    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
+    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}<button class="linkbtn" data-act="sift">Sift</button>${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
     + (s => ROWS.map(r => playRow(r, s)).join(""))(new Set())
     + `<div class="wrap">${radarHTML()}</div>`;
 }
@@ -1059,6 +1059,61 @@ async function editSheet(id){
 }
 
 /* ---------- events ---------- */
+/* ---------- Sift: one card at a time. Right = keep, left = not now (off Play, stays in Library), Up next = pin. ---------- */
+// Deck: wishlist, then owned games not sifted yet, then finds from the Play rows. Previous walks back through this session.
+let sift = null;
+function openSift(){
+  const mine = st => list().filter(g => g.status === st && !g.sifted && !g.notNow && !g.hidden && !g.upNext && playable(g)).map(g => ({g}));
+  const finds = []; const ids = new Set(list().map(g => g.igdbId));
+  for (const items of Object.values(rowCache)) for (const i of items) if (i.x && !ids.has(i.x.igdbId)){ ids.add(i.x.igdbId); finds.push({x: i.x}); }
+  sift = {deck: [...mine("wishlist"), ...mine("backlog"), ...finds], i: 0, done: [], batch: 0};
+  openSheet(`<div id="sift" class="sift"></div>`, "full");
+  $("#dlg").addEventListener("close", () => { sift = null; render(); }, {once: true});
+  $("#sift").onclick = e => { const b = e.target.closest("[data-s]"); if (b) siftAct(b.dataset.s); };
+  siftShow();
+}
+function siftShow(){
+  const el = $("#sift"); if (!el || !sift) return;
+  const it = sift.deck[sift.i], prev = sift.done.length ? `<button class="chip" data-s="prev">← Previous</button>` : "";
+  if (!it || sift.batch >= 20){
+    el.innerHTML = `<h2>${it ? "Done for now" : "All sifted"}</h2><p class="dim">${sift.done.length} games sorted this time.</p><div class="sift-btns">${prev}${it ? `<button class="chip" data-s="more">Continue</button>` : ""}<button class="chip" data-s="close">Close</button></div>`;
+    return;
+  }
+  const g = it.g || it.x, q = g.steamPct != null ? `${g.steamPct}% on Steam` : g.rating ? `Rated ${Math.round(g.rating)}` : "";
+  const where = it.g ? (it.g.status === "wishlist" ? "Wishlist" : "Owned") : "New find";
+  el.innerHTML = `<div class="dim">${where} · ${sift.deck.length - sift.i} left</div>
+    <div id="siftCard" class="sift-card">${coverHTML(it.g || {...it.x, platforms: [], status: "backlog"})}</div>
+    <div class="sift-meta"><b>${esc(g.title)}</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div></div>
+    <div class="sift-btns">${prev}<button class="chip" data-s="nope">✕ Not now</button><button class="chip" data-s="next">Up next</button><button class="chip" data-s="keep">Keep ✓</button></div>`;
+  const c = $("#siftCard"); let x0 = null, dx = 0;
+  c.onpointerdown = e => { x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
+  c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`; };
+  c.onpointerup = c.onpointercancel = () => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
+    if (Math.abs(dx) > 90) siftAct(dx > 0 ? "keep" : "nope"); else c.style.transform = ""; };
+}
+async function siftAct(a){
+  if (!sift) return;
+  if (a === "close") return closeSheet();
+  if (a === "more"){ sift.batch = 0; return siftShow(); }
+  if (a === "prev"){
+    const last = sift.done.pop(); if (!last) return;
+    if (last.newId) await del(last.newId); else await upd(last.id, last.before);
+    sift.i--; sift.batch = Math.max(0, sift.batch - 1); return siftShow();
+  }
+  const it = sift.deck[sift.i]; if (!it) return;
+  if (it.g){
+    const g = it.g, before = {sifted: g.sifted ?? null, notNow: g.notNow ?? null, upNext: g.upNext ?? null};
+    const after = a === "keep" ? {sifted: true} : a === "nope" ? {sifted: true, notNow: true} : {sifted: true, notNow: null, upNext: g.upNext || Date.now()};
+    await upd(g.id, after); sift.done.push({id: g.id, before});
+  } else {
+    const {because, score, added, date, gem, taste, appid, price, ...data} = it.x, nid = newId();
+    await setDoc(doc(col, nid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: it.x.title, platforms: [], status: "wishlist", added: Date.now(), sifted: true,
+      ...(a === "nope" ? {hidden: true, nope: true} : a === "next" ? {upNext: Date.now()} : {})});
+    sift.done.push({newId: nid});
+  }
+  sift.i++; sift.batch++; siftShow();
+}
+
 document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
@@ -1089,6 +1144,7 @@ document.addEventListener("click", async e => {
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else switch (d.act){
     case "seeall": { const r = ROWS.find(x => x[1] === t.dataset.row); openSheet(`<h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div>`, "full"); break; }
+    case "sift": openSift(); break;
     case "upnext": openSheet(`<h2>Up next</h2><div class="grid">${upNextGames().map(g => cardHTML(g)).join("")}</div>`, "full"); break;
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
