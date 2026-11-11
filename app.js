@@ -1191,7 +1191,7 @@ document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
   if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
-  if (d.tab){ const ch = tab !== d.tab; tab = d.tab; q = ""; loadFilters(); render(); scrollTo(0, 0); if (ch) anim($("#main"), "tabin"); }
+  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tab = d.tab; q = ""; loadFilters(); render(); scrollTo(0, 0); if (ch){ $("#main").classList.remove("tabinr", "tabinl"); anim($("#main"), dir); } }
   else if (d.f != null){ const k = d.f.indexOf("|"); toggleFilter(d.f.slice(0, k), d.f.slice(k + 1)); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
