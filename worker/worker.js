@@ -30,6 +30,7 @@ export default {
         case "/topmv":    out = await topMetroidvanias(env); break;
         case "/finds":    out = await finds(env); break;
         case "/steamtags": out = await steamTags(env, (body.apps || []).filter(Number.isFinite).slice(0, 100)); break;
+        case "/toptags":  out = await topTags(env, +url.searchParams.get("appid")); break;
         case "/achievements": out = await achievements(env, +url.searchParams.get("appid")); break;
         case "/trophies": out = await trophies(env); break;
         case "/rarity":   out = await rarity(env, url.searchParams.get("np") || "", url.searchParams.get("svc") || "trophy"); break;
@@ -222,6 +223,13 @@ async function topMetroidvanias(env){
 
 /* ---------- Find rows: Steam tag searches, quality bar, ranked by Omri's taste ---------- */
 // Steam's full tag list (id <-> name), cached for a month.
+// A game's top 5 Steam player tags, in Steam's order (for the game page).
+async function topTags(env, appid){
+  if (!appid) return [];
+  const names = new Map((await tagList(env)).map(t => [t.tagid, t.name]));
+  const [it] = await getItems([appid], {include_tag_count: 8});
+  return (it?.tags || []).map(t => names.get(t.tagid)).filter(Boolean).slice(0, 5);
+}
 async function tagList(env){
   let all = await env.KV.get("steamtagall", "json");
   if (!all){ all = await (await fetch("https://store.steampowered.com/tagdata/populartags/english")).json(); await env.KV.put("steamtagall", JSON.stringify(all), {expirationTtl: 30 * 86400}); }
