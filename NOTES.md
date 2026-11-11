@@ -55,6 +55,9 @@ Loves: metroidvanias, 2D/puzzle/precision platformers (Hollow Knight, Ori, Celes
 4. ✅ DONE (`heroSrc()` swaps to t_720p under 1000px, carousel + game page). Play carousel hero images: IGDB t_1080p → t_720p on phones.
 Skip: style.css cleanup, bundling/minifying.
 
+## Sift (`openSift()`)
+Swipe mode, opened from the Up next bar on Play. Deck: wishlist → owned not yet sifted → finds from the Play rows (`rowCache`). Right/Keep = `sifted: true` (a find goes to the wishlist). Left/Not now = `notNow: true` (off Play rows + carousel, still in Library; a find is hidden as `nope`). Up next = pin. Previous undoes any step this session (stack in `sift.done`); batches of 20; closing resets.
+
 ## Plan: simplify (2026-11-11)
 Decided: one Play tab (Find merged in), mixed purely by quality, Library = storage, Stats tab. Statuses: Wishlist / Owned / Finished / Dropped (Playing removed; stored "playing" reads as Owned).
 0. ✅ Mission in NOTES.
