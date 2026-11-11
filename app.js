@@ -767,7 +767,7 @@ function movePill(){
 addEventListener("resize", () => { const p = $("#tabs .tab-pill"); if (p){ p.classList.add("now"); movePill(); } });
 // Fade covers in the first time an image arrives (cached re-renders stay still, no flicker).
 const seenImg = new Set();
-document.addEventListener("load", e => { const i = e.target; if (i.tagName !== "IMG" || seenImg.has(i.src)) return; seenImg.add(i.src); if (performance.now() - lastRenderAt > 250) anim(i, "imgin"); }, true);
+document.addEventListener("load", e => { const i = e.target; if (i.tagName !== "IMG" || seenImg.has(i.src)) return; seenImg.add(i.src); if (performance.now() > 2500 && performance.now() - lastRenderAt > 250) anim(i, "imgin"); }, true);
 function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ if (history.state?.sheet) history.back(); else shut(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
