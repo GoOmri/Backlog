@@ -5,8 +5,8 @@ import { API, FIREBASE } from "./config.js";
 
 /* ---------- constants ---------- */
 const PLAT = {ps5:["PS5","PS","--ps"], psplus:["PS Plus","P+","--psplus"], steam:["Steam","ST","--steam"], epic:["Epic","EP","--epic"], itch:["itch.io","IO","--itch"], other:["Other","··","--other"]};
-const STAT = {backlog:"Owned", playing:"Playing", done:"Finished", dropped:"Dropped", wishlist:"Wishlist"};
-const RANK = {wishlist:1, backlog:2, playing:3, dropped:4, done:5};
+const STAT = {backlog:"Owned", done:"Finished", dropped:"Dropped", wishlist:"Wishlist"};
+const RANK = {wishlist:1, backlog:2, dropped:4, done:5};
 // Plain white line icons (Lucide shapes), drawn inline so they follow the text colour.
 const ICON = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -25,7 +25,7 @@ const ICON = {
   chev: '<path d="m6 9 6 6 6-6"/>'
 };
 const ic = (n, size = 20, fill = false) => `<svg class="ico-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const TABS = [["home","Play","home"],["disc","Find","compass"],["lib","Library","grid"],["diary","Diary","book"]];
+const TABS = [["home","Play","home"],["disc","Find","compass"],["lib","Library","grid"],["diary","Stats","book"]];
 const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated server|soundtrack|\bsdk\b|\bdemo\b|benchmark/i;
 
 /* ---------- state ---------- */
@@ -40,7 +40,7 @@ function loadFilters(){
   platF = new Set(); statF = ""; genreF = ""; sort = "title"; deckF = false; F = {type: new Set(), view: new Set(), coop: new Set(), access: new Set()};
   try { const o = JSON.parse(localStorage.getItem("filters:" + tab)); if (o){ statF = o.statF || ""; sort = o.sort || "title"; deckF = !!o.deckF; platF = new Set(o.plat); F = {type: new Set(o.type), view: new Set(o.view), coop: new Set(o.coop), access: new Set(o.access)}; } } catch {}
 }
-let mood = new Set(), time = "", discovered = null, leavingArticles = [];
+let mood = new Set(), time = "";
 let db = null, col = null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -69,7 +69,6 @@ function basicTags(g){
 // catalog (PS Plus Extra, can leave), left (gone from PS Plus, not playable now).
 const PS_LABEL = {bought: "Bought", claimed: "Claimed", catalog: "Catalog", left: "Left PS Plus"};
 const playable = g => g.ps !== "left" && !g.hidden;
-const sale = g => g.status === "wishlist" && g.sale?.cut > 0 && /^(steam|epic)/i.test(g.sale.shop || "") ? g.sale : null;
 
 /* ---------- API (Cloudflare Worker) ---------- */
 async function api(path, body){
@@ -173,7 +172,6 @@ async function runQueue(){
     await checkDeck();
     await checkSteamTags();
     await checkCovers();
-    await checkPrices();
     progress(0, 0);
   } catch (e){ progress(0, 0, e.message, true); }
   running = false;
@@ -257,24 +255,6 @@ async function checkDeck(){
     const res = await api("/deck", {items: chunk.map(g => ({title: g.asTyped || g.title, appid: g.steamAppId || null}))});
     await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {deck: res[g.asTyped || g.title]?.deck || 0, ...(res[g.asTyped || g.title]?.appid && !g.steamAppId ? {steamAppId: res[g.asTyped || g.title].appid} : {})})));
   }
-}
-async function checkPrices(force = false){
-  const stale = list().filter(g => g.status === "wishlist" && !g.hidden && (force || !g.sale || Date.now() - (g.sale.checked || 0) > 12 * 3600e3));
-  for (let i = 0; i < stale.length; i += 40){
-    const chunk = stale.slice(i, i + 40);
-    progress(i, stale.length, "Checking PC prices");
-    const res = await api("/prices", {titles: chunk.map(g => g.title)});
-    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {sale: {...(res[g.title] || {cut: 0}), checked: Date.now()}})));
-  }
-}
-async function loadLeaving(){
-  if (!API) return;
-  try { leavingArticles = await api("/psplus"); render(); } catch {}
-}
-function leavingFor(g){
-  if (!(g.platforms || []).includes("psplus") || g.status === "done" || g.title.length < 4) return null;
-  const re = new RegExp("\\b" + g.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
-  return leavingArticles.find(a => re.test(a.text || "")) || null;
 }
 function progress(n, total, text = "", stay = false){
   $("#progress").hidden = !total && !stay;
@@ -391,7 +371,7 @@ async function importSteam(){
     const have = existingIndex(), byApp = new Map(list().filter(g => g.steamAppId).map(g => [g.steamAppId, g]));
     let n = 0, merged = 0; const ops = [];
     for (const s of owned){
-      const want = s.hours >= 2 ? "playing" : "backlog";
+      const want = "backlog";
       const g = byApp.get(s.appid) || have.get(key(s.title));
       if (g){
         merged++;
@@ -403,7 +383,7 @@ async function importSteam(){
       }
     }
     await commitChunks(ops);
-    note(`Steam: added ${n} games and updated ${merged} you already had. Games with 2+ hours played are marked Playing.`);
+    note(`Steam: added ${n} games and updated ${merged} you already had.`);
     runQueue();
   } catch (e){ note(e.message); }
 }
@@ -411,12 +391,8 @@ async function importSteam(){
 /* ---------- pieces ---------- */
 function badges(ps, g){ return (ps || []).map(p => { const v = PLAT[p] || PLAT.other; const dk = p === "steam" && g?.deck >= 2; return `<span class="plat" style="background:var(${v[2]})" title="${v[0]}${dk ? " · good on Steam Deck" : ""}">${v[1]}${dk ? "✓" : ""}</span>`; }).join(""); }
 function coverTag(g){
-  const s = sale(g), lv = leavingFor(g);
   if (g.noMatch) return `<span class="tag nomatch">No match</span>`;
   if (g.ps === "left") return `<span class="tag">Left P+</span>`;
-  if (lv) return `<span class="tag leaving">Leaving P+</span>`;
-  if (s) return `<span class="tag sale ${s.cut >= 50 ? "big" : ""}">−${s.cut}%</span>`;
-  if (g.status === "playing") return `<span class="tag playing">Playing</span>`;
   if (g.status === "dropped") return `<span class="tag">Dropped</span>`;
   return "";
 }
@@ -439,14 +415,13 @@ const isPlatformer = g => (g.genres || []).includes("Platform");
 function upNextGames(){
   const pinned = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
   const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
-  const playing = pool.filter(g => g.status === "playing" && !g.upNext).sort((a, b) => (b.touched || b.added || 0) - (a.touched || a.added || 0));
-  const rest = pool.filter(g => !g.upNext && g.status !== "playing").sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  const rest = pool.filter(g => !g.upNext).sort((a, b) => (b.rating || 0) - (a.rating || 0));
   // The carousel is the shortlist. Suggestions only fill it while nothing is pinned.
-  return pinned.length ? pinned : [...playing, ...rest].slice(0, 5);
+  return pinned.length ? pinned : rest.slice(0, 5);
 }
 function recommended(){
   const w = {};
-  list().filter(g => g.status === "playing" || g.status === "done" || g.myRating >= 4)
+  list().filter(g => g.status === "done" || g.myRating >= 4)
     .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2 : 1)));
   FAV.forEach(t => w[t] = (w[t] || 0) + 3);
   const max = Math.max(1, ...Object.values(w));
@@ -488,12 +463,12 @@ const CATS = [
 // 3D games ranked by how close they are to the 3D games he played and liked.
 function taste3D(gs){
   const w = {};
-  list().filter(g => has(g, "3D") && (g.status === "done" || g.status === "playing" || g.myRating))
+  list().filter(g => has(g, "3D") && (g.status === "done" || g.myRating))
     .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2.5 : 1)));
   return gs.filter(g => has(g, "3D")).map(g => [g, genresOf(g).reduce((s, t) => s + (w[t] || 0), 0) + (g.rating || 60) / 50])
     .sort((a, b) => b[1] - a[1]).map(r => r[0]);
 }
-const byLikely = (a, b) => (b.status === "playing") - (a.status === "playing") || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0);
+const byLikely = (a, b) => (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0);
 function homeHTML(){
   if (!games.size) return emptyHTML();
   homeMode = "owned";
@@ -502,14 +477,14 @@ function homeHTML(){
   const fits = g => CATS.some(([, test]) => test(g));
   const wish = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || fits(b) - fits(a) || (b.rating || 0) - (a.rating || 0)).slice(0, 30);
-  const leaving = list().filter(g => leavingFor(g));
   const is2D = g => basicTags(g).includes("2D");
   const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test], i) => rowHTML(name, pool.filter(test).sort((a, b) => (i === 0 ? is2D(b) - is2D(a) : 0) || byLikely(a, b)).slice(0, 24), "", undefined, 3));
+  const pinnedN = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).length;
   return carouselHTML(top)
+    + (pinnedN ? `<div class="wrap row-head" style="padding-top:8px"><span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext" style="margin-left:auto">Show all</button></div>` : "")
     + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap the <b>pin</b> to put it at the top.</p>`)
     + metroid + plat2d + couch + puzzle
-    + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3)
-    + rowHTML("Leaving PS Plus soon", leaving);
+    + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3);
 }
 function topTags(gs){
   const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
@@ -545,7 +520,7 @@ let shelfShown = [], shelfLimit = CHUNK, shelfKey = "", shelfObs = null, shelfRe
 function moreShelf(){
   const grid = $("#main .grid"); if (!grid || shelfLimit >= shelfShown.length) return;
   const next = shelfShown.slice(shelfLimit, shelfLimit + CHUNK); shelfLimit += next.length;
-  grid.insertAdjacentHTML("beforeend", next.map(g => cardHTML(g, shelfWish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join(""));
+  grid.insertAdjacentHTML("beforeend", next.map(g => cardHTML(g)).join(""));
   if (shelfLimit >= shelfShown.length) $("#shelfMore")?.remove();
 }
 function watchShelf(){
@@ -563,7 +538,7 @@ function sidebarHTML(){
   const any = statF || platF.size || F.type.size || F.view.size || F.coop.size || F.access.size || deckF || sort !== "title";
   const SORTS = {title: wish ? "Most anticipated" : "A–Z", rating: "Best rated", short: "Shortest", added: "Recently added", ...(wish ? {} : {played: "Most played (Steam)"})};
   return `<div class="fhead"><b>Filters</b>${any ? `<button class="linkbtn" data-f="reset|">Reset</button>` : ""}</div>`
-    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
+    + (wish ? "" : sec("Status", [["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"],["hidden","Hidden"]]
         .map(([k, l]) => opt("stat", k, l, k === "hidden" ? list().filter(g => g.hidden && !g.nope && g.status !== "wishlist").length : count("stat", g => !k || g.status === k), statF === k)).join("")))
     + sec("Needs attention", opt("nomatch", "1", "No match found", scope.filter(g => g.noMatch).length, genreF === "__nomatch"))
     + sec("Type", types.map(t => opt("type", t, t, typeCounts[t] || 0, F.type.has(t))).join(""))
@@ -584,7 +559,7 @@ function shelfHTML(wish){
     added: (a, b) => (b.added || 0) - (a.added || 0), played: (a, b) => (b.steamHours || 0) - (a.steamHours || 0),
     anticipated: (a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0)};
   const srt = wish && sort === "title" ? "anticipated" : by[sort] ? sort : "title";
-  shown.sort((a, b) => (srt === "title" ? (b.status === "playing") - (a.status === "playing") : 0) || by[srt](a, b));
+  shown.sort(by[srt]);
   const key = JSON.stringify([wish, s, sort, statF, genreF, accessF, deckF, [...platF], ...Object.values(F).map(x => [...x])]);
   if (key !== shelfKey){ shelfReset = !!shelfKey; shelfKey = key; shelfLimit = CHUNK; }
   shelfShown = shown;
@@ -595,8 +570,8 @@ function shelfHTML(wish){
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
       <span class="mono dim" aria-live="polite">${shown.length} ${shown.length === 1 ? "game" : "games"}</span>
     </div>
-    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["playing","Playing"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}</div>
-    <div class="grid">${shown.slice(0, shelfLimit).map(g => cardHTML(g, wish && sale(g) ? `−${g.sale.cut}% ${g.sale.shop || ""}` : undefined)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>${shown.length > shelfLimit ? `<div id="shelfMore" style="height:1px"></div>` : ""}
+    ${wish ? "" : `<div class="chips statusbar mobile-only">${[["","All"],["backlog","Owned"],["done","Finished"],["dropped","Dropped"]].map(([k, l]) => `<button class="chip" data-f="stat|${k}" aria-pressed="${statF === k}">${l}</button>`).join("")}</div>`}</div>
+    <div class="grid">${shown.slice(0, shelfLimit).map(g => cardHTML(g)).join("") || `<div class="empty">Nothing matches these filters.</div>`}</div>${shown.length > shelfLimit ? `<div id="shelfMore" style="height:1px"></div>` : ""}
   </div></div>`;
 }
 function filterSheet(){
@@ -669,7 +644,7 @@ function findExtrasHTML(){
   };
   const yr = x => x.year || "", when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : yr(x);
   const rev = x => x?.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
-  const played = x => { const g = inList(x); return g && ["playing", "done", "dropped"].includes(g.status); };
+  const played = x => { const g = inList(x); return g && ["done", "dropped"].includes(g.status); };
   const top = (topMV.mvTop || []).filter(x => !played(x)).slice(0, 24), topIds = new Set(top.map(x => x.igdbId));
   // One metroidvania row: top rated first, then MVs you don't own (2D first).
   top.push(...(topMV.mv || []).filter(x => !inList(x) && !topIds.has(x.igdbId)).sort((a, b) => is2D(b) - is2D(a)).slice(0, 30 - top.length));
@@ -681,37 +656,17 @@ function findExtrasHTML(){
     + frow("You missed these", topMV.missed, yr) + frow("Classics", topMV.classics, yr, true);
   const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
     .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
-  const sales = list().filter(g => sale(g)).sort((a, b) => b.sale.cut - a.sale.cut);
   const seeAll = wl.length ? `<span class="dim">${wl.length} on wishlist</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button>` : "";
-  const onSale = sales.length ? `<div class="section"><div class="row-head"><h3>On sale from your wishlist</h3>${seeAll}</div><div class="row">${sales.map(g => cardHTML(g, `−${g.sale.cut}% ${g.sale.shop || ""}`)).join("")}</div></div>`
-    : wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3>${seeAll}</div></div>` : "";
+  const onSale = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3>${seeAll}</div></div>` : "";
   return onSale + mv;
 }
-const findPins = () => carouselHTML(list().filter(g => g.status === "wishlist" && g.upNext && !g.hidden).sort((a, b) => a.upNext - b.upNext));
-function discoverHTML(){
-  const liked = list().filter(g => g.igdbId && (g.myRating >= 4 || (g.status === "done" && !g.myRating) || g.status === "playing"));
-  if (!liked.length) return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div><div class="empty wrap"><h2>Rate a few games first</h2><p>Mark games Finished and give them stars. Discover suggests games similar to the ones you rate 4–5.</p></div>`;
-  if (discovered === null){ try { discovered = JSON.parse(localStorage.getItem("c:disc")); } catch {} discovered = discovered || {loading: 1}; runDiscover(liked); }
-  const body = discovered.loading ? `<span class="why">Finding games like the ${liked.length} you enjoyed…</span>` : discovered.error ? `<span class="why">${esc(discovered.error)}</span>`
-    : `<div class="row">${discovered.filter(d => !inList(d)).map(d => suggestCard(d, "Like " + d.because[0])).join("")}</div>`;
-  return `<div class="wrap">${findExtrasHTML()}${radarHTML()}<div class="section"><div class="row-head"><h3>Because you liked…</h3><button class="btn ghost small" data-act="rediscover">Refresh</button></div>
-    ${body}</div></div>`;
-}
-async function runDiscover(liked){
-  try {
-    const like = liked.sort((a, b) => (b.myRating || 3) - (a.myRating || 3)).slice(0, 60).map(g => g.igdbId);
-    const r = await api("/discover", {like, exclude: list().map(g => g.igdbId).filter(Boolean)}), j = JSON.stringify(r);
-    if (Array.isArray(discovered) && JSON.stringify(discovered) === j) return;
-    discovered = r; try { localStorage.setItem("c:disc", j); } catch {}
-  } catch (e){ if (!Array.isArray(discovered)) discovered = {error: e.message}; }
-  if (tab === "disc") render();
-}
+function discoverHTML(){ return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div>`; }
 
 /* ---------- diary + stats ---------- */
 function diaryHTML(){
   const all = list(), done = all.filter(g => g.status === "done").sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
   const year = new Date().getFullYear(), thisYear = done.filter(g => g.finishedAt && new Date(g.finishedAt).getFullYear() === year);
-  const back = all.filter(g => g.status === "backlog" || g.status === "playing");
+  const back = all.filter(g => g.status === "backlog");
   const left = back.reduce((s, g) => s + (mainH(g) || 0), 0), rated = done.filter(g => g.myRating);
   const avg = rated.length ? (rated.reduce((s, g) => s + g.myRating, 0) / rated.length).toFixed(1) : "–";
   const bar = (label, n, max) => `<div class="barrow"><span>${esc(label)}</span><span class="fill" style="width:${Math.max(4, n / max * 100)}%"></span><span class="n">${n}</span></div>`;
@@ -723,7 +678,7 @@ function diaryHTML(){
   const entries = done.map(g => {
     const m = g.finishedAt ? new Date(g.finishedAt).toLocaleDateString("en-GB", {month: "long", year: "numeric"}) : "Earlier";
     const head = m !== lastMonth ? `<div class="month">${m}</div>` : ""; lastMonth = m;
-    return head + `<button class="entry" data-edit="${g.id}">${coverHTML({...g, platforms: [], status: "done", sale: null})}<span><b>${esc(g.title)}</b><br><span class="why">${esc(genresOf(g).slice(0, 2).join(", "))}</span></span><span class="stars">${starsTxt(g.myRating) || `<span class="dim">Rate</span>`}</span></button>`;
+    return head + `<button class="entry" data-edit="${g.id}">${coverHTML({...g, platforms: [], status: "done"})}<span><b>${esc(g.title)}</b><br><span class="why">${esc(genresOf(g).slice(0, 2).join(", "))}</span></span><span class="stars">${starsTxt(g.myRating) || `<span class="dim">Rate</span>`}</span></button>`;
   }).join("");
   return `<div class="wrap"><div class="section"><h2>Your year in games</h2>
     <div class="stats">
@@ -831,7 +786,6 @@ function menuSheet(){
     <button data-act="nope">Not for me<small>Games you dismissed from suggestions</small></button>
     <button data-act="psplus">Update from PlayStation<small>Paste your PS Plus tab: bought, claimed, catalog, left</small></button>
     <button data-act="rematch">Re-check all matches<small>Fixes games matched to the wrong version</small></button>
-    <button data-act="prices">Check wishlist prices now<small>PC stores via IsThereAnyDeal</small></button>
     <button data-act="signout">Sign out</button></div>
     <div class="actions"><button class="btn ghost" data-act="close">Close</button></div>`);
 }
@@ -919,7 +873,7 @@ async function previewSheet(x){
     pinned = !pinned; $("#pvPin").classList.toggle("on", pinned);
     if (!wid){ if (pinned) $("#pvWish").onclick(); return; }
     await setDoc(doc(col, wid), {upNext: pinned ? Date.now() : null}, {merge: true});
-    toast(pinned ? "Pinned to Play" : "Unpinned");
+    toast(pinned ? "Added to Up next" : "Removed from Up next");
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   fillDifficulty(x, null);
@@ -1028,22 +982,20 @@ function fillMedia(d){
 async function editSheet(id){
   const g = games.get(id); if (!g) return;
   let plats = new Set(g.platforms || []);
-  const s = sale(g), lv = leavingFor(g), toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
+  const toDate = t => t ? new Date(t).toISOString().slice(0, 10) : "";
   const viaPlus = g.ps ? g.ps !== "bought" : (g.platforms || []).includes("psplus");
   const ownP = (g.platforms || []).filter(p => p !== "psplus" && !(p === "ps5" && viaPlus));
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
     : ownP.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
   // One button for the next step only.
-  const NEXT = {wishlist: "I bought it", backlog: "Start playing", playing: "Finished", dropped: "Pick it up again"};
+  const NEXT = {wishlist: "I bought it", backlog: "Finished", dropped: "Pick it up again"};
   const actions = `${NEXT[g.status] ? `<div class="menuwrap"><button class="btn" id="statBtn">${NEXT[g.status]}</button><div class="popmenu" id="statMenu" hidden></div></div>` : ""}
     ${g.status === "wishlist" ? `<button class="ibtn on-heart" id="wishBtn" title="Remove from wishlist" aria-label="Remove from wishlist">${ic("heartf")}</button>` : ""}
     <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">${ic("star", 20, !!g.myRating)}${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
       <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">${ic("star", 26)}</button>`).join("")}</div></div>
-    <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Shortlist" aria-label="Shortlist" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
+    <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Up next" aria-label="Up next" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
     <button class="ibtn" id="nopeBtn" title="${g.hidden ? "Show again" : "Not for me"}" aria-label="${g.hidden ? "Show again" : "Not for me"}">${g.hidden ? ic("undo") : ic("down")}</button>`;
   const facts = `
-    ${s ? `<a class="deal ${s.cut >= 50 ? "hot" : ""}" href="${esc(s.url || "#")}" target="_blank" rel="noopener"><b>−${s.cut}%</b> ${esc(s.price ?? "")} ${esc(s.currency || "")} on ${esc(s.shop || "")}</a>` : ""}
-    ${lv ? `<a class="deal warn" href="${esc(lv.url)}" target="_blank" rel="noopener">Leaving PS Plus soon</a>` : ""}
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
 `;
@@ -1069,9 +1021,9 @@ async function editSheet(id){
   if ($("#statBtn")) $("#statBtn").onclick = async e => {
     e.stopPropagation();
     if (g.status === "wishlist") return askBought("backlog");
-    const st = g.status === "playing" ? "done" : "playing";
+    const st = g.status === "dropped" ? "backlog" : "done";
     await save({status: st, finishedAt: st === "done" ? Date.now() : null});
-    toast(st === "done" ? "Finished! Rate it with the star" : "Enjoy!"); reopen();
+    toast(st === "done" ? "Finished! Rate it with the star" : "Back in your library"); reopen();
   };
   if ($("#wishBtn")) $("#wishBtn").onclick = async () => {
     const snap = {...g}; delete snap.id; closeSheet(); await del(id);
@@ -1165,38 +1117,24 @@ document.addEventListener("click", async e => {
     el.scrollTo({left: Math.max(0, i) * el.clientWidth, behavior: "smooth"});
   }
   else if (d.finish){ await upd(d.finish, {status: "done", finishedAt: Date.now(), touched: Date.now()}); editSheet(d.finish); }
-  else if (d.start) await upd(d.start, {status: "playing", touched: Date.now()});
   else if (d.cwish){
     const it = [...(couchFinds.fresh || []), ...(couchFinds.best || [])].find(x => x.igdbId === +d.cwish); t.disabled = true;
     await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()});
     it.added = true; render();
   }
-  else if (d.nope != null){ const it = discovered[+d.nope]; discovered.splice(+d.nope, 1); render(); notForMe(it); }
   else if (d.rwish){ const it = radarItem(+d.rwish); t.disabled = true; t.textContent = "On wishlist";
     await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()}); }
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
-  else if (d.wish != null){
-    const it = discovered[+d.wish]; t.disabled = true;
-    const {because, score, ...data} = it;
-    await setDoc(doc(col, newId()), {...data, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()});
-    it.added = true; render(); runQueue();
-  }
   else switch (d.act){
+    case "upnext": openSheet(`<h2>Up next</h2><div class="grid">${upNextGames().map(g => cardHTML(g)).join("")}</div>`, "full"); break;
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
     case "steam": importSteam(); break;
     case "steamwish": importSteamWishlist(); break;
-    case "prices":
-      closeSheet();
-      if (running) break;
-      running = true;
-      checkPrices(true).then(() => progress(0, 0), err => progress(0, 0, err.message, true)).finally(() => running = false);
-      break;
     case "psplus": psPasteSheet(); break;
     case "filters": filterSheet(); break;
     case "nope": nopeSheet(); break;
     case "rematch": closeSheet(); rematchAll(); break;
-    case "rediscover": discovered = null; render(); break;
     case "signout": closeSheet(); signOut(getAuth()); break;
     case "close": closeSheet(); break;
   }
@@ -1249,11 +1187,10 @@ onAuthStateChanged(auth, user => {
   if (!API) progress(0, 0, "Covers and info will load once the Worker address is in config.js.", true);
   render();
   unsub = onSnapshot(col, snap => {
-    games = new Map(snap.docs.map(d => [d.id, {id: d.id, ...d.data()}]));
+    games = new Map(snap.docs.map(d => { const g = {id: d.id, ...d.data()}; if (g.status === "playing") g.status = "backlog"; return [d.id, g]; }));
     $("#sync").textContent = navigator.onLine ? "" : "offline";
     const first = !loaded; loaded = true;
     if (first) render(); else if (snap.docChanges().length) softRender();
-    if (first) loadLeaving();
     runQueue();
   }, e => { $("#main").innerHTML = `<div class="empty wrap">Couldn't load your games: ${esc(e.message)}</div>`; });
 });

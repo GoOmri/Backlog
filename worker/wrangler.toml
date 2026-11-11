@@ -9,4 +9,4 @@ binding = "KV"
 id = "5f776cc91cbb45a683e3e566b6abf54b"
 
 [triggers]
-crons = ["0 6 * * *"]
+crons = []  # no scheduled jobs (PS Plus leaving check removed)
