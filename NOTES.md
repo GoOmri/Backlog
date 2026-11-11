@@ -36,12 +36,50 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 ## Taste (for ranking)
 Loves: metroidvanias, 2D/puzzle/precision platformers (Hollow Knight, Ori, Celeste), hand-drawn or good pixel art, narrative, mystery, cozy, Zelda-likes. Heavy combat only if the game is great. Couch co-op with his wife: puzzle co-op and co-op platformers. Prefers games from 2008 on, but keeps a Classics row. Wants hidden gems kept.
 
-## Planned: optimization (in this order)
+## Done: optimization
 1. ✅ DONE (softRender: snapshot redraws batched to one per 500ms, skipped while a page is open or app hidden). Fewer full redraws: Firestore onSnapshot calls render() on every change, and the background queue writes games one by one, so the whole tab (597 Library cards) redraws many times. Batch into one render per ~500ms; skip if the current tab isn't affected.
 2. ✅ DONE (CHUNK=60, IntersectionObserver on #shelfMore; count kept across data redraws, reset on filter change). Library in chunks: render ~60 cards, add more on scroll.
 3. ✅ DONE (`sw.js`: app files network-first with no-cache + 3s timeout → cache, so a push shows on next open; fonts/Firebase SDK cache-first; bump `V` to clear caches). Service worker: cache app shell (app.js, style.css, index.html, fonts) for instant open, update in background.
 4. ✅ DONE (`heroSrc()` swaps to t_720p under 1000px, carousel + game page). Play carousel hero images: IGDB t_1080p → t_720p on phones.
 Skip: style.css cleanup, bundling/minifying.
+
+## Planned: curation rebuild (the algorithm is the project now)
+Goal: open the app and quickly find a game to play now, especially couch co-op with his wife. Rows are views of ONE score.
+
+What Omri dislikes is execution, not genre (2026-11-11):
+- Padding/grind/level gates/paid time-skippers, yearly franchises (Assassin's Creed). But liked Fallout 4, Cyberpunk.
+- Very long + cutscene-heavy (Expedition 33). Linear + text-heavy that breaks the action (Iconoclasts, even though MV).
+- One mechanic stretched over a whole game (endless FPS) — but liked Doom 2016.
+- Sports — but likes Rocket League. Strategy/CRPG rarely — but liked Frostpunk, Disco Elysium.
+- Anime art/story is usually a no — but likes Persona 5. Judges by cover first: anime, cheap, basic, overdesigned human characters = no.
+- Likes walking sims with puzzles; cinematic is fine.
+
+A. Rows that show the wrong games (small, do first)
+1. 2D platformers: "2D Platformer" in top ~5 Steam tags + IGDB side view. Drop Puzzle/Precision searches from this row.
+2. Couch co-op platformers: "Platformer" must be a top tag.
+3. Rule: rows only use a game's main tags (top ~5), never "anywhere in the list".
+
+B. One taste score
+4. DISLIKE list → "needs to be great": hack and slash, gore, roguelites, open world, FPS, sports, strategy, CRPG allowed if exceptional (lower bar than today's 94% & 10k).
+5. Anime: strong penalty, beatable by exceptional.
+6. Length: very long main story (IGDB time-to-beat) needs to be great.
+7. Franchise fatigue: long-running series entries pushed down (IGDB franchises/collections).
+8. Text-heavy: only "Visual Novel" / "Text-Based" penalised. Not "Cinematic", not walking sims.
+9. Grind/monetisation: "Grinding", "Free to Play", "Massively Multiplayer" penalised.
+10. Learn from his data: high-rated / finished / many Steam hours add weight to their main tags; dropped / low-rated subtract.
+11. 👎 stays ONE tap, no reason picker. Silently lowers that game's main tags a bit.
+
+C. Structure
+12. ~4 rows instead of 11: For you, Hidden gems, Couch co-op, New & upcoming — all sorted by the score.
+13. Short "why" on each card ("like Ori + Celeste").
+14. Find includes PS5/PS4 games, not only Steam searches.
+
+D. Other Find fixes
+15. Wishlist sale row: only games added in the last year or pinned; 50%+ on the rest under See all.
+16. PS Store link missing on PS4 games — likely matched to the PC IGDB entry. Need an example game.
+17. Steam IL prices on every Find card (see Later).
+
+Size: A, 15, 16 small. B + C = the real rebuild, medium–big, mostly worker `/finds` (bump findsN).
 
 ## Later
 - Steam prices (IL) on every Find card and game page: new worker route /steamprice (appids → price_overview cc=il, KV cache 1 day).
