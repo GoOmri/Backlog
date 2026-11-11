@@ -1134,13 +1134,17 @@ function siftShow(){
   const g = it.g || it.x, q = g.steamPct != null ? `${g.steamPct}% on Steam` : g.rating ? `Rated ${Math.round(g.rating)}` : "";
   const where = it.g ? (it.g.status === "wishlist" ? "Wishlist" : "Owned") : "New find";
   const poster = coverHTML(it.g || {...it.x, platforms: [], status: "backlog"});
+  // The next card waits underneath (blurred poster, first screenshot, title) and rises as you drag.
+  const nx = sift.deck[sift.i + 1], ng = nx && (nx.g || nx.x);
+  const nextH = ng ? `<div class="sift-next" id="siftNext">${ng.cover ? `<div class="sift-bg" style="background-image:url('${esc(ng.cover)}')"></div>` : ""}<div class="sift-next-shot" id="siftNextShot"></div><b>${esc(ng.title)}</b></div>` : "";
   el.innerHTML = `<div class="sift-top">${prev}<span class="dim">${where} · ${sift.deck.length - sift.i} left</span>${close}</div>
-    <div id="siftCard" class="sift-card">
+    <div class="sift-deck">${nextH}<div id="siftCard" class="sift-card">
       ${g.cover ? `<div class="sift-bg" style="background-image:url('${esc(g.cover)}')"></div>` : ""}
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
       <div class="sift-hint yes">✓</div><div class="sift-hint no">✕</div>
       <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div>${(g.genres || []).filter(x => x !== "Indie").length ? `<div class="sift-genres">${g.genres.filter(x => x !== "Indie").slice(0, 4).map(esc).join(" · ")}</div>` : ""}<div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
+    </div>
     </div>
     <div class="sift-btns"><button class="sift-round no" data-s="nope" aria-label="Not now">✕</button><button class="sift-round pin" data-s="next" aria-label="Up next">${ic("pin", 20)}</button><button class="sift-round yes" data-s="keep" aria-label="Keep">✓</button></div>
     <div class="sift-labels"><span>Not now</span><span>Up next</span><span>Keep</span></div>`;
@@ -1173,11 +1177,12 @@ function siftShow(){
     if (shots.length || trailer) showShots(); else fail("No gameplay found.");
   }).catch(e => { if (sift && sift.i === me) fail("Couldn't load gameplay."); console.warn("sift details", g.title, e); });
   else fail("This game isn't matched, so there's no gameplay.");
+  if (ng?.igdbId) gameDetails(ng.igdbId).then(d => { const u = d.shots?.[0], el = $("#siftNextShot"); if (u && el) el.style.backgroundImage = `url('${med(u)}')`; }).catch(() => {});
   for (const nx of sift.deck.slice(sift.i + 1, sift.i + 3)){ const ng = nx.g || nx.x;
     if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 3).forEach(u => { new Image().src = med(u); })).catch(() => {}); }
   const c = $("#siftCard"); let x0 = null, dx = 0, downOn = null;
   c.onpointerdown = e => { if (e.target.closest("button, iframe, [data-s], .vwrap")) return; downOn = e.target.closest("#siftStack") ? "shots" : null; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
-  const hint = d => { c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
+  const hint = d => { const ne = $("#siftNext"); if (ne){ const p = Math.min(1, Math.abs(d) / 140); ne.style.transform = `scale(${.94 + .06 * p})`; ne.style.opacity = .5 + .5 * p; } c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
   c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 25}deg)`; hint(dx); };
   c.onpointerup = c.onpointercancel = e => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
     if (Math.abs(dx) > 90) return siftAct(dx > 0 ? "keep" : "nope");
