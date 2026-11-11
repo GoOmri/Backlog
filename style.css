@@ -601,7 +601,3 @@ body::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none
 .gp-title{min-height:96px;display:flex;align-items:flex-end}
 .gp-main .mdots{min-height:8px}
 .desc.clamp:empty{min-height:4.8em}
-/* Trailer stays hidden until it has played ~2.5s: YouTube shows its own title/share/logo overlay at the start */
-.vwrap{background:#000}
-.vwrap iframe{opacity:0;transition:opacity .5s}
-.vwrap iframe.live{opacity:1}
