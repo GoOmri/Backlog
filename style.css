@@ -700,3 +700,4 @@ img.ok.now{transition:none}
 .gp-body .desc{font-size:17px}
 .gp-head .meta,.gp-facts .strip,.gp-facts .links,.gp-facts .ownline{font-size:16px}
 .gtags span{font-size:14px}
+.gp-facts .strip .score{padding-top:4px;padding-bottom:4px;line-height:1.2}
