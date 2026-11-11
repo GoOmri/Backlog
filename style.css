@@ -541,7 +541,7 @@ html,body{overflow-x:clip}
 .plat.avail{background:rgba(14,17,22,.6);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
 
 /* Sift: full height. Top bar, stacked gameplay (fills the free height), info row, round buttons fixed at the bottom. Cards enter from the bottom. */
-.sift{display:flex;flex-direction:column;gap:10px;height:calc(100dvh - 72px);min-height:420px}
+.sift{display:flex;flex-direction:column;gap:10px;height:calc(100dvh - 24px - env(safe-area-inset-bottom));min-height:420px}
 .sift-top{display:flex;align-items:center;gap:8px}
 .sift-top > span{margin:0 auto;font-size:14px}
 .sift-top [data-s="close"]{font-size:18px;padding:4px 8px}
@@ -572,9 +572,9 @@ html,body{overflow-x:clip}
 .sift-labels{display:flex;justify-content:space-around;padding:0 12px;font-size:12px;opacity:.7;margin-top:-4px}
 .sift-labels span{width:60px;text-align:center}
 .sift-end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
-.sift-hint{position:absolute;top:18px;padding:6px 14px;border-radius:10px;font-size:20px;font-weight:700;letter-spacing:.04em;opacity:0;pointer-events:none;z-index:3!important;border:3px solid}
-.sift-hint.yes{left:16px;color:#5fd38d;border-color:#5fd38d;background:rgba(95,211,141,.18);transform:rotate(-10deg)}
-.sift-hint.no{right:16px;color:#ff6b6b;border-color:#ff6b6b;background:rgba(255,107,107,.18);transform:rotate(10deg)}
+.sift-hint{position:absolute;inset:0;display:grid;place-items:center;font-size:96px;font-weight:700;opacity:0;pointer-events:none;z-index:3!important;border-radius:14px}
+.sift-hint.yes{color:#fff;background:rgba(40,190,100,.55)}
+.sift-hint.no{color:#fff;background:rgba(230,60,60,.55)}
 .sift-meta [data-s="open"]{cursor:pointer}
 .sift-back{position:fixed;left:12px;top:max(12px,env(safe-area-inset-top));z-index:1000;padding:8px 14px;border-radius:20px;background:rgba(0,0,0,.75);color:#fff;font-size:14px}
 .sift-card > .sift-hint{position:absolute}
