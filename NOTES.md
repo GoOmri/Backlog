@@ -70,6 +70,7 @@ Decided: one Play tab (Find merged in), mixed purely by quality, Library = stora
 Old "curation rebuild" (taste score with many penalties) dropped: rules kept breaking on exceptions; quality decides.
 
 ## Later
+- Stats: the new tiles (finished all-time, hours on Steam, couch co-op finished, metroidvanias finished) look skewed — revisit with Omri.
 - Steam prices (IL) on every Find card and game page: new worker route /steamprice (appids → price_overview cc=il, KV cache 1 day).
 
 ## Open ideas
