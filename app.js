@@ -661,7 +661,7 @@ function diaryHTML(){
       ${(() => { const st = all.filter(g => g.steamHours > 0), h = st.reduce((n, g) => n + g.steamHours, 0), top = st.sort((a, b) => b.steamHours - a.steamHours)[0];
         return `<div class="stat"><b>${Math.round(h).toLocaleString()}h</b><span>on Steam${top ? ` · most: ${esc(top.title)}` : ""}</span></div>`; })()}
       <div class="stat"><b>${done.filter(g => g.couch).length}</b><span>couch co-op finished</span></div>
-      ${(() => { const own = all.filter(g => g.status !== "wishlist").length; return `<div class="stat"><b>${own ? Math.round(done.length / own * 100) : 0}%</b><span>of your library finished</span></div>`; })()}
+      <div class="stat"><b>${done.filter(g => kwOf(g).includes("Metroidvania")).length}</b><span>metroidvanias finished</span></div>
     </div>
     <div class="two">
       ${gTop.length ? `<div class="panel"><span class="label">What you finish</span><div class="bars">${gTop.map(([t, n]) => bar(t, n, gTop[0][1])).join("")}</div></div>` : ""}
