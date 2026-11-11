@@ -1107,7 +1107,7 @@ function siftShow(){
       ${g.cover ? `<div class="sift-bg" style="background-image:url('${esc(g.cover)}')"></div>` : ""}
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
-      <div class="sift-hint yes">Keep ✓</div><div class="sift-hint no">✕ Not now</div>
+      <div class="sift-hint yes">✓</div><div class="sift-hint no">✕</div>
       <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div><div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
     </div>
     <div class="sift-btns"><button class="sift-round no" data-s="nope" aria-label="Not now">✕</button><button class="sift-round pin" data-s="next" aria-label="Up next">${ic("pin", 20)}</button><button class="sift-round yes" data-s="keep" aria-label="Keep">✓</button></div>
