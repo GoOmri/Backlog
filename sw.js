@@ -2,8 +2,8 @@
 // App files (same origin): network first, bypassing the browser's HTTP cache, so a push shows on the next open;
 // falls back to the cached copy when offline or the network takes over 3s.
 // Fonts + pinned Firebase SDK never change: cache first. Bump V to force-clear old caches.
-const V = "shell-v2";
-const SHELL = ["index.html", "app.js", "style.css", "config.js", "manifest.webmanifest", "icon-192.png"];
+const V = "shell-v3";
+const SHELL = ["index.html", "app.js", "style.css", "config.js", "manifest.webmanifest", "icon-cat-192.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
