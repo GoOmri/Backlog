@@ -30,6 +30,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 ## Worker routes (worker.js)
 /match /search /game /info /grids /logos /discover /steam /steamwish /prices (ITAD, PC only) /psplus /upcoming /deck /couch /topmv /finds /steamtags /steamrev /achievements /achrarity /trophies /rarity
 - `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds11) — bump N when the output shape changes.
+- KV is only for shared lists (finds, upcoming, psplus, topmv, trophies, tokens). No per-game KV caching (free tier = 1,000 writes/day); the client caches per-game data (localStorage gd5:/rev:, Firestore hero/logo). No hover prefetch.
 - IGDB text `search` is broken; use name lookups (`name ~ "x"`).
 
 ## Taste (for ranking)

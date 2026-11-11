@@ -144,10 +144,7 @@ async function search(env, text){
 
 async function game(env, id){
   if (!id) throw new Error("Missing id");
-  const cached = await env.KV.get("game5:" + id, "json");
-  if (cached) return cached;
   const out = await gameFresh(env, id);
-  await env.KV.put("game5:" + id, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 // Gameplay first; avoid teasers, announcements and cinematic (CG/story) trailers when there's a choice.
@@ -397,24 +394,18 @@ async function deck(env, items){
 /* ---------- Steam user reviews ---------- */
 async function steamReviews(env, appid){
   if (!appid) throw new Error("Missing appid");
-  const c = await env.KV.get("rev:" + appid, "json");
-  if (c) return c;
   const r = await (await fetch(`https://store.steampowered.com/appreviews/${appid}?json=1&language=all&purchase_type=all&num_per_page=0`)).json();
   const s = r.query_summary || {};
   const out = {pct: s.total_reviews ? Math.round(s.total_positive / s.total_reviews * 100) : null, label: s.review_score_desc || "", total: s.total_reviews || 0};
-  await env.KV.put("rev:" + appid, JSON.stringify(out), {expirationTtl: 7 * 86400});
   return out;
 }
 
 /* ---------- Steam achievements (your progress per game) ---------- */
 async function achievements(env, appid){
   if (!appid) throw new Error("Missing appid");
-  const c = await env.KV.get("ach:" + appid, "json");
-  if (c) return c;
   const r = await fetch(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid=${appid}&key=${env.STEAM_KEY}&steamid=${env.STEAM_ID}`);
   const list = r.ok ? (await r.json()).playerstats?.achievements || [] : [];
   const out = {got: list.filter(a => a.achieved).length, total: list.length};
-  await env.KV.put("ach:" + appid, JSON.stringify(out), {expirationTtl: 6 * 3600});
   return out;
 }
 
@@ -460,28 +451,22 @@ async function trophies(env){
 // How many players earned the platinum (or the rarest trophy): a difficulty measure from PlayStation's own data.
 async function rarity(env, np, svc){
   if (!/^NPWR\d+_\d+$/.test(np)) throw new Error("Bad trophy id");
-  const c = await env.KV.get("rar:" + np, "json");
-  if (c) return c;
   const tok = await psnToken(env);
   const r = await (await fetch(`https://m.np.playstation.com/api/trophy/v1/users/me/npCommunicationIds/${np}/trophyGroups/all/trophies?npServiceName=${svc === "trophy2" ? "trophy2" : "trophy"}`, {headers: {Authorization: "Bearer " + tok}})).json();
   const list = r.trophies || [];
   const plat = list.find(t => t.trophyType === "platinum");
   const rates = list.map(t => parseFloat(t.trophyEarnedRate)).filter(x => !isNaN(x));
   const out = {plat: plat ? parseFloat(plat.trophyEarnedRate) : null, rarest: rates.length ? Math.min(...rates) : null};
-  await env.KV.put("rar:" + np, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 
 // Steam: share of players who earned the rarest achievement.
 async function achRarity(env, appid){
   if (!appid) throw new Error("Missing appid");
-  const c = await env.KV.get("achr:" + appid, "json");
-  if (c) return c;
   const r = await fetch(`https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appid}`);
   const list = r.ok ? (await r.json()).achievementpercentages?.achievements || [] : [];
   const p = list.map(a => parseFloat(a.percent)).filter(x => !isNaN(x));
   const out = {rarest: p.length ? Math.round(Math.min(...p) * 10) / 10 : null};
-  await env.KV.put("achr:" + appid, JSON.stringify(out), {expirationTtl: 14 * 86400});
   return out;
 }
 
