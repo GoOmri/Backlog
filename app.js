@@ -1073,13 +1073,26 @@ function openSift(){
   for (const items of Object.values(rowCache)) for (const i of items) if (i.x && !ids.has(i.x.igdbId)){ ids.add(i.x.igdbId); finds.push({x: i.x}); }
   sift = {deck: [...mine("wishlist"), ...mine("backlog"), ...finds], i: 0, done: [], batch: 0};
   openSheet(`<div id="sift" class="sift"></div>`, "full");
-  $("#dlg").addEventListener("close", () => { sift = null; render(); }, {once: true});
+  $("#dlg").addEventListener("close", () => { sift = null; $("#siftBack")?.remove(); render(); }, {once: true});
+  siftMount();
+}
+function siftMount(){
+  $("#siftBack")?.remove();
+  if (!$("#sift")) $("#sheet").innerHTML = `<div id="sift" class="sift"></div>`;
   $("#sift").onclick = e => { const b = e.target.closest("[data-s]"); if (b) siftAct(b.dataset.s); };
   siftShow();
+}
+// Tapping the title or poster opens the game page; a floating button brings you back to the same card.
+function siftOpen(){
+  const it = sift.deck[sift.i]; if (!it) return;
+  if (it.g) editSheet(it.g.id); else previewSheet(it.x);
+  $("#dlg").insertAdjacentHTML("beforeend", `<button id="siftBack" class="sift-back">← Back to Sift</button>`);
+  $("#siftBack").onclick = siftMount;
 }
 function siftShow(){
   const el = $("#sift"); if (!el || !sift) return;
   const it = sift.deck[sift.i];
+  if (it?.g && games.has(it.g.id)) it.g = games.get(it.g.id);
   const prev = `<button class="linkbtn" data-s="prev" ${sift.done.length ? "" : "hidden"}>← Previous</button>`;
   const close = `<button class="linkbtn" data-s="close" aria-label="Close">✕</button>`;
   if (!it || sift.batch >= 20){
@@ -1094,7 +1107,8 @@ function siftShow(){
       ${g.cover ? `<div class="sift-bg" style="background-image:url('${esc(g.cover)}')"></div>` : ""}
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
-      <div class="sift-meta"><div class="sift-thumb">${poster}</div><div><b>${esc(g.title)}</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div><div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
+      <div class="sift-hint yes">Keep ✓</div><div class="sift-hint no">✕ Not now</div>
+      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div><div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
     </div>
     <div class="sift-btns"><button class="sift-round no" data-s="nope" aria-label="Not now">✕</button><button class="sift-round pin" data-s="next" aria-label="Up next">${ic("pin", 20)}</button><button class="sift-round yes" data-s="keep" aria-label="Keep">✓</button></div>
     <div class="sift-labels"><span>Not now</span><span>Up next</span><span>Keep</span></div>`;
@@ -1102,37 +1116,42 @@ function siftShow(){
   const stack = $("#siftStack"), dots = $("#siftDots"), me = sift.i, med = u => u.replace("t_screenshot_huge", "t_screenshot_med");
   let shots = [], k = 0, trailer = null;
   const play = () => `<button class="sift-play" data-s="play" aria-label="Play trailer">▶</button>`;
+  const vid = () => `<div class="sift-shot trailer"><img src="https://i.ytimg.com/vi/${encodeURIComponent(trailer)}/hqdefault.jpg" alt="">${play()}</div>`;
+  const shot = u => `<div class="sift-shot"><img src="${esc(u)}" alt=""></div>`;
+  const per = () => trailer ? 2 : 3;
+  // With a trailer: screenshot, video, screenshot. Without: three screenshots. Tap the stack for the next screenshots.
   const showShots = () => {
-    const set = shots.slice(k, k + 3);
-    stack.innerHTML = set.map((u, n) => `<div class="sift-shot"><img src="${esc(u)}" alt="">${n === 0 && trailer ? play() : ""}</div>`).join("");
-    const pages = Math.ceil(shots.length / 3);
-    dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / 3 ? "on" : ""}"></i>`).join("") : "";
+    const set = shots.slice(k, k + per()).map(shot);
+    if (trailer) set.splice(Math.min(1, set.length), 0, vid());
+    stack.innerHTML = set.join("");
+    const pages = Math.ceil(shots.length / per());
+    dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / per() ? "on" : ""}"></i>`).join("") : "";
   };
   const fail = msg => { stack.innerHTML = `<div class="sift-shot poster">${poster}</div>${msg ? `<div class="dim">${msg} <button class="linkbtn" data-s="retry">Retry</button></div>` : ""}`; };
-  sift.play = () => { const f = stack.querySelector(".sift-shot"); if (f && trailer) f.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailer)}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`; };
+  sift.play = () => { const f = stack.querySelector(".sift-shot.trailer"); if (f && trailer) f.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailer)}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`; };
   sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd6:" + g.igdbId); } catch {} siftShow(); };
   if (g.igdbId) gameDetails(g.igdbId).then(d => {
     if (!sift || sift.i !== me || !$("#siftStack")) return;
     shots = (d.shots || []).map(med); trailer = d.trailer || null;
-    if (shots.length) showShots();
-    else if (trailer) stack.innerHTML = `<div class="sift-shot"><img src="https://i.ytimg.com/vi/${encodeURIComponent(trailer)}/hqdefault.jpg" alt="">${play()}</div>`;
-    else fail("No gameplay found.");
+    if (shots.length || trailer) showShots(); else fail("No gameplay found.");
   }).catch(e => { if (sift && sift.i === me) fail("Couldn't load gameplay."); console.warn("sift details", g.title, e); });
   else fail("This game isn't matched, so there's no gameplay.");
   const nx = sift.deck[sift.i + 1], ng = nx && (nx.g || nx.x);
   if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 3).forEach(u => { new Image().src = med(u); })).catch(() => {});
   const c = $("#siftCard"); let x0 = null, dx = 0;
-  c.onpointerdown = e => { if (e.target.closest("button, iframe")) return; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
-  c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 25}deg)`; };
+  c.onpointerdown = e => { if (e.target.closest("button, iframe, [data-s]")) return; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
+  const hint = d => { c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
+  c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 25}deg)`; hint(dx); };
   c.onpointerup = c.onpointercancel = e => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
     if (Math.abs(dx) > 90) return siftAct(dx > 0 ? "keep" : "nope");
-    c.style.transform = "";
-    if (Math.abs(dx) < 8 && e.type === "pointerup" && shots.length > 3 && e.target.closest("#siftStack")){ k = (k + 3) % shots.length; showShots(); } };
+    c.style.transform = ""; hint(0);
+    if (Math.abs(dx) < 8 && e.type === "pointerup" && shots.length > per() && e.target.closest("#siftStack")){ k = (k + per()) % shots.length; showShots(); } };
 }
 async function siftAct(a){
   if (!sift) return;
   if (a === "close") return closeSheet();
   if (a === "play") return sift.play?.();
+  if (a === "open") return siftOpen();
   if (a === "retry") return sift.retry?.();
   if (a === "more"){ sift.batch = 0; return siftShow(); }
   if (a === "prev"){
@@ -1152,7 +1171,7 @@ async function siftAct(a){
     sift.done.push({newId: nid});
   }
   const c = $("#siftCard");
-  if (c){ c.classList.remove("dragging"); c.style.transform = `translateX(${a === "nope" ? -130 : 130}%) rotate(${a === "nope" ? -12 : 12}deg)`; c.style.opacity = "0"; await new Promise(r => setTimeout(r, 180)); }
+  if (c){ c.classList.remove("dragging"); const h = c.querySelector(a === "nope" ? ".sift-hint.no" : ".sift-hint.yes"); if (h && a !== "next") h.style.opacity = 1; c.style.transform = `translateX(${a === "nope" ? -130 : 130}%) rotate(${a === "nope" ? -12 : 12}deg)`; c.style.opacity = "0"; await new Promise(r => setTimeout(r, 180)); }
   sift.i++; sift.batch++; siftShow();
 }
 
