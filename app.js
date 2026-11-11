@@ -657,6 +657,10 @@ function diaryHTML(){
       <div class="stat"><b>${back.length}</b><span>in your backlog</span></div>
       <div class="stat"><b>${left.toLocaleString()}h</b><span>to beat the backlog</span></div>
       <div class="stat"><b>${avg}</b><span>average rating</span></div>
+      <div class="stat"><b>${done.length}</b><span>finished all-time</span></div>
+      ${(() => { const st = all.filter(g => g.steamHours > 0), h = st.reduce((n, g) => n + g.steamHours, 0), top = st.sort((a, b) => b.steamHours - a.steamHours)[0];
+        return `<div class="stat"><b>${Math.round(h).toLocaleString()}h</b><span>on Steam${top ? ` · most: ${esc(top.title)}` : ""}</span></div>`; })()}
+      <div class="stat"><b>${done.filter(g => g.couch).length}</b><span>couch co-op finished</span></div>
     </div>
     <div class="two">
       ${gTop.length ? `<div class="panel"><span class="label">What you finish</span><div class="bars">${gTop.map(([t, n]) => bar(t, n, gTop[0][1])).join("")}</div></div>` : ""}
