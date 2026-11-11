@@ -83,8 +83,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd5:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd5:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd6:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd6:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -1100,7 +1100,7 @@ function siftShow(){
   // Gameplay first: three screenshots stacked (tap the stack for the next three), ▶ turns the top one into the gameplay trailer.
   const stack = $("#siftStack"), dots = $("#siftDots"), me = sift.i, med = u => u.replace("t_screenshot_huge", "t_screenshot_med");
   let shots = [], k = 0, trailer = null;
-  const play = trailer => `<button class="sift-play" data-s="play" aria-label="Play trailer">▶</button>`;
+  const play = () => `<button class="sift-play" data-s="play" aria-label="Play trailer">▶</button>`;
   const showShots = () => {
     const set = shots.slice(k, k + 3);
     stack.innerHTML = set.map((u, n) => `<div class="sift-shot"><img src="${esc(u)}" alt="">${n === 0 && trailer ? play() : ""}</div>`).join("");
@@ -1109,11 +1109,13 @@ function siftShow(){
   };
   const fail = msg => { stack.innerHTML = `<div class="sift-shot poster">${poster}</div>${msg ? `<div class="dim">${msg} <button class="linkbtn" data-s="retry">Retry</button></div>` : ""}`; };
   sift.play = () => { const f = stack.querySelector(".sift-shot"); if (f && trailer) f.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailer)}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`; };
-  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd5:" + g.igdbId); } catch {} siftShow(); };
+  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd6:" + g.igdbId); } catch {} siftShow(); };
   if (g.igdbId) gameDetails(g.igdbId).then(d => {
     if (!sift || sift.i !== me || !$("#siftStack")) return;
     shots = (d.shots || []).map(med); trailer = d.trailer || null;
-    if (shots.length) showShots(); else { fail(trailer ? "" : "No gameplay found."); if (trailer) stack.insertAdjacentHTML("beforeend", play()); }
+    if (shots.length) showShots();
+    else if (trailer) stack.innerHTML = `<div class="sift-shot"><img src="https://i.ytimg.com/vi/${encodeURIComponent(trailer)}/hqdefault.jpg" alt="">${play()}</div>`;
+    else fail("No gameplay found.");
   }).catch(e => { if (sift && sift.i === me) fail("Couldn't load gameplay."); console.warn("sift details", g.title, e); });
   else fail("This game isn't matched, so there's no gameplay.");
   const nx = sift.deck[sift.i + 1], ng = nx && (nx.g || nx.x);
