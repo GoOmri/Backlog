@@ -616,10 +616,10 @@ dialog:has(.sift)::before{content:"";position:fixed;inset:-30%;z-index:-1;pointe
 /* Sift stack: the next card waits underneath and rises as you drag */
 .sift-deck{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
 .sift-deck > .sift-card{flex:1;background:var(--surface)}
-.sift-next{position:absolute;inset:0;border-radius:14px;overflow:hidden;transform:translateY(24px) scale(.88);opacity:0;filter:brightness(.45);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;padding:8px;background:var(--surface);pointer-events:none}
+.sift-next{position:absolute;inset:0;border-radius:14px;overflow:hidden;transform:translateY(24px) scale(.62);opacity:0;filter:brightness(.45);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;padding:8px;background:var(--surface);pointer-events:none}
 .sift-next > :not(.sift-bg){position:relative;z-index:1}
 .sift-next-shot{width:100%;aspect-ratio:16/9;border-radius:10px;background:#000 center/cover no-repeat}
-@keyframes siftUp{from{transform:translateY(24px) scale(.88);opacity:.3;filter:brightness(.45)}to{transform:none;opacity:1;filter:none}}
+@keyframes siftUp{from{transform:translateY(24px) scale(.62);opacity:.3;filter:brightness(.45)}to{transform:none;opacity:1;filter:none}}
 /* Library filters: collapsible sections, active chips, sort dropdown */
 details.fsec > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:4px}
 details.fsec > summary::-webkit-details-marker{display:none}

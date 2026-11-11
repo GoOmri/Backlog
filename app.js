@@ -1203,7 +1203,7 @@ function siftShow(){
     if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 3).forEach(u => { new Image().src = med(u); })).catch(() => {}); }
   const c = $("#siftCard"); let x0 = null, dx = 0, downOn = null;
   c.onpointerdown = e => { if (e.target.closest("button, iframe, [data-s], .vwrap")) return; downOn = e.target.closest("#siftStack") ? "shots" : null; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
-  const hint = d => { const ne = $("#siftNext"); if (ne){ const p = Math.min(1, Math.abs(d) / 140); ne.style.transform = `translateY(${24 * (1 - p)}px) scale(${.88 + .12 * p})`; ne.style.opacity = p; ne.style.filter = `brightness(${.45 + .55 * p})`; } c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
+  const hint = d => { const ne = $("#siftNext"); if (ne){ const p = Math.min(1, Math.abs(d) / 140); ne.style.transform = `translateY(${24 * (1 - p)}px) scale(${.62 + .38 * p})`; ne.style.opacity = p; ne.style.filter = `brightness(${.45 + .55 * p})`; } c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
   c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 25}deg)`; hint(dx); };
   c.onpointerup = c.onpointercancel = e => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
     if (Math.abs(dx) > 90) return siftAct(dx > 0 ? "keep" : "nope");
