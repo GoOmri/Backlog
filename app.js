@@ -712,7 +712,7 @@ function render(){
   eagerLeft = 12; lastRenderAt = performance.now();
   renderTabs();
   const m = $("#main");
-  if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
+  if (!loaded){ m.innerHTML = `<div class="empty lateshow">Loading your games…</div>`; return; }
   renderMain(m);
 }
 function renderTabs(){
@@ -882,16 +882,18 @@ async function previewSheet(x){
   try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
-let ytReady, vTimer, isScrubbing = () => false;
+let ytReady;
 function loadYT(){ return ytReady ||= new Promise(res => { window.onYouTubeIframeAPIReady = res; const sc = document.createElement("script"); sc.src = "https://www.youtube.com/iframe_api"; document.head.append(sc); }); }
-async function mountTrailer(id){
-  await loadYT(); if (!$("#ytp")) return;
-  const flash = t => { const f = $("#vflash"); if (!f) return; f.textContent = t; f.classList.remove("show"); void f.offsetWidth; f.classList.add("show"); };
-  const pl = new YT.Player("ytp", {videoId: id, playerVars: {autoplay: 1, mute: 1, start: 5, controls: 0, cc_load_policy: 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3, fs: 0},
-    events: {onStateChange: e => $("#vctl")?.classList.toggle("paused", e.data === 2), onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($("#vtitle")) $("#vtitle").textContent = t || ""; }}});
-  clearInterval(vTimer);
-  vTimer = setInterval(() => { const f = $("#vfill"); if (!f || !pl.getDuration || isScrubbing()) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
-  const ctl = $("#vctl");
+async function mountTrailer(id, root = document){
+  const $r = sel => root.querySelector(sel);
+  await loadYT(); if (!$r("#ytp")) return;
+  const flash = t => { const f = $r("#vflash"); if (!f) return; f.textContent = t; f.classList.remove("show"); void f.offsetWidth; f.classList.add("show"); };
+  const pl = new YT.Player($r("#ytp"), {videoId: id, playerVars: {autoplay: 1, mute: 1, start: 5, controls: 0, cc_load_policy: 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3, fs: 0},
+    events: {onStateChange: e => $r("#vctl")?.classList.toggle("paused", e.data === 2), onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($r("#vtitle")) $r("#vtitle").textContent = t || ""; }}});
+  clearInterval(root._vt);
+  let scrubbing = false;
+  root._vt = setInterval(() => { const f = $r("#vfill"); if (!f || !pl.getDuration || scrubbing) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
+  const ctl = $r("#vctl");
   ctl.onclick = e => {
     if (e.target.closest("#vbar")) return;
     const r = ctl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
@@ -900,14 +902,13 @@ async function mountTrailer(id){
     else if (pl.getPlayerState() === 1){ pl.pauseVideo(); flash("❚❚"); } else { pl.playVideo(); flash("▶"); }
   };
   // Drag along the timeline to scrub: the bar follows your finger, the video jumps as you move and settles on release.
-  const bar = $("#vbar"); let scrubbing = false;
+  const bar = $r("#vbar");
   const frac = e => { const r = bar.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); };
-  const show = f => { $("#vfill").style.width = f * 100 + "%"; };
+  const show = f => { $r("#vfill").style.width = f * 100 + "%"; };
   bar.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); scrubbing = true; bar.setPointerCapture(e.pointerId); const f = frac(e); show(f); pl.seekTo(f * (pl.getDuration() || 0), false); };
   bar.onpointermove = e => { if (!scrubbing) return; const f = frac(e); show(f); pl.seekTo(f * (pl.getDuration() || 0), false); };
   bar.onpointerup = bar.onpointercancel = e => { if (!scrubbing) return; scrubbing = false; pl.seekTo(frac(e) * (pl.getDuration() || 0), true); };
   bar.onclick = e => e.stopPropagation();
-  isScrubbing = () => scrubbing;
 }
 // Your progress: Steam achievements and PlayStation trophies.
 let trophyList = null;
@@ -970,7 +971,7 @@ function fillMedia(d){
     $("#mslides").innerHTML = slides.join("");
     $("#mdots").innerHTML = slides.map((_, i) => `<button class="dotbtn" data-mgo="${i}" aria-label="Slide ${i + 1}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("");
   }
-  if (d.trailer && $("#ytp")) mountTrailer(d.trailer);
+  if (d.trailer && $("#dlg #ytp")) mountTrailer(d.trailer, $("#dlg"));
   const byIgdb = new Map(list().map(g => [g.igdbId, g]));
   const sims = (d.similar || []).filter(x => !byIgdb.get(x.igdbId)?.nope);
   if (sims.length && $("#simBox")){
@@ -1139,7 +1140,7 @@ function siftShow(){
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
       <div class="sift-hint yes">✓</div><div class="sift-hint no">✕</div>
-      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div>${(g.genres || []).length ? `<div class="sift-genres">${g.genres.slice(0, 4).map(esc).join(" · ")}</div>` : ""}<div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
+      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div>${(g.genres || []).filter(x => x !== "Indie").length ? `<div class="sift-genres">${g.genres.filter(x => x !== "Indie").slice(0, 4).map(esc).join(" · ")}</div>` : ""}<div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
     </div>
     <div class="sift-btns"><button class="sift-round no" data-s="nope" aria-label="Not now">✕</button><button class="sift-round pin" data-s="next" aria-label="Up next">${ic("pin", 20)}</button><button class="sift-round yes" data-s="keep" aria-label="Keep">✓</button></div>
     <div class="sift-labels"><span>Not now</span><span>Up next</span><span>Keep</span></div>`;
@@ -1159,7 +1160,7 @@ function siftShow(){
       const html = set.map(shot);
       if (trailer) html.splice(Math.min(1, html.length), 0, vid());
       stack.innerHTML = html.join("");
-      if (trailer) mountTrailer(trailer);
+      if (trailer) mountTrailer(trailer, $("#sift"));
     }
     const pages = Math.ceil(shots.length / per());
     dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / per() ? "on" : ""}"></i>`).join("") : "";
@@ -1273,7 +1274,7 @@ document.addEventListener("change", e => {
   if (id === "sortSel"){ sort = e.target.value; render(); }
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
-$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval(vTimer); if (history.state?.sheet) history.back(); softPending = false; render(); });
+$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval($("#dlg")._vt); if (history.state?.sheet) history.back(); softPending = false; render(); });
 document.addEventListener("scroll", e => {
   const el = e.target; if (el.id !== "slides" && el.id !== "mslides") return;
   const i = Math.round(el.scrollLeft / el.clientWidth);
