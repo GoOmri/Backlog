@@ -405,7 +405,7 @@ function coverTag(g){
   return "";
 }
 // "Available on" (outlined) for platforms you don't own it on. Owned platforms stay filled; PS Plus/PS5 cover PS, Steam/Epic/itch cover PC.
-const AVAIL = {ps5: "PS5", ps4: "PS4", pc: "PC", switch: "NS", xbox: "XB"};
+const AVAIL = {ps5: "PS5", ps4: "PS4", pc: "PC", switch: "NS"};
 function availBadges(g){
   const own = g.platforms || [], hasPS = own.some(p => p === "ps5" || p === "psplus"), hasPC = own.some(p => ["steam", "epic", "itch"].includes(p));
   const av = (g.avail || []).filter(c => AVAIL[c] && !(hasPS && (c === "ps5" || c === "ps4")) && !(hasPC && c === "pc"));
@@ -879,7 +879,7 @@ function pageShell(x, {own, actions, facts, edit}){
       <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
       <p class="desc clamp" id="desc"></p>
     </div>
-    <aside class="gp-facts">${own}<div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"><span class="dchip none">…</span><span>Difficulty</span></div>${facts || ""}</aside>
+    <aside class="gp-facts">${own}<div class="gp-plats" id="gpPlats"></div><div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"><span class="dchip none">…</span><span>Difficulty</span></div>${facts || ""}</aside>
   </div>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
 }
@@ -978,10 +978,11 @@ async function fillTags(g){
 async function fillStrip(g, d){
   fillTags(g);
   const box = $("#strip"); if (!box) return;
-  if (d.available?.length && $("#ownAvail")) $("#ownAvail").textContent = " · available on " + d.available.join(", ");
+  // Platforms: where you own it (filled) and where else it's available (outlined); wishlist platforms are outlined too.
+  if ($("#gpPlats")){ const x = {...g, avail: d.avail || g.avail || []}; $("#gpPlats").innerHTML = badges(x.platforms || [], x) + availBadges(x); }
   // No PlayStation release (e.g. PC only): drop the PS Store link.
   if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) $(".pslink")?.remove();
-  const parts = [null, d.critic && `<span>Critics <b>${d.critic}</b>/100</span>`, null, d.developers?.[0] && `<span>Developer <b>${esc(d.developers[0])}</b></span>`, (d.ttb || g.ttb)?.main && `<span>Time to beat <b>~${(d.ttb || g.ttb).main}h</b>${(d.ttb || g.ttb).full > (d.ttb || g.ttb).main ? ` · 100% ~${(d.ttb || g.ttb).full}h` : ""}</span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
+  const parts = [null, d.critic && `<span>Critics <b>${d.critic}</b></span>`, null, d.developers?.[0] && `<span>by <b>${esc(d.developers[0])}</b></span>`, (d.ttb || g.ttb)?.main && `<span><b>~${(d.ttb || g.ttb).main}h</b> to beat</span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
   if (g.steamAppId){
