@@ -254,13 +254,25 @@ const DISLIKE = ["Souls-like", "Hack and Slash", "Action Roguelike", "Bullet Hel
 const SEARCHES = [
   ["mv", ["Metroidvania"], "sort_by=Reviews_DESC"], ["mv", ["Metroidvania"], "sort_by=Reviews_DESC", 100],
   ["plat", ["2D Platformer"], "sort_by=Reviews_DESC"], ["plat", ["2D Platformer"], "sort_by=Reviews_DESC", 100],
-  ["plat", ["Puzzle Platformer"], "sort_by=Reviews_DESC"], ["plat", ["Precision Platformer"], "sort_by=Reviews_DESC"],
   ["walk", ["Walking Simulator"], "sort_by=Reviews_DESC"], ["mystery", ["Mystery"], "sort_by=Reviews_DESC"], ["mystery", ["Detective"], "sort_by=Reviews_DESC"],
   ["cozy", ["Cozy"], "sort_by=Reviews_DESC"], ["zelda", ["Top-Down", "Action-Adventure"], "sort_by=Reviews_DESC"],
   ["coopPuzzle", ["Local Co-Op", "Puzzle"], "sort_by=Reviews_DESC"], ["coopPlat", ["Local Co-Op", "Platformer"], "sort_by=Reviews_DESC"]
 ];
+// A row only counts a game when the row's genre is one of the game's main Steam tags (top 5), never "anywhere in the list".
+// "Local Co-Op" is a feature tag, so it may sit anywhere (the search already guarantees it).
+const TOP = 5, isPlat = t => /Platformer$/.test(t);
+const MAIN = {
+  mv: (t) => t.includes("Metroidvania"),
+  plat: (t, g) => t.includes("2D Platformer") && (g.player_perspectives || []).some(p => p.name === "Side view"),
+  walk: (t) => t.includes("Walking Simulator"),
+  mystery: (t) => t.includes("Mystery") || t.includes("Detective"),
+  cozy: (t) => t.includes("Cozy"),
+  zelda: (t) => t.includes("Top-Down") && t.includes("Action-Adventure"),
+  coopPuzzle: (t) => t.some(x => /Puzzle/.test(x)),
+  coopPlat: (t) => t.some(isPlat)
+};
 async function finds(env){
-  const c = await env.KV.get("finds11", "json");
+  const c = await env.KV.get("finds12", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600, half = now - 180 * 86400, three = now - 3 * 365 * 86400;
   const clean = `version_parent = null & parent_game = null`, side = `genres = (8) & player_perspectives = (4)`;
@@ -296,7 +308,8 @@ async function finds(env){
   for (let i = 0; i < ids.length; i += 250) games.push(...await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${ids.slice(i, i + 250).join(",")}) & ${clean}; limit 500;`));
   const elite = h => h.pct >= 94 && h.n >= 10000;
   const items = games.map(g => {
-    const h = gameOf.get(g.id), top = (h.tags || []).slice(0, 8);
+    const h = gameOf.get(g.id), top = (h.tags || []).slice(0, 8), main = top.slice(0, TOP);
+    const keys = new Set([...h.keys].filter(k => !MAIN[k] || MAIN[k](main, g)));
     const taste = Math.min(6, top.filter(t => LIKE.includes(t)).length * 1.5) - (elite(h) ? 0 : top.filter(t => DISLIKE.includes(t)).length * 6);
     const base = h.pct != null ? (h.pct * h.n + 80 * 300) / (h.n + 300) : 75;
     const sk = [...new Set((h.tags || []).map(t => STAG[t]).filter(Boolean))];
@@ -304,8 +317,8 @@ async function finds(env){
       date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app, price: h.price};
     x.score = base + taste + Math.max(0, (x.year || 2008) - 2008) * 0.3;
     x.gem = h.n < 1500 && h.pct >= 92; x.taste = taste;
-    return {x, keys: h.keys};
-  }).filter(({x}) => !x.genres.includes("Visual Novel"));
+    return {x, keys};
+  }).filter(({x, keys}) => keys.size && !x.genres.includes("Visual Novel"));
   const pick = (keys, f = () => true, sort = (a, b) => b.score - a.score, n = 40) =>
     items.filter(i => keys.some(k => i.keys.has(k)) && f(i.x)).map(i => i.x).sort(sort).slice(0, n);
   const taste = ["mv", "plat", "walk", "mystery", "cozy", "zelda", "coopPuzzle", "coopPlat"];
@@ -318,7 +331,7 @@ async function finds(env){
     missed: pick(taste, x => x.date > three && x.date < half && x.taste >= 0),
     classics: classics.map(g => slim(g)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 30)
   };
-  await env.KV.put("finds11", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds12", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 
