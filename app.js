@@ -850,7 +850,7 @@ function inList(x){
 function pageShell(x, {own, actions, facts, edit}){
   const yr = new Date().getFullYear();
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
-  const meta = [when, ...basicTags(x), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
+  const meta = [when, ...basicTags(x).filter(t => VIEWS.includes(t) || COOPS.includes(t)), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = heroSrc(x.hero) || x.cover;
   return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
@@ -1164,7 +1164,7 @@ function siftShow(){
       <div id="siftStack" class="sift-stack"><div class="sift-shot"><span class="dim">Loading gameplay…</span></div></div>
       <div id="siftDots" class="sift-dots"></div>
       <div class="sift-hint yes">✓</div><div class="sift-hint no">✕</div>
-      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).slice(0, 2)].filter(Boolean).map(esc).join(" · ")}</div>${(g.genres || []).filter(x => x !== "Indie").length ? `<div class="sift-genres">${g.genres.filter(x => x !== "Indie").slice(0, 4).map(esc).join(" · ")}</div>` : ""}<div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
+      <div class="sift-meta"><div class="sift-thumb" data-s="open">${poster}</div><div><b data-s="open">${esc(g.title)} ›</b><div class="dim">${[g.year, q, ...basicTags(g).filter(t => VIEWS.includes(t) || COOPS.includes(t))].filter(Boolean).map(esc).join(" · ")}</div>${(g.genres || []).filter(x => x !== "Indie").length ? `<div class="sift-genres">${g.genres.filter(x => x !== "Indie").slice(0, 4).map(esc).join(" · ")}</div>` : ""}<div class="sift-plats">${badges(g.platforms || [], g)}${availBadges(g)}</div></div></div>
     </div>
     </div>
     <div class="sift-btns"><button class="sift-round no" data-s="nope" aria-label="Not now">✕</button><button class="sift-round pin" data-s="next" aria-label="Up next">${ic("pin", 20)}</button><button class="sift-round yes" data-s="keep" aria-label="Keep">✓</button></div>
@@ -1203,7 +1203,7 @@ function siftShow(){
     if (ng?.igdbId) gameDetails(ng.igdbId).then(d => (d.shots || []).slice(0, 3).forEach(u => { new Image().src = med(u); })).catch(() => {}); }
   const c = $("#siftCard"); let x0 = null, dx = 0, downOn = null;
   c.onpointerdown = e => { if (e.target.closest("button, iframe, [data-s], .vwrap")) return; downOn = e.target.closest("#siftStack") ? "shots" : null; x0 = e.clientX; dx = 0; c.classList.add("dragging"); c.setPointerCapture(e.pointerId); };
-  const hint = d => { const ne = $("#siftNext"); if (ne){ const p = Math.min(1, Math.abs(d) / 140); ne.style.transform = `translateY(${36 * (1 - p)}px) scale(${.94 + .06 * p})`; ne.style.opacity = .35 + .65 * p; ne.style.filter = `brightness(${.45 + .55 * p})`; } c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
+  const hint = d => { const ne = $("#siftNext"); if (ne){ const p = Math.min(1, Math.abs(d) / 140); ne.style.transform = `translateY(${24 * (1 - p)}px) scale(${.88 + .12 * p})`; ne.style.opacity = p; ne.style.filter = `brightness(${.45 + .55 * p})`; } c.querySelector(".sift-hint.yes").style.opacity = Math.max(0, Math.min(1, d / 90)); c.querySelector(".sift-hint.no").style.opacity = Math.max(0, Math.min(1, -d / 90)); };
   c.onpointermove = e => { if (x0 == null) return; dx = e.clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 25}deg)`; hint(dx); };
   c.onpointerup = c.onpointercancel = e => { if (x0 == null) return; x0 = null; c.classList.remove("dragging");
     if (Math.abs(dx) > 90) return siftAct(dx > 0 ? "keep" : "nope");
