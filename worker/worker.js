@@ -1,6 +1,6 @@
 // Backlog data service — runs on Cloudflare Workers.
 // Keys live in Cloudflare as secrets (never in this file):
-//   TWITCH_ID, TWITCH_SECRET, SGDB_KEY, STEAM_KEY, STEAM_ID, ITAD_KEY
+//   TWITCH_ID, TWITCH_SECRET, SGDB_KEY, STEAM_KEY, STEAM_ID
 // KV namespace bound as KV. Only answers requests from ALLOWED_ORIGIN.
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
@@ -21,7 +21,6 @@ export default {
         case "/match":    out = await match(env, (body.titles || []).slice(0, 10)); break;
         case "/search":   out = await search(env, url.searchParams.get("q") || ""); break;
         case "/game":     out = await game(env, +url.searchParams.get("id")); break;
-        case "/discover": out = await discover(env, body.like || [], body.exclude || []); break;
         case "/info":     out = await info(env, (body.ids || []).filter(Number.isFinite).slice(0, 200)); break;
         case "/upcoming": out = await upcoming(env); break;
         case "/deck":     out = await deck(env, (body.items || []).slice(0, 12)); break;
@@ -38,17 +37,13 @@ export default {
         case "/couch":    out = await couch(env, url.searchParams.get("kind") || "platformer"); break;
         case "/steamwish": out = await steamWishlist(env); break;
         case "/steam":    out = await steam(env); break;
-        case "/prices":   out = await prices(env, (body.titles || []).slice(0, 40)); break;
-        case "/psplus":   out = await psplus(env, ctx); break;
         default: return json({error: "Not found"}, 404, cors);
       }
       return json(out, 200, cors);
     } catch (e){
       return json({error: e.message || String(e)}, 502, cors);
     }
-  },
-  // Daily cron: look for new "leaving PS Plus" articles.
-  async scheduled(event, env, ctx){ ctx.waitUntil(refreshPsPlus(env)); }
+  }
 };
 
 const json = (o, status, headers) => new Response(JSON.stringify(o), {status, headers: {...headers, "Content-Type": "application/json"}});
@@ -335,26 +330,6 @@ async function finds(env){
   return d;
 }
 
-/* ---------- Discover: games IGDB lists as similar to ones you like ---------- */
-async function discover(env, like, exclude){
-  like = like.filter(Number.isFinite).slice(0, 60);
-  if (!like.length) return [];
-  const src = await igdb(env, "games", `fields name,similar_games; where id = (${like.join(",")}); limit 60;`);
-  const ex = new Set(exclude), count = new Map(), because = new Map();
-  for (const g of src) for (const s of g.similar_games || []){
-    if (ex.has(s)) continue;
-    count.set(s, (count.get(s) || 0) + 1);
-    if (!because.has(s)) because.set(s, []);
-    because.get(s).push(g.name);
-  }
-  const top = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(e => e[0]);
-  if (!top.length) return [];
-  const list = await igdb(env, "games", `fields ${MATCH_FIELDS}; where id = (${top.join(",")}); limit 30;`);
-  const ttb = await ttbFor(env, list.map(g => g.id));
-  return list.map(g => ({...slim(g, ttb), because: because.get(g.id).slice(0, 3), score: count.get(g.id)}))
-    .sort((a, b) => b.score - a.score || (b.rating || 0) - (a.rating || 0));
-}
-
 /* ---------- Couch co-op finder ---------- */
 // IGDB ids: genre 8 = Platform, perspective 4 = Side view.
 async function couch(env, kind){
@@ -506,65 +481,3 @@ async function steamWishlist(env){
   }
   return items.map(x => ({appid: x.appid, title: names[x.appid], added: (x.date_added || 0) * 1000, priority: x.priority})).filter(x => x.title);
 }
-
-/* ---------- IsThereAnyDeal prices (PC stores) ---------- */
-async function itad(env, path, body){
-  const r = await fetch(`https://api.isthereanydeal.com/${path}${path.includes("?") ? "&" : "?"}key=${env.ITAD_KEY}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-  if (!r.ok) throw new Error("IsThereAnyDeal " + r.status);
-  return r.json();
-}
-async function prices(env, titles){
-  if (!titles.length) return {};
-  const ids = await itad(env, "lookup/id/title/v1", titles);
-  const uuids = [...new Set(Object.values(ids).filter(Boolean))];
-  if (!uuids.length) return Object.fromEntries(titles.map(t => [t, null]));
-  let rows;
-  try { rows = await itad(env, "games/prices/v3?country=IL&deals=true", uuids); }
-  catch { rows = await itad(env, "games/prices/v3?country=US&deals=true", uuids); }
-  const best = {};
-  for (const r of rows){
-    // Only the stores Omri buys from on PC.
-    const d = (r.deals || []).filter(x => /^(steam|epic)/i.test(x.shop?.name || "")).sort((a, b) => (b.cut || 0) - (a.cut || 0))[0];
-    if (d) best[r.id] = {cut: d.cut || 0, price: d.price?.amount, regular: d.regular?.amount, currency: d.price?.currency, shop: d.shop?.name, url: d.url};
-  }
-  return Object.fromEntries(titles.map(t => [t, ids[t] ? (best[ids[t]] || {cut: 0}) : null]));
-}
-
-/* ---------- PS Plus leaving: news articles, matched against your titles in the app ---------- */
-const FEEDS = ["https://www.pushsquare.com/feeds/latest", "https://www.kitguru.net/feed/"];
-const LEAVING = /(leav|last chance|los(e|ing)).*(ps plus|playstation plus)|(ps plus|playstation plus).*(leav|last chance|los(e|ing))/i;
-async function psplus(env, ctx){
-  let data = await env.KV.get("psplus", "json");
-  if (!data || Date.now() - data.checked > 12 * 3600e3){
-    ctx.waitUntil(refreshPsPlus(env));
-    data = data || await refreshPsPlus(env);
-  }
-  const cutoff = Date.now() - 45 * 864e5;
-  return (data.articles || []).filter(a => a.date > cutoff);
-}
-async function refreshPsPlus(env){
-  const old = (await env.KV.get("psplus", "json")) || {articles: []};
-  const known = new Set(old.articles.map(a => a.url));
-  const found = [];
-  for (const feed of FEEDS){
-    try {
-      const xml = await (await fetch(feed, {headers: {"User-Agent": "Backlog personal app"}})).text();
-      for (const item of xml.split(/<item[\s>]/).slice(1)){
-        const title = strip(pick(item, "title")), link = strip(pick(item, "link")), date = Date.parse(strip(pick(item, "pubDate"))) || Date.now();
-        if (LEAVING.test(title) && link && !known.has(link)) found.push({title, url: link, date});
-      }
-    } catch {}
-  }
-  for (const a of found.slice(0, 4)){
-    try {
-      const html = await (await fetch(a.url, {headers: {"User-Agent": "Backlog personal app"}})).text();
-      a.text = strip(html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ")).slice(0, 20000);
-    } catch {}
-  }
-  const cutoff = Date.now() - 60 * 864e5;
-  const data = {checked: Date.now(), articles: [...found.filter(a => a.text), ...old.articles].filter(a => a.date > cutoff).slice(0, 12)};
-  await env.KV.put("psplus", JSON.stringify(data));
-  return data;
-}
-const pick = (s, tag) => (s.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`)) || [])[1] || "";
-const strip = s => s.replace(/<!\[CDATA\[|\]\]>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
