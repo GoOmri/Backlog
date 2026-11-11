@@ -651,3 +651,9 @@ details.fsec[open]::details-content{block-size:auto;opacity:1}
 .chip.on,.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#0E1116}
 .fopt[aria-pressed="true"]{background:rgb(167 139 250 / .16);color:var(--accent)}
 .fopt[aria-pressed="true"] .n{color:var(--accent)}
+#main.taboutl{animation:taboutl .11s ease-in forwards}
+#main.taboutr{animation:taboutr .11s ease-in forwards}
+@keyframes taboutl{to{opacity:0;transform:translateX(-28px)}}
+@keyframes taboutr{to{opacity:0;transform:translateX(28px)}}
+@keyframes tabinr{from{opacity:0;transform:translateX(28px)}}
+@keyframes tabinl{from{opacity:0;transform:translateX(-28px)}}

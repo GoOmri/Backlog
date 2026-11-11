@@ -1251,7 +1251,11 @@ document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return;
   const d = t.dataset;
   if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
-  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tab = d.tab; q = ""; loadFilters(); renderTabs(); requestAnimationFrame(() => setTimeout(() => { render(); scrollTo(0, 0); if (ch){ $("#main").classList.remove("tabinr", "tabinl"); anim($("#main"), dir); } })); }
+  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tab = d.tab; q = ""; loadFilters(); renderTabs();
+    // Old screen slides out the other way (~110ms) while the new one is built, then the new one slides in: no blank frame.
+    const m = $("#main"); m.classList.remove("tabinr", "tabinl", "taboutr", "taboutl");
+    if (ch){ void m.offsetWidth; m.classList.add(dir === "tabinr" ? "taboutl" : "taboutr"); }
+    setTimeout(() => { render(); scrollTo(0, 0); m.classList.remove("taboutr", "taboutl"); if (ch) anim(m, dir); }, ch ? 110 : 0); }
   else if (d.f != null){ const k = d.f.indexOf("|"); toggleFilter(d.f.slice(0, k), d.f.slice(k + 1)); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }
