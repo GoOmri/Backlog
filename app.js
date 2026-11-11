@@ -122,10 +122,6 @@ document.addEventListener("pointermove", e => {
 addEventListener("pointerup", () => { if (!drag) return; const d = drag; drag = null; d.el.style.scrollSnapType = ""; d.el.classList.remove("dragging");
   if (d.moved) addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }, {capture: true, once: true}); });
 // Start loading details when the pointer rests on a cover, so the page opens ready.
-document.addEventListener("pointerover", e => {
-  const c = e.target.closest?.("[data-edit]"); const g = c && games.get(c.dataset.edit);
-  if (g?.igdbId && API) gameDetails(g.igdbId).catch(() => {});
-});
 
 /* ---------- writes ---------- */
 const upd = (id, d) => updateDoc(doc(col, id), d);
