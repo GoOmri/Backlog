@@ -601,3 +601,8 @@ body::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none
 .gp-title{min-height:96px;display:flex;align-items:flex-end}
 .gp-main .mdots{min-height:8px}
 .desc.clamp:empty{min-height:4.8em}
+/* Same slow glow inside Sift (the sheet has its own opaque background) */
+dialog:has(.sift)::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none;
+  background:radial-gradient(40% 35% at 25% 30%,rgb(70 110 255 / .16),transparent 70%),radial-gradient(38% 34% at 75% 65%,rgb(150 80 255 / .14),transparent 70%);
+  animation:glow 60s ease-in-out infinite alternate;will-change:transform}
+@media (prefers-reduced-motion:reduce){dialog:has(.sift)::before{animation:none}}
