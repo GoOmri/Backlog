@@ -25,7 +25,7 @@ const ICON = {
   chev: '<path d="m6 9 6 6 6-6"/>'
 };
 const ic = (n, size = 20, fill = false) => `<svg class="ico-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const TABS = [["home","Play","home"],["disc","Find","compass"],["lib","Library","grid"],["diary","Stats","book"]];
+const TABS = [["home","Play","home"],["lib","Library","grid"],["diary","Stats","book"]];
 const SKIP_STEAM = /^(blender|sharex|wallpaper engine)$|public test|dedicated server|soundtrack|\bsdk\b|\bdemo\b|benchmark/i;
 
 /* ---------- state ---------- */
@@ -405,9 +405,6 @@ function cardHTML(g, sub){
   return `<button class="card" data-edit="${g.id}">${coverHTML(g)}<span class="ctitle">${esc(g.title)}</span>
     <span class="csub"><span>${esc(sub ?? (basicTags(g).slice(0, 2).join(" · ") || g.year || ""))}</span>${right}</span></button>`;
 }
-const rowHTML = (title, items, sub = "", subFn, min = 1) => items.length >= min ? `<section class="section wrap"><div class="row-head"><h3>${title}</h3><span class="dim">${sub}</span></div>
-  <div class="row">${items.map(g => cardHTML(g, subFn?.(g))).join("")}</div></section>` : "";
-
 /* ---------- home ---------- */
 const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; // his favourite kinds of games
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
@@ -454,37 +451,41 @@ async function fetchHero(g){
 // Omri's categories. A game can sit in more than one.
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
 const plat = g => (g.genres || []).includes("Platform");
-const CATS = [
-  ["MV's you own", g => kwOf(g).includes("Metroidvania")],
-  ["2D platformers", g => plat(g) && has(g, "2D") && !kwOf(g).includes("Metroidvania") && !(g.genres || []).includes("Puzzle")],
-  ["Couch co-op platformers", g => plat(g) && g.couch],
-  ["Puzzle-platformers", g => plat(g) && ((g.genres || []).includes("Puzzle") || (g.kw || []).includes("Puzzle-platformer"))]
+// Play = Up next carousel, then rows. Each row mixes your games (owned or wishlist; not finished, dropped or pinned)
+// with Find picks from /finds, sorted purely by quality. To split back into Play + Find, give each tab its own part of ROWS.
+const ROWS = [
+  ["2D platformers", "plat2d", g => plat(g) && has(g, "2D")],
+  ["3D platformers", "plat3d", g => plat(g) && has(g, "3D")],
+  ["Couch co-op", "coop", g => g.couch],
+  ["Unique", "unique", () => false]
 ];
-// 3D games ranked by how close they are to the 3D games he played and liked.
-function taste3D(gs){
-  const w = {};
-  list().filter(g => has(g, "3D") && (g.status === "done" || g.myRating))
-    .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2.5 : 1)));
-  return gs.filter(g => has(g, "3D")).map(g => [g, genresOf(g).reduce((s, t) => s + (w[t] || 0), 0) + (g.rating || 60) / 50])
-    .sort((a, b) => b[1] - a[1]).map(r => r[0]);
+// Same scale as the worker's quality(): Steam % pulled toward 80 when few reviews, else IGDB rating pulled toward 75.
+const quality = x => x.score ?? (x.steamPct != null ? (x.steamPct * (x.steamN || 0) + 80 * 300) / ((x.steamN || 0) + 300)
+  : x.rating ? (x.rating * (x.ratingCount || 0) + 75 * 20) / ((x.ratingCount || 0) + 20) : 70);
+let rowCache = {};
+function rowItems(key, test){
+  const mine = list().filter(g => playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
+  const found = ((topMV || {})[key] || []).filter(x => !inList(x)).map(x => ({x, q: quality(x)}));
+  return [...mine, ...found].sort((a, b) => b.q - a.q);
 }
-const byLikely = (a, b) => (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0);
+const itemCard = i => i.g ? cardHTML(i.g) : suggestCard(i.x, i.x.year || "");
+function playRow([title, key, test]){
+  const items = rowCache[key] = rowItems(key, test);
+  if (!items.length) return "";
+  const more = items.length > 10 ? `<button class="linkbtn" data-act="seeall" data-row="${key}" style="margin-left:auto">See all</button>` : "";
+  return `<section class="section wrap"><div class="row-head"><h3>${title}</h3>${more}</div><div class="row">${items.slice(0, 10).map(itemCard).join("")}</div></section>`;
+}
 function homeHTML(){
   if (!games.size) return emptyHTML();
   homeMode = "owned";
-  const top = upNextGames(), inTop = new Set(top.map(g => g.id));
-  const pool = list().filter(g => playable(g) && g.status === "backlog");
-  const fits = g => CATS.some(([, test]) => test(g));
-  const wish = list().filter(g => g.status === "wishlist" && !g.hidden)
-    .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || fits(b) - fits(a) || (b.rating || 0) - (a.rating || 0)).slice(0, 30);
-  const is2D = g => basicTags(g).includes("2D");
-  const [metroid, plat2d, couch, puzzle] = CATS.map(([name, test], i) => rowHTML(name, pool.filter(test).sort((a, b) => (i === 0 ? is2D(b) - is2D(a) : 0) || byLikely(a, b)).slice(0, 24), "", undefined, 3));
+  if (topMV === null) topMV = swr("c:finds", () => api("/finds"), r => topMV = r) || {};
+  const top = upNextGames();
   const pinnedN = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).length;
+  const wishN = list().filter(g => g.status === "wishlist" && !g.hidden).length;
   return carouselHTML(top)
-    + (pinnedN ? `<div class="wrap row-head" style="padding-top:8px"><span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext" style="margin-left:auto">Show all</button></div>` : "")
-    + (list().some(g => g.upNext) ? "" : `<p class="wrap why" style="padding-top:12px">Tip: open any game and tap the <b>pin</b> to put it at the top.</p>`)
-    + metroid + plat2d + couch + puzzle
-    + rowHTML("3D games for you", taste3D(pool).slice(0, 24), "", undefined, 3);
+    + `<div class="wrap row-head" style="padding-top:8px">${pinnedN ? `<span class="dim">Up next · ${pinnedN}</span><button class="linkbtn" data-act="upnext">Show all</button>` : `<span class="why">Open any game and tap the <b>pin</b> to put it in Up next.</span>`}${wishN ? `<button class="linkbtn" data-tab="wish" style="margin-left:auto">Wishlist · ${wishN}</button>` : ""}</div>`
+    + ROWS.map(playRow).join("")
+    + `<div class="wrap">${radarHTML()}</div>`;
 }
 function topTags(gs){
   const c = {}; gs.forEach(g => basicTags(g).forEach(t => c[t] = (c[t] || 0) + 1));
@@ -564,7 +565,7 @@ function shelfHTML(wish){
   if (key !== shelfKey){ shelfReset = !!shelfKey; shelfKey = key; shelfLimit = CHUNK; }
   shelfShown = shown;
   const nOn = platF.size + F.type.size + F.view.size + F.coop.size + F.access.size + (deckF ? 1 : 0) + (sort !== "title" ? 1 : 0);
-  return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="disc">← Find</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
+  return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="lib">← Library</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
     <div class="libhead"><div class="filters">
       <input id="q" type="search" autocomplete="off" placeholder="Search" value="${esc(q)}" aria-label="Search">
       <button class="chip mobile-only" data-act="filters">Filters${nOn ? ` · ${nOn}` : ""}</button>
@@ -619,38 +620,17 @@ function radarHTML(){
   const have = new Set(list().map(g => g.igdbId));
   [...radar.soonPs5, ...radar.soonPc, ...radar.recent].forEach(x => previewCache.set(x.igdbId, x));
   const card = (x, sub) => suggestCard(x, sub);
-  const row = (t, xs, subf) => { xs = xs.filter(x => !inList(x)); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
+  const row = (t, xs, subf) => { xs = xs.filter(x => !inList(x)).slice(0, 10); return xs.length ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => card(x, subf(x))).join("")}</div></div>` : ""; };
   const when = x => x.date ? new Date(x.date * 1000).toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "Coming soon";
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when);
 }
-// Find tab: wishlist link + four rows from /finds (top 10 each).
 // Show the last saved result instantly, refresh in the background, re-render only if it changed.
 function swr(key, fetcher, set, onErr){
   let c = null; try { c = JSON.parse(localStorage.getItem(key)); } catch {}
-  fetcher().then(r => { const j = JSON.stringify(r); if (c && JSON.stringify(c) === j) return; try { localStorage.setItem(key, j); } catch {} set(r); if (tab === "disc") render(); },
-    e => { if (!c && onErr){ onErr(e); if (tab === "disc") render(); } });
+  fetcher().then(r => { const j = JSON.stringify(r); if (c && JSON.stringify(c) === j) return; try { localStorage.setItem(key, j); } catch {} set(r); if (tab === "home") render(); },
+    e => { if (!c && onErr){ onErr(e); if (tab === "home") render(); } });
   return c;
 }
-function findExtrasHTML(){
-  const is2D = g => basicTags(g).includes("2D");
-  if (topMV === null) topMV = swr("c:finds", () => api("/finds"), r => topMV = r) || {};
-  const seen = new Set();
-  const frow = (t, xs, subf, twoD) => {
-    xs = (xs || []).filter(x => !inList(x) && !seen.has(x.igdbId));
-    if (twoD) xs.sort((a, b) => is2D(b) - is2D(a));
-    xs = xs.slice(0, 10); xs.forEach(x => { seen.add(x.igdbId); previewCache.set(x.igdbId, x); });
-    return xs.length >= 3 ? `<div class="section"><h3>${t}</h3><div class="row">${xs.map(x => suggestCard(x, subf(x))).join("")}</div></div>` : "";
-  };
-  const yr = x => x.year || "";
-  const rev = x => x?.steamN ? `${x.steamPct}% · ${x.steamN.toLocaleString("en")} reviews` : yr(x);
-  const mv = frow("2D platformers", topMV.plat2d, yr) + frow("3D platformers", topMV.plat3d, yr) + frow("Couch co-op", topMV.coop, yr) + frow("Unique", topMV.unique, rev);
-  const wl = list().filter(g => g.status === "wishlist" && !g.hidden)
-    .sort((a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0));
-  const seeAll = wl.length ? `<span class="dim">${wl.length} on wishlist</span><button class="linkbtn" data-tab="wish" style="margin-left:auto">See all</button>` : "";
-  const onSale = wl.length ? `<div class="section"><div class="row-head"><h3>Your wishlist</h3>${seeAll}</div></div>` : "";
-  return onSale + mv;
-}
-function discoverHTML(){ return `<div class="wrap">${findExtrasHTML()}${radarHTML()}</div>`; }
 
 /* ---------- diary + stats ---------- */
 function diaryHTML(){
@@ -714,7 +694,7 @@ function patchNode(a, b){
 /* ---------- render ---------- */
 function render(){
   eagerLeft = 12;
-  const tabsH = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "disc" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
+  const tabsH = TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}" ${tab === k || (k === "lib" && tab === "wish") ? 'aria-current="page"' : ""}><span class="ico">${ic(i)}</span>${l}</button>`).join("");
   if (tabsH !== lastTabsH){ $("#tabs").innerHTML = tabsH; lastTabsH = tabsH; }
   const m = $("#main");
   if (!loaded){ m.innerHTML = `<div class="empty">Loading your games…</div>`; return; }
@@ -723,7 +703,8 @@ function render(){
   const same = rowTab === tab;
   const pos = same ? new Map([...m.querySelectorAll(".row, #slides")].map(el => [keyOf(el), el.scrollLeft])) : new Map();
   rowTab = tab;
-  const html = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : tab === "disc" ? discoverHTML() : diaryHTML();
+  if (tab === "disc") tab = "home";
+  const html = tab === "home" ? homeHTML() : tab === "lib" ? shelfHTML(false) : tab === "wish" ? shelfHTML(true) : diaryHTML();
   if (same) patch(m, html); else m.innerHTML = html;
   if (pos.size) for (const el of m.querySelectorAll(".row, #slides")){ const x = pos.get(keyOf(el)); if (x) el.scrollLeft = x; }
   document.documentElement.style.setProperty("--barH", $(".bar").offsetHeight + "px");
@@ -855,7 +836,7 @@ async function previewSheet(x){
   $("#pvWish").onclick = async () => {
     if (wid){ await del(wid); wid = null; $("#pvWish").innerHTML = ic("heart"); $("#pvWish").classList.remove("on-heart"); toast("Removed from wishlist"); return; }
     wid = newId(); $("#pvWish").innerHTML = ic("heartf"); $("#pvWish").classList.add("on-heart");
-    const {because, score, added, date, gem, taste, appid, steamPct, steamN, price, ...data} = x; await setDoc(doc(col, wid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, platforms: [], status: "wishlist", added: Date.now(), ...(pinned ? {upNext: Date.now()} : {})});
+    const {because, score, added, date, gem, taste, appid, price, ...data} = x; await setDoc(doc(col, wid), {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, platforms: [], status: "wishlist", added: Date.now(), ...(pinned ? {upNext: Date.now()} : {})});
     toast("Added to wishlist");
   };
   let pinned = false;
@@ -1116,6 +1097,7 @@ document.addEventListener("click", async e => {
     await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()}); }
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else switch (d.act){
+    case "seeall": { const r = ROWS.find(x => x[1] === t.dataset.row); openSheet(`<h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div>`, "full"); break; }
     case "upnext": openSheet(`<h2>Up next</h2><div class="grid">${upNextGames().map(g => cardHTML(g)).join("")}</div>`, "full"); break;
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
