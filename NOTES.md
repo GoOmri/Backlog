@@ -40,6 +40,8 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 ## Rendering
 - `render()` rebuilds the tab's HTML string; on the same tab `patch(el, html)` applies only the differences (keys: data-key / data-edit / id). To update a small part, change the data and call `render()` (or `softRender()` for batched). `patch()` also works for any element, e.g. a sheet.
 
+- Art fallback: no cover/logo/hero from IGDB or SteamGridDB → Steam store art by app id (`steamArt()`, `coverOf()`, `logoOf()`: library_600x900 → header.jpg on error, logo.png → plain title on error, library_hero). App id comes from Steam import or `checkDeck`.
+
 ## Worker routes (worker.js)
 /match /search /game /toptags (top 5 Steam tags for the game page) /info /grids /logos /steam /steamwish /upcoming /deck /couch /topmv /finds /steamtags /steamrev /achievements /achrarity /trophies /rarity
 - `/finds`: Steam tag searches (`SEARCHES`), quality bar (85%+ & 300+ reviews, or 92%+ & 40+ = gem), taste via Steam tags (`LIKE` / `DISLIKE`), mapped to IGDB via external_games, Steam prices (IL). KV cache key `findsN` (now finds14) — bump N when the output shape changes.
