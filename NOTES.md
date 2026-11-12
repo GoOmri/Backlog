@@ -95,7 +95,7 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 
 ## Name, icon, splash (2026-11-11)
 - App name **Game Night** (header, tab title, manifest). Repo/URL still Backlog.
-- Icon = Omri's pixel couch scene cropped on the cat's head (icon-192/512.png). Splash = splash.jpg (left part of the same scene), `#splash` in index.html, pixel font Press Start 2P; title = two stacked spans (`.t-back` cream stroke + dark extrusion, `.t-front` purple→navy gradient). `hideSplash()` after first load (min ~0.9s, max 6s).
+- Icon = Omri's pixel couch scene cropped on the cat (64×64 art → icon-192.png 3× / icon-512.png 8×, nearest-neighbor; 512 also listed as maskable). Splash = splash.png (270×600 art → 1080×2400 at 4×), `#splash` in index.html, centered, pixel font Press Start 2P; title = two stacked spans (`.t-back` cream stroke + dark extrusion, `.t-front` purple→navy gradient). `hideSplash()` after first load (min ~0.9s, max 6s).
 
 ## Open items (end of 2026-11-11/12 session)
 - Sift logic feels "backwards" to Omri (Keep changes nothing visible) — unresolved; he's not sold on opt-in (Play shows only kept games). Talk before changing.
