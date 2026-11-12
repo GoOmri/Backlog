@@ -144,7 +144,7 @@ async function applyMatch(g, m){
       ...(g.steamHours != null ? {steamHours: g.steamHours, steamAppId: g.steamAppId} : {})});
     await del(g.id);
   } else {
-    await upd(g.id, {...m, ...(g.couchSet ? {couch: g.couch} : {}), asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null});
+    await upd(g.id, {...m, ...(g.couchSet ? {couch: g.couch} : {}), asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null, heroSet: null});
   }
 }
 
@@ -421,7 +421,7 @@ function availBadges(g){
 const deadArt = new Set();
 const steamArt = (g, f) => { const a = g.steamAppId || g.appid, u = a ? `https://cdn.akamai.steamstatic.com/steam/apps/${a}/${f}` : ""; return deadArt.has(u) ? "" : u; };
 // Top image: SteamGridDB hero > Steam store hero > IGDB artwork/screenshot > cover.
-const heroOf = (g, h = g.hero) => { const st = steamArt(g, "library_hero.jpg"); return (h && !(st && h.includes("images.igdb.com")) ? heroSrc(h) : "") || st || heroSrc(h) || g.cover || steamArt(g, "header.jpg"); };
+const heroOf = (g, h = g.hero) => { if (g.heroSet && g.hero) return heroSrc(g.hero); const st = steamArt(g, "library_hero.jpg"); return (h && !(st && h.includes("images.igdb.com")) ? heroSrc(h) : "") || st || heroSrc(h) || g.cover || steamArt(g, "header.jpg"); };
 const coverOf = g => g.cover || steamArt(g, "library_600x900.jpg") || steamArt(g, "header.jpg"), logoOf = g => g.logo || steamArt(g, "logo.png");
 function coverHTML(g){
   const cv = coverOf(g);
@@ -1147,6 +1147,7 @@ async function editSheet(id){
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
+      <div class="field"><span class="label">Top image</span><button class="btn ghost small" id="heroGo">Change top image</button><div class="coverpick heropick" id="heroes"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
 `;
   const pc = p => `<span class="pc" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`;
@@ -1210,6 +1211,16 @@ async function editSheet(id){
       box.querySelectorAll("[data-logo]").forEach(b => b.onclick = async () => { await upd(id, {logo: b.dataset.logo, logoSet: true}); toast("Logo changed"); closeSheet(); });
     } catch (e){ box.textContent = e.message; }
   };
+  // Top image: pick from Steam banner, artwork and screenshots; saved with heroSet so lookups don't replace it.
+  $("#heroGo").onclick = async () => {
+    const box = $("#heroes"); box.textContent = "Loading images…";
+    try {
+      const d = await gameDetails(g.igdbId), st = steamArt({...g, steamAppId: g.steamAppId || d.appid}, "library_hero.jpg");
+      const urls = [...new Set([st, d.hero, ...(d.shots || [])].filter(Boolean))];
+      box.innerHTML = urls.map(u => `<button data-hero="${esc(u)}"><img src="${esc(u)}" alt="" loading="lazy"></button>`).join("") || "No images.";
+      box.querySelectorAll("[data-hero]").forEach(b => b.onclick = async () => { await upd(id, {hero: b.dataset.hero, heroSet: true}); toast("Top image changed"); closeSheet(); });
+    } catch (e){ box.textContent = e.message; }
+  };
   $("#coverGo").onclick = async () => {
     const box = $("#covers"); box.textContent = "Loading covers…";
     try {
@@ -1228,7 +1239,7 @@ async function editSheet(id){
   };
   if (!g.igdbId) return;
   try {
-    const d0 = await gameDetails(g.igdbId), d = g.logoSet ? {...d0, logo: g.logo} : d0;
+    const d0 = await gameDetails(g.igdbId), d = {...d0, ...(g.logoSet ? {logo: g.logo} : {}), ...(g.heroSet ? {hero: g.hero} : {})};
     fillMedia(d, g); fillStrip(g, d); fillProgress(g);
     if (!g.steamAppId && d.appid) upd(id, {steamAppId: d.appid}).catch(() => {});
     if ((!g.hero && d.hero) || (!g.logoSet && (d.logo || "") !== (g.logo || ""))) upd(id, {hero: g.hero || d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})});

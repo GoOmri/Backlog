@@ -40,7 +40,8 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 ## Rendering
 - `render()` rebuilds the tab's HTML string; on the same tab `patch(el, html)` applies only the differences (keys: data-key / data-edit / id). To update a small part, change the data and call `render()` (or `softRender()` for batched). `patch()` also works for any element, e.g. a sheet.
 
-- Top image order (`heroOf()`): SteamGridDB hero > Steam library_hero > IGDB artwork/screenshot > cover. Failed Steam images go in `deadArt` (no flicker).
+- Game page ⋯ → Change top image (`#heroGo`): Steam banner / IGDB artwork / screenshots → saved as `hero` + `heroSet` (wins everywhere; re-match clears it).
+- Top image order (`heroOf()`): chosen (heroSet) > SteamGridDB hero > Steam library_hero > IGDB artwork/screenshot > cover. Failed Steam images go in `deadArt` (no flicker).
 - Art fallback: no cover/logo/hero from IGDB or SteamGridDB → Steam store art by app id (`steamArt()`, `coverOf()`, `logoOf()`: library_600x900 → header.jpg on error, logo.png → plain title on error, library_hero). App id comes from Steam import or `checkDeck`.
 
 ## Worker routes (worker.js)
