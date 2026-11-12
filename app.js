@@ -278,6 +278,7 @@ async function addTitles(titles, platform, status){
   const have = existingIndex(); let n = 0, merged = 0; const ops = [];
   for (const raw of new Set(titles.map(t => t.trim()).filter(Boolean))){
     const g = have.get(key(raw));
+    if (g && status === "wishlist"){ merged++; continue; } // wishlist import: games you already have stay as they are
     if (g){ merged++; ops.push(b => b.update(doc(col, g.id), {platforms: [...new Set([...(g.platforms || []), platform])], status: RANK[status] > RANK[g.status] ? status : g.status})); }
     else { const t = Date.now() + n++; ops.push(b => b.set(doc(col, newId()), {title: raw, asTyped: raw, platforms: [platform], status, added: t})); }
   }
