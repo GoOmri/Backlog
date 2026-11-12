@@ -412,8 +412,12 @@ function availBadges(g){
   if (av.includes("ps5")) av.splice(av.indexOf("ps4") >>> 0, av.includes("ps4") ? 1 : 0);
   return av.map(c => `<span class="plat avail" title="Available on ${AVAIL[c]}">${AVAIL[c]}</span>`).join("");
 }
+// Steam store art as a fallback when IGDB/SteamGridDB have none yet (new indies). Plain image URLs, no API calls.
+const steamArt = (g, f) => { const a = g.steamAppId || g.appid; return a ? `https://cdn.akamai.steamstatic.com/steam/apps/${a}/${f}` : ""; };
+const coverOf = g => g.cover || steamArt(g, "library_600x900.jpg"), logoOf = g => g.logo || steamArt(g, "logo.png");
 function coverHTML(g){
-  return `<div class="cover">${g.cover ? `<img src="${esc(g.cover)}" alt="" loading="${eagerLeft-- > 0 ? "eager" : "lazy"}">` : `<span class="ph">${esc(g.title)}</span>`}
+  const cv = coverOf(g);
+  return `<div class="cover">${cv ? `<img src="${esc(cv)}" alt="" loading="${eagerLeft-- > 0 ? "eager" : "lazy"}">` : `<span class="ph">${esc(g.title)}</span>`}
     <span class="badges">${badges(g.platforms, g)}${availBadges(g)}</span>${coverTag(g)}</div>`;
 }
 function cardHTML(g, sub){
@@ -477,9 +481,9 @@ function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
   const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "Suggested · pin to keep";
-  return `<div class="hero slide"><div class="hero-bg">${g.hero || g.cover ? `<img src="${esc(heroSrc(g.hero) || g.cover)}" alt="" loading="lazy">` : ""}</div>
+  return `<div class="hero slide"><div class="hero-bg">${g.hero || coverOf(g) ? `<img src="${esc(heroSrc(g.hero) || g.cover || steamArt(g, "library_hero.jpg"))}" alt="" loading="lazy">` : ""}</div>
     <div class="hero-in">
-      ${g.logo ? `<img class="hero-logo" src="${esc(g.logo)}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
+      ${logoOf(g) ? `<img class="hero-logo" src="${esc(logoOf(g))}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
       <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
       <div class="hero-actions"><button class="btn" data-edit="${g.id}">Details</button></div>
     </div></div>`;
@@ -832,7 +836,11 @@ document.addEventListener("pointerdown", e => {
   if (id) gameDetails(id).catch(() => {});
 }, {passive: true});
 document.addEventListener("load", e => { const i = e.target; if (i.tagName === "IMG") i.classList.add("ok"); }, true);
-document.addEventListener("error", e => { const i = e.target; if (i.tagName === "IMG") i.classList.add("bad"); }, true);
+document.addEventListener("error", e => { const i = e.target; if (i.tagName !== "IMG") return;
+  // Steam fallbacks: tall cover missing → wide header; logo missing → plain title.
+  if (i.src.includes("/library_600x900.jpg")){ i.src = i.src.replace("library_600x900.jpg", "header.jpg"); return; }
+  if (i.src.includes("steamstatic") && i.src.endsWith("/logo.png") && i.alt){ const h = document.createElement("h1"); h.className = i.classList.contains("gp-logo") ? "gp-title" : "hero-title"; h.textContent = i.alt; i.replaceWith(h); return; }
+  i.classList.add("bad"); }, true);
 new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1)
   for (const i of n.tagName === "IMG" ? [n] : n.querySelectorAll("img")) if (i.complete && i.naturalWidth) i.classList.add("ok", "now"); }).observe(document.body, {childList: true, subtree: true});
 function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
@@ -934,7 +942,7 @@ function pageShell(x, {own, actions, facts, edit}){
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
     <div class="gp-head">
-      ${x.logo ? `<img class="gp-logo" src="${esc(x.logo)}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
+      ${logoOf(x) ? `<img class="gp-logo" src="${esc(logoOf(x))}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
       ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
       <div class="gtags" id="gtags">${genresOf(x).filter(t => t !== "Indie").slice(0, 5).map(t => `<span>${esc(t)}</span>`).join("")}</div>
       <div class="gp-actions">${actions}</div>
