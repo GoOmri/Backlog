@@ -422,6 +422,10 @@ const deadArt = new Set();
 const steamArt = (g, f) => { const a = g.steamAppId || g.appid, u = a ? `https://cdn.akamai.steamstatic.com/steam/apps/${a}/${f}` : ""; return deadArt.has(u) ? "" : u; };
 // Top image: SteamGridDB hero > Steam store hero > IGDB artwork/screenshot > cover.
 const heroOf = (g, h = g.hero) => { if (g.heroSet && g.hero) return heroSrc(g.hero); const st = steamArt(g, "library_hero.jpg"); return (h && !(st && h.includes("images.igdb.com")) ? heroSrc(h) : "") || st || heroSrc(h) || g.cover || steamArt(g, "header.jpg"); };
+// Per-game framing of the top image (Recenter): heroPos {x, y, z} → object-position + zoom around that point.
+// clip-path keeps the zoomed image inside its own box (the page hero has overflow:visible).
+const heroStyle = (g, pos = g.heroPos) => { if (!pos) return ""; const {x = 50, y = 50, z = 1} = pos, k = 1 - 1 / z;
+  return `style="object-position:${x}% ${y}%;transform:scale(${z});transform-origin:${x}% ${y}%;clip-path:inset(${y * k}% ${(100 - x) * k}% ${(100 - y) * k}% ${x * k}%)"`; };
 const coverOf = g => g.cover || steamArt(g, "library_600x900.jpg") || steamArt(g, "header.jpg"), logoOf = g => g.logo || steamArt(g, "logo.png");
 function coverHTML(g){
   const cv = coverOf(g);
@@ -489,7 +493,7 @@ function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
   const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "Suggested · pin to keep";
-  return `<div class="hero slide"><div class="hero-bg">${heroOf(g) ? `<img src="${esc(heroOf(g))}" alt="" loading="lazy">` : ""}</div>
+  return `<div class="hero slide"><div class="hero-bg">${heroOf(g) ? `<img src="${esc(heroOf(g))}" alt="" loading="lazy" ${heroStyle(g)}>` : ""}</div>
     <div class="hero-in">
       ${logoOf(g) ? `<img class="hero-logo" src="${esc(logoOf(g))}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
       <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
@@ -950,7 +954,7 @@ function pageShell(x, {own, actions, facts, edit}){
   const art = heroOf(x);
   return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
-  <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
+  <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="" ${heroStyle(x)}>` : ""}
     <div class="gp-head">
       ${logoOf(x) ? `<img class="gp-logo" src="${esc(logoOf(x))}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
       ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
@@ -1147,7 +1151,7 @@ async function editSheet(id){
       <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
-      <div class="field"><span class="label">Top image</span><button class="btn ghost small" id="heroGo">Change top image</button><div class="coverpick heropick" id="heroes"></div></div>
+      <div class="field"><span class="label">Top image</span><button class="btn ghost small" id="heroGo">Change top image</button> <button class="btn ghost small" id="heroPosGo">Recenter</button><div id="heroPosBox"></div><div class="coverpick heropick" id="heroes"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
 `;
   const pc = p => `<span class="pc" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`;
@@ -1218,8 +1222,28 @@ async function editSheet(id){
       const d = await gameDetails(g.igdbId), st = steamArt({...g, steamAppId: g.steamAppId || d.appid}, "library_hero.jpg");
       const urls = [...new Set([st, d.hero, ...(d.shots || [])].filter(Boolean))];
       box.innerHTML = urls.map(u => `<button data-hero="${esc(u)}"><img src="${esc(u)}" alt="" loading="lazy"></button>`).join("") || "No images.";
-      box.querySelectorAll("[data-hero]").forEach(b => b.onclick = async () => { await upd(id, {hero: b.dataset.hero, heroSet: true}); toast("Top image changed"); closeSheet(); });
+      box.querySelectorAll("[data-hero]").forEach(b => b.onclick = async () => { await upd(id, {hero: b.dataset.hero, heroSet: true, heroPos: null}); toast("Top image changed"); closeSheet(); });
     } catch (e){ box.textContent = e.message; }
+  };
+  // Recenter: drag the preview to move, slider to zoom. Saved per game, used on the page and the Up next carousel.
+  $("#heroPosGo").onclick = () => {
+    const src = heroOf(g); if (!src){ toast("No top image yet"); return; }
+    let {x = 50, y = 50, z = 1} = g.heroPos || {};
+    $("#heroPosBox").innerHTML = `<div class="hpos" id="hpos"><img src="${esc(src)}" alt=""></div>
+      <div class="hzoom"><span class="dim">Zoom</span><input type="range" id="hz" min="1" max="2" step="0.05" value="${z}"></div>
+      <div class="actions"><button class="btn ghost small" id="hpReset">Reset</button><button class="btn small" id="hpSave">Save</button></div>`;
+    const box = $("#hpos"), img = box.firstElementChild, show = () => img.setAttribute("style", heroStyle(g, {x, y, z}).slice(7, -1));
+    show();
+    let p0 = null;
+    box.onpointerdown = e => { p0 = {px: e.clientX, py: e.clientY, x, y}; box.setPointerCapture(e.pointerId); };
+    box.onpointermove = e => { if (!p0) return; const r = box.getBoundingClientRect();
+      x = Math.max(0, Math.min(100, p0.x - (e.clientX - p0.px) / r.width * 100 / z));
+      y = Math.max(0, Math.min(100, p0.y - (e.clientY - p0.py) / r.height * 100 / z)); show(); };
+    box.onpointerup = box.onpointercancel = () => { p0 = null; };
+    $("#hz").oninput = e => { z = +e.target.value; show(); };
+    $("#hpReset").onclick = () => { x = 50; y = 50; z = 1; $("#hz").value = 1; show(); };
+    $("#hpSave").onclick = async () => { const pos = {x: Math.round(x), y: Math.round(y), z: +z.toFixed(2)};
+      await upd(id, {heroPos: pos.x === 50 && pos.y === 50 && pos.z === 1 ? null : pos}); toast("Top image recentered"); closeSheet(); };
   };
   $("#coverGo").onclick = async () => {
     const box = $("#covers"); box.textContent = "Loading covers…";
