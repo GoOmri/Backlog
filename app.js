@@ -416,6 +416,8 @@ function availBadges(g){
 // Steam images that failed are remembered so redraws don't bring them back (no flicker).
 const deadArt = new Set();
 const steamArt = (g, f) => { const a = g.steamAppId || g.appid, u = a ? `https://cdn.akamai.steamstatic.com/steam/apps/${a}/${f}` : ""; return deadArt.has(u) ? "" : u; };
+// Top image: SteamGridDB hero > Steam store hero > IGDB artwork/screenshot > cover.
+const heroOf = (g, h = g.hero) => { const st = steamArt(g, "library_hero.jpg"); return (h && !(st && h.includes("images.igdb.com")) ? heroSrc(h) : "") || st || heroSrc(h) || g.cover || steamArt(g, "header.jpg"); };
 const coverOf = g => g.cover || steamArt(g, "library_600x900.jpg") || steamArt(g, "header.jpg"), logoOf = g => g.logo || steamArt(g, "logo.png");
 function coverHTML(g){
   const cv = coverOf(g);
@@ -483,7 +485,7 @@ function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
   const facts = [g.year, mainH(g) && `about ${mainH(g)}h`, g.steamHours && `${g.steamHours}h played`, g.rating && `Rating ${g.rating}`].filter(Boolean);
   const eyebrow = g.upNext ? (g.status === "wishlist" ? "Shortlist · wishlist" : "Shortlist") : "Suggested · pin to keep";
-  return `<div class="hero slide"><div class="hero-bg">${g.hero || coverOf(g) ? `<img src="${esc(heroSrc(g.hero) || g.cover || steamArt(g, "library_hero.jpg"))}" alt="" loading="lazy">` : ""}</div>
+  return `<div class="hero slide"><div class="hero-bg">${heroOf(g) ? `<img src="${esc(heroOf(g))}" alt="" loading="lazy">` : ""}</div>
     <div class="hero-in">
       ${logoOf(g) ? `<img class="hero-logo" src="${esc(logoOf(g))}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
       <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
@@ -941,7 +943,7 @@ function pageShell(x, {own, actions, facts, edit}){
   const yr = new Date().getFullYear();
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
   const meta = [when, ...basicTags(x).filter(t => VIEWS.includes(t) || COOPS.includes(t)), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
-  const art = heroSrc(x.hero) || x.cover || steamArt(x, "library_hero.jpg") || steamArt(x, "header.jpg");
+  const art = heroOf(x);
   return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
@@ -988,7 +990,7 @@ async function previewSheet(x){
     closeSheet(); toast(`${x.title} added · ${PLAT[p][0]}`);
     setDoc(doc(col, id), wid ? owned : {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, added: Date.now(), ...owned}, {merge: true}).catch(saveErr); };
   fillDifficulty(x, null);
-  try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
+  try { const d = await gameDetails(x.igdbId); fillMedia(d, x); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
 let ytReady;
@@ -1090,11 +1092,11 @@ function setPanel(open){
   else { p.classList.remove("panelin"); anim(p, "panelout"); setTimeout(() => { p.hidden = true; p.classList.remove("panelout"); }, 160); }
 }
 // Trailer (with timeline) + screenshots, description, similar games.
-function fillMedia(d){
+function fillMedia(d, x = {}){
   if (!$("#dlg").open || !$("#mslides")) return;
   $("#desc").textContent = d.summary || "";
   if (d.logo && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(d.logo)}" alt="">`;
-  if (d.hero && $(".gp-bg") && !$(".gp-bg").src.includes(heroSrc(d.hero))) $(".gp-bg").src = heroSrc(d.hero);
+  if (d.hero && $(".gp-bg")){ const h = heroOf(x, d.hero); if ($(".gp-bg").src !== h) $(".gp-bg").src = h; }
   const slides = [
     d.trailer && `<div class="mslide vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vtitle" id="vtitle"></div><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
@@ -1221,7 +1223,7 @@ async function editSheet(id){
   if (!g.igdbId) return;
   try {
     const d0 = await gameDetails(g.igdbId), d = g.logoSet ? {...d0, logo: g.logo} : d0;
-    fillMedia(d); fillStrip(g, d); fillProgress(g);
+    fillMedia(d, g); fillStrip(g, d); fillProgress(g);
     if ((!g.hero && d.hero) || (!g.logoSet && (d.logo || "") !== (g.logo || ""))) upd(id, {hero: g.hero || d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
