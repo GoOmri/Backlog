@@ -853,6 +853,15 @@ document.addEventListener("pointerdown", e => {
   if (id) gameDetails(id).catch(() => {});
 }, {passive: true});
 document.addEventListener("load", e => { const i = e.target; if (i.tagName === "IMG") i.classList.add("ok"); }, true);
+// Android: open Steam / PlayStation Store links in their apps (falls back to the website if the app isn't installed).
+const STORE_APPS = {"store.steampowered.com": "com.valvesoftware.android.steam.community", "store.playstation.com": "com.scee.psxandroid"};
+if (/Android/i.test(navigator.userAgent)) document.addEventListener("click", e => {
+  const a = e.target.closest("a[href]"); if (!a) return;
+  let u; try { u = new URL(a.href); } catch { return; }
+  const pkg = STORE_APPS[u.hostname]; if (!pkg) return;
+  e.preventDefault();
+  location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${encodeURIComponent(u.href)};end`;
+}, true);
 document.addEventListener("error", e => { const i = e.target; if (i.tagName !== "IMG") return;
   // Steam fallbacks: tall cover / hero missing → wide header; logo missing → plain title.
   if (i.src.includes("steamstatic")) deadArt.add(i.src);
