@@ -732,3 +732,12 @@ img.ok.now{transition:none}
 .sheet-list{padding:calc(20px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) 32px max(20px,env(safe-area-inset-left,0px))}
 .sheet-list h2{margin:0 52px 4px 0}
 .sheet-list h2{margin-bottom:16px}
+/* Add sheet: search results + paste fallback; preview "I own it on" chips */
+.addlist{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
+.addres{display:flex;gap:12px;align-items:center;text-align:left;background:none;border:0;padding:4px 0;color:inherit}
+.addres img,.addres .ph{width:40px;height:54px;border-radius:var(--r-s);object-fit:cover;background:var(--raise);flex:none}
+.addres b{display:block;font-size:var(--t-m)}
+.addres .why{display:block;font-size:var(--t-xs);color:var(--dim)}
+.addres .badges{position:static;display:flex;gap:4px;margin-top:4px}
+.addpaste summary{color:var(--accent);font-size:var(--t-s);cursor:pointer;margin-bottom:8px}
+.ownon{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:var(--t-s)}

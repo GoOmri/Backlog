@@ -859,13 +859,34 @@ function menuSheet(){
     <button data-act="signout">Sign out</button></div>
     <div class="actions"><button class="btn ghost" data-act="close">Close</button></div>`);
 }
-function addSheet(){
+// Add: search first (IGDB via /search) → tap a result for its page, where you pick wishlist or the platform you own it on.
+// Bulk paste stays behind "Paste a list instead".
+let addT, addSeq = 0;
+function addResults(list){
+  return list.length ? list.map(x => { previewCache.set(x.igdbId, x); const have = inList(x);
+    return `<button class="addres" ${have ? `data-edit="${have.id}"` : `data-preview="${x.igdbId}"`}>${x.cover ? `<img src="${esc(x.cover)}" alt="">` : `<span class="ph"></span>`}<span><b>${esc(x.title)}</b><span class="why">${x.year || ""}${have ? " · In your list" : ""}</span><span class="badges">${availBadges(x)}</span></span></button>`; }).join("")
+    : `<div class="status">No games found.</div>`;
+}
+function addSheet(q0 = ""){
   openSheet(`<h2>Add games</h2>
+    <div class="field"><input id="aQ" type="search" autocomplete="off" placeholder="Hollow Knight" aria-label="Search games" value="${esc(q0)}"></div>
+    <div id="aRes" class="addlist"></div>
+    <details class="addpaste"><summary>Paste a list instead</summary>
     <div class="field"><label class="label" for="titles">One title per line</label><textarea id="titles" rows="8" placeholder="Hades&#10;Hollow Knight&#10;Astro Bot"></textarea></div>
     <div class="grid2"><div class="field"><label class="label" for="aPlat">Platform</label><select id="aPlat">${platOpts("ps5")}</select></div>
       <div class="field"><label class="label" for="aStat">List</label><select id="aStat">${statOpts(tab === "wish" ? "wishlist" : "backlog")}</select></div></div>
     <div class="status" id="aMsg">Covers and info load automatically. Games you already have get the new platform added.</div>
-    <div class="actions"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" id="aGo">Add</button></div>`);
+    <div class="actions"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" id="aGo">Add</button></div></details>`);
+  if (!q0) $("#aQ").focus();
+  $("#aQ").oninput = () => { clearTimeout(addT); const t = $("#aQ").value.trim(), n = ++addSeq;
+    if (t.length < 2){ $("#aRes").innerHTML = ""; return; }
+    addT = setTimeout(async () => { $("#aRes").innerHTML = `<div class="status">Searching…</div>`;
+      const list = await api("/search?q=" + encodeURIComponent(t)).catch(() => null);
+      if (n !== addSeq || !$("#aRes")) return;
+      $("#aRes").innerHTML = list ? addResults(list) : `<div class="status">Search failed. Try again.</div>`; }, 350); };
+  // Back from a result's page returns here with the same search.
+  $("#aRes").onclick = e => { if (e.target.closest("[data-edit], [data-preview]")) { const v = $("#aQ").value; sheetBack = () => addSheet(v); } };
+  if (q0) $("#aQ").oninput();
   $("#aGo").onclick = async () => {
     $("#aGo").disabled = true;
     try { const {n, merged} = await addTitles($("#titles").value.split(/\r?\n/), $("#aPlat").value, $("#aStat").value);
@@ -931,7 +952,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div><div class="ownon"><span class="dim">I own it on</span>${["ps5", "psplus", "steam", "epic", "itch"].map(p => `<button class="chip" data-own="${p}">${PLAT[p][0]}</button>`).join("")}</div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = toggleDesc;
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -948,6 +969,12 @@ async function previewSheet(x){
     toast(pinned ? "Added to Up next" : "Removed from Up next");
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
+  // Owned: one tap on the platform saves it to the Library (or turns the wishlist entry just made into owned).
+  $(".ownon").onclick = async e => { const p = e.target.closest("[data-own]")?.dataset.own; if (!p) return;
+    const {because, score, added, date, gem, taste, appid, price, ...data} = x;
+    const id = wid || newId(), owned = {platforms: [p], status: "backlog", ...(pinned ? {upNext: Date.now()} : {})};
+    closeSheet(); toast(`${x.title} added · ${PLAT[p][0]}`);
+    setDoc(doc(col, id), wid ? owned : {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, added: Date.now(), ...owned}, {merge: true}).catch(saveErr); };
   fillDifficulty(x, null);
   try { const d = await gameDetails(x.igdbId); fillMedia(d); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
