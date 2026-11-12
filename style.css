@@ -731,3 +731,4 @@ img.ok.now{transition:none}
 /* List sheets (Up next, See all): breathing room from the screen edges */
 .sheet-list{padding:calc(20px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) 32px max(20px,env(safe-area-inset-left,0px))}
 .sheet-list h2{margin:0 52px 4px 0}
+.sheet-list h2{margin-bottom:16px}
