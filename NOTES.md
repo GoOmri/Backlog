@@ -89,3 +89,12 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 ## Name, icon, splash (2026-11-11)
 - App name **Game Night** (header, tab title, manifest). Repo/URL still Backlog.
 - Icon = Omri's pixel couch scene cropped on the cat's head (icon-192/512.png). Splash = splash.jpg (left part of the same scene), `#splash` in index.html, pixel font Press Start 2P; title = two stacked spans (`.t-back` cream stroke + dark extrusion, `.t-front` purple→navy gradient). `hideSplash()` after first load (min ~0.9s, max 6s).
+
+## Open items (end of 2026-11-11/12 session)
+- Sift logic feels "backwards" to Omri (Keep changes nothing visible) — unresolved; he's not sold on opt-in (Play shows only kept games). Talk before changing.
+- Stats tiles look skewed — revisit with Omri.
+- Ideas offered, not yet approved: "Wrong game?" on Sift cards; "Out now" badge for released wishlist/coming-soon games; hours total under Up next; Wishlist chip in Library status filters; rate-on-finish.
+- Unverified: Steam % backfill for owned games (GetItems include_reviews), /toptags for all games. Needs a live check — only with Omri's OK.
+- To tune after he tests: Up next list hold-to-drag delay (200ms); splash title look on his phone.
+- Lint note: the only remaining eslint error is `YT` (YouTube API global) — expected.
+- Working style: mockup first for anything visual; ask before big changes with a size; no live checks unless asked; run `node --check` + eslint no-undef before every push.
