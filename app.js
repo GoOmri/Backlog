@@ -425,6 +425,28 @@ function cardHTML(g, sub){
 const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; // his favourite kinds of games
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
+// Up next as a list you can reorder: hold ≡ and drag. The carousel follows this order (stored in each game's upNext value).
+function upNextSheet(){
+  const gs = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
+  openSheet(`<h2>Up next</h2><p class="dim">Hold ≡ and drag to change the order.</p><ol class="unlist" id="unlist">${gs.map(g => `<li data-id="${g.id}">
+    <span class="unh" aria-label="Drag to reorder">≡</span>${g.cover ? `<img src="${esc(g.cover)}" alt="">` : "<i></i>"}<button class="unt" data-edit="${g.id}">${esc(g.title)}</button></li>`).join("")}</ol>`, "full");
+  const ol = $("#unlist"); let li = null, y0 = 0;
+  ol.onpointerdown = e => { const h = e.target.closest(".unh"); if (!h) return; li = h.closest("li"); y0 = e.clientY; li.classList.add("drag"); h.setPointerCapture(e.pointerId); e.preventDefault(); };
+  ol.onpointermove = e => {
+    if (!li) return;
+    const dy = e.clientY - y0, prev = li.previousElementSibling, next = li.nextElementSibling, top = li.offsetTop;
+    if (next && dy > next.offsetHeight / 2) next.after(li);
+    else if (prev && dy < -prev.offsetHeight / 2) prev.before(li);
+    y0 += li.offsetTop - top;
+    li.style.transform = `translateY(${e.clientY - y0}px)`;
+  };
+  ol.onpointerup = ol.onpointercancel = () => {
+    if (!li) return; li.classList.remove("drag"); li.style.transform = ""; li = null;
+    // Reuse the existing values in the new order, so only the games that moved are saved.
+    const vals = gs.map(g => g.upNext).sort((a, b) => a - b);
+    [...ol.children].forEach((el, i) => { const g = games.get(el.dataset.id); if (g && g.upNext !== vals[i]) upd(g.id, {upNext: vals[i]}).catch(saveErr); });
+  };
+}
 function upNextGames(){
   const pinned = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
   const pool = list().filter(g => isPlatformer(g) && playable(g) && g.status === "backlog");
@@ -1317,7 +1339,7 @@ document.addEventListener("click", async e => {
   else switch (d.act){
     case "seeall": { const r = ROWS.find(x => x[1] === t.dataset.row); openSheet(`<h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div>`, "full"); break; }
     case "unmatched": closeSheet(); statF = ""; genreF = "__nomatch"; tab = "lib"; saveFilters(); render(); break;
-    case "upnext": openSheet(`<h2>Up next</h2><div class="grid">${upNextGames().map(g => cardHTML(g)).join("")}</div>`, "full"); break;
+    case "upnext": upNextSheet(); break;
     case "add": addSheet(); break;
     case "import": closeSheet(); $("#importFile").click(); break;
     case "steam": importSteam(); break;

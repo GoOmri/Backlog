@@ -718,3 +718,11 @@ img.ok.now{transition:none}
 /* Splash title fix: the back layer has a filter, which paints it above a plain sibling, so lift the gradient layer; thinner outline so the pixel letters stay open */
 .t-front{position:relative;z-index:1}
 .t-back{-webkit-text-stroke-width:.2em}
+/* Up next list (See all): drag to reorder */
+.unlist{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.unlist li{display:flex;align-items:center;gap:12px;padding:6px 10px 6px 4px;border-radius:var(--r-m);background:var(--surface);transition:box-shadow var(--d),background-color var(--d)}
+.unlist li.drag{position:relative;z-index:2;background:var(--raise);box-shadow:0 10px 30px rgb(0 0 0 / .45)}
+.unh{touch-action:none;cursor:grab;font-size:22px;line-height:1;padding:10px 8px;color:var(--dim);user-select:none}
+.unlist li.drag .unh{cursor:grabbing;color:var(--accent)}
+.unlist img,.unlist i{width:40px;height:53px;object-fit:cover;border-radius:var(--r-s);flex:none;background:var(--raise)}
+.unt{background:none;border:0;color:var(--fg);font:inherit;font-size:var(--t-m);text-align:left;padding:8px 0;flex:1}
