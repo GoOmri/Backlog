@@ -88,8 +88,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd7:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd7:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd8:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd8:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -505,7 +505,7 @@ function carouselHTML(gs){
 const heroAsked = new Set();
 async function fetchHero(g){
   heroAsked.add(g.id);
-  try { const d = await gameDetails(g.igdbId); await upd(g.id, {hero: d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})}); } catch {}
+  try { const d = await gameDetails(g.igdbId); await upd(g.id, {hero: d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""}), ...(!g.steamAppId && d.appid ? {steamAppId: d.appid} : {})}); } catch {}
 }
 // Omri's categories. A game can sit in more than one.
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
@@ -994,7 +994,7 @@ async function previewSheet(x){
     closeSheet(); toast(`${x.title} added · ${PLAT[p][0]}`);
     setDoc(doc(col, id), wid ? owned : {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, added: Date.now(), ...owned}, {merge: true}).catch(saveErr); };
   fillDifficulty(x, null);
-  try { const d = await gameDetails(x.igdbId); fillMedia(d, x); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
+  try { const d = await gameDetails(x.igdbId); if (!x.appid && d.appid) x.appid = d.appid; fillMedia(d, x); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
 let ytReady;
@@ -1099,8 +1099,10 @@ function setPanel(open){
 function fillMedia(d, x = {}){
   if (!$("#dlg").open || !$("#mslides")) return;
   $("#desc").textContent = d.summary || "";
-  if (d.logo && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(d.logo)}" alt="">`;
-  if (d.hero && $(".gp-bg")){ const h = heroOf(x, d.hero); if ($(".gp-bg").src !== h) $(".gp-bg").src = h; }
+  // Steam app id from IGDB store links (wishlist/search games have none saved) → Steam hero/logo fallbacks work here too.
+  const xs = {...x, steamAppId: x.steamAppId || x.appid || d.appid}, lg = d.logo || steamArt(xs, "logo.png");
+  if (lg && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(lg)}" alt="${esc(x.title || "")}">`;
+  const h = heroOf(xs, d.hero); if (h && $(".gp-bg") && $(".gp-bg").src !== h) $(".gp-bg").src = h;
   const slides = [
     d.trailer && `<div class="mslide vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vtitle" id="vtitle"></div><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
@@ -1228,6 +1230,7 @@ async function editSheet(id){
   try {
     const d0 = await gameDetails(g.igdbId), d = g.logoSet ? {...d0, logo: g.logo} : d0;
     fillMedia(d, g); fillStrip(g, d); fillProgress(g);
+    if (!g.steamAppId && d.appid) upd(id, {steamAppId: d.appid}).catch(() => {});
     if ((!g.hero && d.hero) || (!g.logoSet && (d.logo || "") !== (g.logo || ""))) upd(id, {hero: g.hero || d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
@@ -1308,7 +1311,7 @@ function siftShow(){
     dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / per() ? "on" : ""}"></i>`).join("") : "";
   };
   const fail = msg => { stack.innerHTML = `<div class="sift-shot poster">${poster}</div>${msg ? `<div class="dim">${msg} <button class="linkbtn" data-s="retry">Retry</button></div>` : ""}`; };
-  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd7:" + g.igdbId); } catch {} siftShow(); };
+  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd8:" + g.igdbId); } catch {} siftShow(); };
   if (g.igdbId) gameDetails(g.igdbId).then(d => {
     if (!sift || sift.i !== me || !$("#siftStack")) return;
     shots = (d.shots || []).map(med); trailer = d.trailer || null;
