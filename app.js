@@ -1414,7 +1414,7 @@ document.addEventListener("scroll", e => {
 const phoneMQ = matchMedia("(max-width:760px)");
 function placeTabs(){ const t = $("#tabs"); if (phoneMQ.matches) document.body.append(t); else $(".bar-in .brand").after(t); }
 placeTabs(); phoneMQ.addEventListener("change", placeTabs);
-$("#addBtn").onclick = addSheet;
+$("#addBtn").onclick = () => addSheet();
 $("#menuBtn").onclick = menuSheet;
 
 /* ---------- boot ---------- */
