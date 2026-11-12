@@ -428,21 +428,30 @@ const isPlatformer = g => (g.genres || []).includes("Platform");
 // Up next as a list you can reorder: hold ≡ and drag. The carousel follows this order (stored in each game's upNext value).
 function upNextSheet(){
   const gs = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
-  openSheet(`<h2>Up next</h2><p class="dim">Hold ≡ and drag to change the order.</p><ol class="unlist" id="unlist">${gs.map(g => `<li data-id="${g.id}">
-    <span class="unh" aria-label="Drag to reorder">≡</span>${g.cover ? `<img src="${esc(g.cover)}" alt="">` : "<i></i>"}<button class="unt" data-edit="${g.id}">${esc(g.title)}</button></li>`).join("")}</ol>`, "full");
-  const ol = $("#unlist"); let li = null, y0 = 0;
-  ol.onpointerdown = e => { const h = e.target.closest(".unh"); if (!h) return; li = h.closest("li"); y0 = e.clientY; li.classList.add("drag"); h.setPointerCapture(e.pointerId); e.preventDefault(); };
+  openSheet(`<div class="sheet-list"><h2>Up next</h2><ol class="unlist" id="unlist">${gs.map(g => `<li data-id="${g.id}">
+    ${g.cover ? `<img src="${esc(g.cover)}" alt="">` : "<i></i>"}<span class="unt">${esc(g.title)}</span><span class="unh" aria-hidden="true">≡</span></li>`).join("")}</ol></div>`, "full");
+  listOpen = upNextSheet;
+  // Hold a row ~0.2s to pick it up, then drag. A quick tap opens the game; a quick swipe scrolls.
+  const ol = $("#unlist"); let li = null, y0 = 0, sy = 0, timer = 0, armed = null, moved = false;
+  const stopScroll = e => { if (li) e.preventDefault(); };
+  ol.addEventListener("touchmove", stopScroll, {passive: false});
+  ol.oncontextmenu = e => e.preventDefault();
+  ol.onpointerdown = e => {
+    armed = e.target.closest("li"); if (!armed) return; sy = e.clientY; moved = false;
+    clearTimeout(timer); timer = setTimeout(() => { if (!armed) return; li = armed; y0 = sy; li.classList.add("drag"); try { ol.setPointerCapture(e.pointerId); } catch {} }, 200);
+  };
   ol.onpointermove = e => {
-    if (!li) return;
+    if (!li){ if (armed && Math.abs(e.clientY - sy) > 8){ moved = true; clearTimeout(timer); armed = null; } return; }
     const dy = e.clientY - y0, prev = li.previousElementSibling, next = li.nextElementSibling, top = li.offsetTop;
     if (next && dy > next.offsetHeight / 2) next.after(li);
     else if (prev && dy < -prev.offsetHeight / 2) prev.before(li);
     y0 += li.offsetTop - top;
     li.style.transform = `translateY(${e.clientY - y0}px)`;
   };
-  ol.onpointerup = ol.onpointercancel = () => {
-    if (!li) return; li.classList.remove("drag"); li.style.transform = ""; li = null;
-    // Reuse the existing values in the new order, so only the games that moved are saved.
+  ol.onpointerup = ol.onpointercancel = e => {
+    clearTimeout(timer);
+    if (!li){ if (armed && !moved && e.type === "pointerup"){ sheetBack = upNextSheet; editSheet(armed.dataset.id); } armed = null; return; }
+    li.classList.remove("drag"); li.style.transform = ""; li = null; armed = null;
     const vals = gs.map(g => g.upNext).sort((a, b) => a - b);
     [...ol.children].forEach((el, i) => { const g = games.get(el.dataset.id); if (g && g.upNext !== vals[i]) upd(g.id, {upNext: vals[i]}).catch(saveErr); });
   };
@@ -799,7 +808,12 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && so
 // The system back gesture (swipe from the screen edge) closes an open page.
 addEventListener("popstate", () => { if ($("#dlg").open) shut(); });
 // Close with a slide-down instead of vanishing; Esc goes through the same path.
-function shut(){ const g = $("#dlg"); if (!g.open || g.classList.contains("closing")) return; g.classList.add("closing"); setTimeout(() => { if (g.classList.contains("closing")){ g.classList.remove("closing"); g.close(); } }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180); }
+// When a game page is opened from a list sheet (Up next, See all), closing it (✕ or swipe back) returns to that list.
+let sheetBack = null, listOpen = null;
+document.addEventListener("click", e => { if (listOpen && e.target.closest(".sheet-list [data-edit], .sheet-list [data-preview], .sheet-list [data-un]")) sheetBack = listOpen; }, true);
+function shut(){ const g = $("#dlg"); if (!g.open || g.classList.contains("closing")) return;
+  const back = sheetBack; sheetBack = null; listOpen = null;
+  if (back){ setTimeout(back, 200); } g.classList.add("closing"); setTimeout(() => { if (g.classList.contains("closing")){ g.classList.remove("closing"); g.close(); } }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180); }
 $("#dlg").addEventListener("cancel", e => { e.preventDefault(); closeSheet(); });
 // Restart a one-shot CSS animation class on an element.
 function anim(el, c){ if (!el) return; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
@@ -1337,7 +1351,7 @@ document.addEventListener("click", async e => {
     await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()}); }
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else switch (d.act){
-    case "seeall": { const r = ROWS.find(x => x[1] === t.dataset.row); openSheet(`<h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div>`, "full"); break; }
+    case "seeall": { const key = t.dataset.row, show = () => { const r = ROWS.find(x => x[1] === key); openSheet(`<div class="sheet-list"><h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div></div>`, "full"); listOpen = show; }; show(); break; }
     case "unmatched": closeSheet(); statF = ""; genreF = "__nomatch"; tab = "lib"; saveFilters(); render(); break;
     case "upnext": upNextSheet(); break;
     case "add": addSheet(); break;
