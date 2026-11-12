@@ -88,8 +88,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd6:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd6:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd7:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd7:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -154,6 +154,10 @@ const tried = new Set();
 async function runQueue(){
   if (running || !API) return;
   running = true;
+  // One-time: SteamGridDB art saved before the exact-name fix may belong to another game → clear so it's re-checked.
+  try { if (!localStorage.getItem("artfix1")){ const bad = list().filter(g => String(g.hero).includes("steamgriddb") || (!g.logoSet && String(g.logo).includes("steamgriddb")));
+    if (bad.length) await commitChunks(bad.map(g => b => b.update(doc(col, g.id), {hero: null, ...(g.logoSet ? {} : {logo: null})})));
+    localStorage.setItem("artfix1", "1"); } } catch {}
   let done = 0;
   try {
     while (true){
@@ -1304,7 +1308,7 @@ function siftShow(){
     dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / per() ? "on" : ""}"></i>`).join("") : "";
   };
   const fail = msg => { stack.innerHTML = `<div class="sift-shot poster">${poster}</div>${msg ? `<div class="dim">${msg} <button class="linkbtn" data-s="retry">Retry</button></div>` : ""}`; };
-  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd6:" + g.igdbId); } catch {} siftShow(); };
+  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd7:" + g.igdbId); } catch {} siftShow(); };
   if (g.igdbId) gameDetails(g.igdbId).then(d => {
     if (!sift || sift.i !== me || !$("#siftStack")) return;
     shots = (d.shots || []).map(med); trailer = d.trailer || null;

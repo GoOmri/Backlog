@@ -181,8 +181,9 @@ async function sgdb(env, path){
   return (await r.json()).data;
 }
 async function sgdbArt(env, name, fallbackHero){
-  const hit = (await sgdb(env, "search/autocomplete/" + encodeURIComponent(name)))?.[0];
-  if (!hit) return {};
+  // Exact name only: the first autocomplete hit is often a different game (e.g. new indies not on SteamGridDB yet).
+  const hit = (await sgdb(env, "search/autocomplete/" + encodeURIComponent(name)))?.find(h => norm(h.name) === norm(name));
+  if (!hit) return {hero: fallbackHero, logo: null};
   const [heroes, logos] = await Promise.all([
     sgdb(env, `heroes/game/${hit.id}?types=static&nsfw=false`).catch(() => []),
     sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false&language=en`).then(r => r?.length ? r : sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false`)).catch(() => [])
@@ -192,7 +193,7 @@ async function sgdbArt(env, name, fallbackHero){
 
 // Logo choices for one game (English first).
 async function logos(env, t){
-  const hit = (await sgdb(env, "search/autocomplete/" + encodeURIComponent(t)))?.find(h => norm(h.name) === norm(t)) || (await sgdb(env, "search/autocomplete/" + encodeURIComponent(t)))?.[0];
+  const hits = await sgdb(env, "search/autocomplete/" + encodeURIComponent(t)), hit = hits?.find(h => norm(h.name) === norm(t)) || hits?.[0];
   if (!hit) return [];
   const [en, all] = await Promise.all([sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false&language=en`).catch(() => []), sgdb(env, `logos/game/${hit.id}?types=static&nsfw=false`).catch(() => [])]);
   return [...new Set([...(en || []), ...(all || [])].map(x => x.url))].slice(0, 8);
