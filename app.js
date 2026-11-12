@@ -413,8 +413,10 @@ function availBadges(g){
   return av.map(c => `<span class="plat avail" title="Available on ${AVAIL[c]}">${AVAIL[c]}</span>`).join("");
 }
 // Steam store art as a fallback when IGDB/SteamGridDB have none yet (new indies). Plain image URLs, no API calls.
-const steamArt = (g, f) => { const a = g.steamAppId || g.appid; return a ? `https://cdn.akamai.steamstatic.com/steam/apps/${a}/${f}` : ""; };
-const coverOf = g => g.cover || steamArt(g, "library_600x900.jpg"), logoOf = g => g.logo || steamArt(g, "logo.png");
+// Steam images that failed are remembered so redraws don't bring them back (no flicker).
+const deadArt = new Set();
+const steamArt = (g, f) => { const a = g.steamAppId || g.appid, u = a ? `https://cdn.akamai.steamstatic.com/steam/apps/${a}/${f}` : ""; return deadArt.has(u) ? "" : u; };
+const coverOf = g => g.cover || steamArt(g, "library_600x900.jpg") || steamArt(g, "header.jpg"), logoOf = g => g.logo || steamArt(g, "logo.png");
 function coverHTML(g){
   const cv = coverOf(g);
   return `<div class="cover">${cv ? `<img src="${esc(cv)}" alt="" loading="${eagerLeft-- > 0 ? "eager" : "lazy"}">` : `<span class="ph">${esc(g.title)}</span>`}
@@ -837,8 +839,10 @@ document.addEventListener("pointerdown", e => {
 }, {passive: true});
 document.addEventListener("load", e => { const i = e.target; if (i.tagName === "IMG") i.classList.add("ok"); }, true);
 document.addEventListener("error", e => { const i = e.target; if (i.tagName !== "IMG") return;
-  // Steam fallbacks: tall cover missing → wide header; logo missing → plain title.
-  if (i.src.includes("/library_600x900.jpg")){ i.src = i.src.replace("library_600x900.jpg", "header.jpg"); return; }
+  // Steam fallbacks: tall cover / hero missing → wide header; logo missing → plain title.
+  if (i.src.includes("steamstatic")) deadArt.add(i.src);
+  const m = i.src.match(/\/(library_600x900|library_hero)\.jpg$/);
+  if (m){ i.src = i.src.replace(m[0], "/header.jpg"); return; }
   if (i.src.includes("steamstatic") && i.src.endsWith("/logo.png") && i.alt){ const h = document.createElement("h1"); h.className = i.classList.contains("gp-logo") ? "gp-title" : "hero-title"; h.textContent = i.alt; i.replaceWith(h); return; }
   i.classList.add("bad"); }, true);
 new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1)
@@ -937,7 +941,7 @@ function pageShell(x, {own, actions, facts, edit}){
   const yr = new Date().getFullYear();
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
   const meta = [when, ...basicTags(x).filter(t => VIEWS.includes(t) || COOPS.includes(t)), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
-  const art = heroSrc(x.hero) || x.cover;
+  const art = heroSrc(x.hero) || x.cover || steamArt(x, "library_hero.jpg") || steamArt(x, "header.jpg");
   return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="">` : ""}
