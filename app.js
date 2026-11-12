@@ -128,11 +128,15 @@ addEventListener("pointerup", () => { if (!drag) return; const d = drag; drag = 
 // Start loading details when the pointer rests on a cover, so the page opens ready.
 
 /* ---------- writes ---------- */
-const upd = (id, d) => updateDoc(doc(col, id), d);
+const upd = (id, d) => updateDoc(doc(col, id), d).catch(e => gone(e));
 const del = id => deleteDoc(doc(col, id));
 const newId = () => doc(col).id;
+// A game deleted meanwhile (edition/duplicate merge, or another device) makes a whole batch fail with not-found:
+// then retry that chunk one op at a time and skip the missing ones.
+const gone = e => { if (e?.code !== "not-found") throw e; };
 async function commitChunks(ops){
-  for (let i = 0; i < ops.length; i += 400){ const b = writeBatch(db); ops.slice(i, i + 400).forEach(f => f(b)); await b.commit(); }
+  for (let i = 0; i < ops.length; i += 400){ const chunk = ops.slice(i, i + 400), b = writeBatch(db); chunk.forEach(f => f(b));
+    try { await b.commit(); } catch (e){ gone(e); for (const f of chunk){ const b1 = writeBatch(db); f(b1); await b1.commit().catch(gone); } } }
 }
 
 // Point a game at an IGDB entry; if another entry already is that game, merge into it.
