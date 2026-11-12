@@ -741,3 +741,6 @@ img.ok.now{transition:none}
 .addres .badges{position:static;display:flex;gap:4px;margin-top:4px}
 .addpaste summary{color:var(--accent);font-size:var(--t-s);cursor:pointer;margin-bottom:8px}
 .ownon{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:var(--t-s)}
+/* Top image picker: wide thumbnails */
+.heropick{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.heropick img{aspect-ratio:16/9}
