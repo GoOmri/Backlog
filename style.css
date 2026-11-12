@@ -722,7 +722,12 @@ img.ok.now{transition:none}
 .unlist{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
 .unlist li{display:flex;align-items:center;gap:12px;padding:6px 10px 6px 4px;border-radius:var(--r-m);background:var(--surface);transition:box-shadow var(--d),background-color var(--d)}
 .unlist li.drag{position:relative;z-index:2;background:var(--raise);box-shadow:0 10px 30px rgb(0 0 0 / .45)}
-.unh{touch-action:none;cursor:grab;font-size:22px;line-height:1;padding:10px 8px;color:var(--dim);user-select:none}
+.unh{font-size:22px;line-height:1;padding:10px 8px;color:var(--dim)}
 .unlist li.drag .unh{cursor:grabbing;color:var(--accent)}
 .unlist img,.unlist i{width:40px;height:53px;object-fit:cover;border-radius:var(--r-s);flex:none;background:var(--raise)}
-.unt{background:none;border:0;color:var(--fg);font:inherit;font-size:var(--t-m);text-align:left;padding:8px 0;flex:1}
+.unt{color:var(--fg);font-size:var(--t-m);flex:1}
+.unlist li{cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.unlist li.drag{cursor:grabbing;transform-origin:center;scale:1.02}
+/* List sheets (Up next, See all): breathing room from the screen edges */
+.sheet-list{padding:calc(20px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) 32px max(20px,env(safe-area-inset-left,0px))}
+.sheet-list h2{margin:0 52px 4px 0}
