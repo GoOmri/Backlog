@@ -1060,7 +1060,7 @@ async function fillStrip(g, d){
   // Platforms: where you own it (filled) and where else it's available (outlined); wishlist platforms are outlined too.
   if ($("#gpPlats")){ const x = {...g, avail: d.avail || g.avail || []}; $("#gpPlats").innerHTML = badges(x.platforms || [], x) + availBadges(x); }
   // No PlayStation release (e.g. PC only): drop the PS Store link.
-  if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) $(".pslink")?.remove();
+  if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) document.querySelectorAll(".pslink").forEach(a => a.remove());
   const score = (n, src) => `<span class="score ${n >= 75 ? "good" : n >= 60 ? "mid" : "low"}" title="${esc(src)}">${n}%</span>`;
   const sp = g.steamPct;
   const parts = [sp != null ? score(sp, "Steam reviews") : d.critic ? score(d.critic, "Critics") : null, null, null, d.developers?.[0] && `<span>by <b>${esc(d.developers[0])}</b></span>`, (d.ttb || g.ttb)?.main && `<span><b>~${(d.ttb || g.ttb).main}h</b> to beat</span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
@@ -1127,7 +1127,7 @@ async function editSheet(id){
     <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Up next" aria-label="Up next" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
     <button class="ibtn" id="nopeBtn" title="${g.notNow ? "Back on Play" : "Not now"}" aria-label="${g.notNow ? "Back on Play" : "Not now"}">${g.notNow ? ic("undo") : ic("down")}</button>`;
   const facts = `
-    <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
+    <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a class="pslink" href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
     <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
 `;
   const edit = `
