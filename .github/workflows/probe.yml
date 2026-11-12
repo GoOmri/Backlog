@@ -5,9 +5,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          sleep 60
-          curl -s -H "Origin: https://goomri.github.io" https://backlog-api.goomric.workers.dev/finds | python3 -c "
-          import sys,json; d=json.load(sys.stdin)
-          if 'error' in d: print(d); sys.exit()
-          for k,v in d.items(): print(k, len(v), '|', ', '.join(f\"{x['title']} {x['year']}\" for x in v[:8]))
-          print('GOLDMAN', [ (k,x['title']) for k,v in d.items() for x in v if 'oldman' in x['title']])"
+          A=https://backlog-api.goomric.workers.dev; H="Origin: https://goomri.github.io"
+          curl -s -H "$H" "$A/search?q=monomoon" | python3 -c "import sys,json; [print('SEARCH', x['igdbId'], x['title'], x.get('year'), x.get('appid')) for x in json.load(sys.stdin)[:4]]"
+          ID=$(curl -s -H "$H" "$A/search?q=monomoon" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['igdbId'])")
+          curl -s -H "$H" "$A/game?id=$ID" | python3 -c "import sys,json; d=json.load(sys.stdin); print('GAME', {k: d.get(k) for k in ['title','appid','hero','logo','cover','available','error']})"
+          APP=$(curl -s -H "$H" "$A/game?id=$ID" | python3 -c "import sys,json; print(json.load(sys.stdin).get('appid') or '')")
+          for f in library_hero.jpg logo.png library_600x900.jpg header.jpg; do echo "STEAM $APP $f $(curl -s -o /dev/null -w '%{http_code}' https://cdn.akamai.steamstatic.com/steam/apps/$APP/$f)"; done
