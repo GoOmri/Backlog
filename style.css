@@ -765,3 +765,26 @@ img.ok.now{transition:none}
 /* Owned line: owned platforms as named filled badges, next to outlined "also on" badges */
 .ownline .gp-plats{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;min-height:0}
 .plat.own{font:600 var(--t-xs) var(--body);height:22px;padding:0 8px;letter-spacing:0;opacity:1}
+/* Game page header (DESIGN.md: rows never wrap) */
+.gp-head .gtags{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);padding-right:24px}
+.gp-head .gtags::-webkit-scrollbar{display:none}
+.gp-head .gtags span{flex:none;white-space:nowrap}
+.gp-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:var(--s2)}
+.gp-actions > *{flex:none}
+.gp-actions .gp-spacer{flex:1 1 0;min-width:0}
+.gp-actions .btn{white-space:nowrap}
+.stbadge{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:999px;font-weight:600;font-size:var(--t-s);background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.rstars{display:inline-flex;align-items:center;height:40px;padding:0 6px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);background:rgba(14,17,22,.5)}
+.rstars button{background:none;border:0;padding:0 3px;font-size:19px;line-height:40px;color:var(--line);cursor:pointer}
+.rstars button.on{color:var(--gold)}
+@media (max-width:370px){.rstars button{font-size:17px;padding:0 2px}.stbadge,.gp-actions .btn{padding:0 11px}}
+/* Fact tiles: 2-column grid, each fact one tile, empty ones disappear */
+.ftiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}
+.ftiles > .strip,.ftiles > .prog,.ftiles > .diff{display:contents}
+.ftile{background:var(--surface);border-radius:var(--r-m);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ftile .fl{font-size:var(--t-xs);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftile b{font:600 var(--t-r) var(--body);color:var(--fg);font-variant-numeric:tabular-nums}
+.ftile .fs{font-size:var(--t-xs);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftile .ptrack{margin-top:6px}
+.ftile .score{border:0;padding:0;font:inherit}
+.ftile .dl.vhard,.ftile .dl.hard{color:var(--bad)}.ftile .dl.med{color:var(--gold)}.ftile .dl.easy{color:var(--good)}

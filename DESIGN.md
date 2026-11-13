@@ -23,6 +23,7 @@ Read with NOTES.md before any visual change. New UI reuses what's here; if somet
 - Mobile first: design and check at 360px wide. Desktop is the same layout, wider.
 - Side gutter `--gut` (16px+safe area). Nothing touches screen edges.
 - Tap targets ≥ 44px tall (icon buttons 44×44).
+- Rows of chips/buttons never wrap: they scroll sideways with a right-edge fade (tags) or shorten (labels → one word, secondary actions → 40–44px icon buttons on the right).
 - Stacked rows of chips/buttons always have a gap (`--s2`) between rows.
 - Grids: phone 3 columns for game cards, 2 max for anything with text.
 
@@ -33,6 +34,8 @@ Read with NOTES.md before any visual change. New UI reuses what's here; if somet
 - Platform badge: filled = you own it there; outlined = available there, not owned. Never repeat the same platform as text next to it.
 - Buttons: one filled `--accent` primary per view (the status button); others are outlined/ghost or 44px round icon buttons.
 - Sheets: full-screen game page or bottom sheet; close top-right; actions at the bottom, primary on the right.
+
+- Game page: header = title → year · developer (· Deck) → one tag line (`tagLine`, max 6, co-op once) → action row (status/“✓ Finished” · tap stars · spacer · icon buttons). Facts = 2-column tiles (`.ftile`: label, value, optional small line); a tile with no data isn't drawn.
 
 ## One piece of information, one place
 - Don't show the same fact twice on a screen (e.g. owned platform as text and as a badge).
