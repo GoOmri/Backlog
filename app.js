@@ -86,10 +86,14 @@ const playable = g => g.ps !== "left" && !g.hidden && !isSoft(g); // software st
 /* ---------- API (Cloudflare Worker) ---------- */
 async function api(path, body){
   if (!API) throw new Error("Add your Worker address to config.js to load game info.");
-  const r = await fetch(API + path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || "Data service answered " + r.status);
-  return d;
+  for (let i = 0; ; i++){
+    const r = await fetch(API + path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) return d;
+    // Busy (rate limit): wait 2s, 4s, 8s and try again before showing an error.
+    if (i < 3 && (r.status === 429 || /429|too many/i.test(d.error || ""))){ await new Promise(res => setTimeout(res, 2000 * 2 ** i)); continue; }
+    throw new Error(d.error || "Data service answered " + r.status);
+  }
 }
 
 // Game details (description, screenshots, trailer) change rarely: keep them on this device.
