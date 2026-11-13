@@ -49,7 +49,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const clean = t => String(t).replace(/[™®©]/g, "").replace(/\s{2,}/g, " ").trim();
 const key = t => String(t).toLowerCase().replace(/[™®©]/g, "").replace(/[^a-z0-9]+/g, "");
-const list = () => [...games.values()];
+const all = () => [...games.values()];
+const list = () => all().filter(g => !g.folded); // DLC whose main game is in the list lives on that game's page
 const genresOf = g => [...new Set([...(g.genres || []), ...(g.themes || [])])];
 const mainH = g => g.ttb?.main || null;
 const lenOf = h => !h ? "" : h < 10 ? "short" : h <= 30 ? "medium" : "long";
@@ -91,8 +92,8 @@ async function api(path, body){
 const detailMem = new Map();
 async function gameDetails(id){
   if (detailMem.has(id)) return detailMem.get(id);
-  try { const c = JSON.parse(localStorage.getItem("gd8:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
-  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd8:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
+  try { const c = JSON.parse(localStorage.getItem("gd9:" + id)); if (c && Date.now() - c.t < 30 * 864e5){ detailMem.set(id, c.d); return c.d; } } catch {}
+  const p = api("/game?id=" + id).then(d => { try { localStorage.setItem("gd9:" + id, JSON.stringify({t: Date.now(), d})); } catch {} return d; });
   detailMem.set(id, p); p.catch(() => detailMem.delete(id));
   return p;
 }
@@ -228,12 +229,12 @@ async function mergeEditions(){
 }
 async function backfill(){
   await mergeEditions();
-  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined || g.kw === undefined || g.avail === undefined));
+  const need = list().filter(g => g.igdbId && (g.views === undefined || g.couch === undefined || g.kw === undefined || g.avail === undefined || g.dlcOf === undefined));
   for (let i = 0; i < need.length; i += 200){
     const chunk = need.slice(i, i + 200);
     progress(i, need.length, "Adding game details");
     const res = await api("/info", {ids: chunk.map(g => g.igdbId), apps: chunk.map(g => +g.steamAppId).filter(Boolean)}), st = res.steam || {};
-    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: g.couchSet ? !!g.couch : !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop, kw: res[g.igdbId]?.kw || [], avail: res[g.igdbId]?.avail || [], ...(st[g.steamAppId] ? {steamPct: st[g.steamAppId].pct, steamN: st[g.steamAppId].n} : {})})));
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {views: res[g.igdbId]?.views || [], couch: g.couchSet ? !!g.couch : !!res[g.igdbId]?.couch, onlineCoop: !!res[g.igdbId]?.onlineCoop, kw: res[g.igdbId]?.kw || [], avail: res[g.igdbId]?.avail || [], dlcOf: res[g.igdbId]?.dlcOf || null, ...(st[g.steamAppId] ? {steamPct: st[g.steamAppId].pct, steamN: st[g.steamAppId].n} : {})})));
   }
   const odd = list().filter(g => g.igdbId && g.asTyped && !g.rechecked && key(g.title) !== key(g.asTyped));
   for (const [i, g] of odd.entries()){
@@ -988,6 +989,7 @@ function pageShell(x, {own, actions, facts, edit}){
     </div>
     <aside class="gp-facts">${own}<div class="gp-plats" id="gpPlats"></div><div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"></div>${facts || ""}</aside>
   </div>
+  <section class="gp-dlc" id="dlcBox" hidden><h3>DLC</h3><div id="dlcList"></div></section>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
 }
 async function previewSheet(x){
@@ -1018,7 +1020,7 @@ async function previewSheet(x){
     closeSheet(); toast(`${x.title} added · ${PLAT[p][0]}`);
     setDoc(doc(col, id), wid ? owned : {...data, ...(appid ? {steamAppId: appid} : {}), asTyped: x.title, added: Date.now(), ...owned}, {merge: true}).catch(saveErr); };
   fillDifficulty(x, null);
-  try { const d = await gameDetails(x.igdbId); if (!x.appid && d.appid) x.appid = d.appid; fillMedia(d, x); fillStrip(x, d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
+  try { const d = await gameDetails(x.igdbId); if (!x.appid && d.appid) x.appid = d.appid; fillMedia(d, x); fillStrip(x, d); fillDlc(d); } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
 }
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
 let ytReady;
@@ -1087,6 +1089,14 @@ async function fillTags(g){
   let t = null; try { const c = JSON.parse(localStorage.getItem("tt:" + app)); if (c && Date.now() - c.at < 30 * 864e5) t = c.t; } catch {}
   if (!t){ t = await api("/toptags?appid=" + app).catch(() => null); if (t?.length) try { localStorage.setItem("tt:" + app, JSON.stringify({at: Date.now(), t})); } catch {} }
   const el = $("#gtags"); if (el && t?.length) el.innerHTML = t.map(x => `<span>${esc(x)}</span>`).join("");
+}
+// DLC / expansions from IGDB; "Owned" when that DLC is in your list (folded into this page). Tap → its own preview.
+function fillDlc(d){
+  const box = $("#dlcBox"); if (!box || !d.dlc?.length) return;
+  const mine = new Map(all().filter(g => g.igdbId).map(g => [g.igdbId, g.id]));
+  $("#dlcList").innerHTML = d.dlc.sort((a, b) => (a.year || 9999) - (b.year || 9999)).map(x => { previewCache.set(x.igdbId, x);
+    return `<button class="dlcrow" ${mine.has(x.igdbId) ? `data-edit="${mine.get(x.igdbId)}"` : `data-preview="${x.igdbId}"`}>${x.cover ? `<img src="${esc(x.cover)}" alt="" loading="lazy">` : `<span class="ph"></span>`}<span><b>${esc(x.title)}</b><span class="why">${x.year || ""}</span></span>${mine.has(x.igdbId) ? `<span class="owned">Owned</span>` : ""}</button>`; }).join("");
+  box.hidden = false;
 }
 async function fillStrip(g, d){
   fillTags(g);
@@ -1284,7 +1294,7 @@ async function editSheet(id){
   if (!g.igdbId) return;
   try {
     const d0 = await gameDetails(g.igdbId), d = {...d0, ...(g.logoSet ? {logo: g.logo} : {}), ...(g.heroSet ? {hero: g.hero} : {})};
-    fillMedia(d, g); fillStrip(g, d); fillProgress(g);
+    fillMedia(d, g); fillStrip(g, d); fillDlc(d); fillProgress(g);
     if (!g.steamAppId && d.appid) upd(id, {steamAppId: d.appid}).catch(() => {});
     if ((!g.hero && d.hero) || (!g.logoSet && (d.logo || "") !== (g.logo || ""))) upd(id, {hero: g.hero || d.hero || "", ...(g.logoSet ? {} : {logo: d.logo || ""})});
   } catch (e){ if ($("#desc")) $("#desc").textContent = e.message; }
@@ -1366,7 +1376,7 @@ function siftShow(){
     dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / per() ? "on" : ""}"></i>`).join("") : "";
   };
   const fail = msg => { stack.innerHTML = `<div class="sift-shot poster">${poster}</div>${msg ? `<div class="dim">${msg} <button class="linkbtn" data-s="retry">Retry</button></div>` : ""}`; };
-  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd8:" + g.igdbId); } catch {} siftShow(); };
+  sift.retry = () => { detailMem.delete(g.igdbId); try { localStorage.removeItem("gd9:" + g.igdbId); } catch {} siftShow(); };
   if (g.igdbId) gameDetails(g.igdbId).then(d => {
     if (!sift || sift.i !== me || !$("#siftStack")) return;
     shots = (d.shots || []).map(med); trailer = d.trailer || null;
@@ -1518,6 +1528,7 @@ onAuthStateChanged(auth, user => {
   render();
   unsub = onSnapshot(col, snap => {
     games = new Map(snap.docs.map(d => { const g = {id: d.id, ...d.data()}; if (g.status === "playing") g.status = "backlog"; if (g.hidden && !g.nope){ g.notNow = true; g.hidden = false; } return [d.id, g]; }));
+    { const ids = new Set([...games.values()].map(g => g.igdbId).filter(Boolean)); for (const g of games.values()) if (g.dlcOf && ids.has(g.dlcOf)) g.folded = true; }
     $("#sync").textContent = navigator.onLine ? "" : "offline";
     const first = !loaded; loaded = true; hideSplash();
     if (first) render(); else if (snap.docChanges().length) softRender();

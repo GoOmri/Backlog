@@ -749,3 +749,12 @@ img.ok.now{transition:none}
 .hpos img{width:100%;height:100%;object-fit:cover;pointer-events:none;user-select:none}
 .hzoom{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:var(--t-s)}
 .hzoom input{flex:1}
+/* DLC section on the game page (above Similar games) */
+.gp-dlc{max-width:1100px;margin:0 auto;padding:24px max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px))}
+.gp-dlc h3{margin:0 0 10px}
+.dlcrow{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:6px 0;color:inherit}
+.dlcrow img,.dlcrow .ph{width:40px;height:54px;border-radius:var(--r-s);object-fit:cover;background:var(--raise);flex:none}
+.dlcrow > span:nth-child(2){flex:1;min-width:0}
+.dlcrow b{display:block;font-size:var(--t-m)}
+.dlcrow .why{display:block;font-size:var(--t-xs);color:var(--dim)}
+.dlcrow .owned{font-size:var(--t-xs);font-weight:600;padding:3px 8px;border-radius:var(--r-s);background:var(--accent);color:var(--bg)}
