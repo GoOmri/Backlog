@@ -513,7 +513,7 @@ function heroHTML(g){
   return `<div class="hero slide"><div class="hero-bg">${heroOf(g) ? `<img src="${esc(heroOf(g))}" alt="" loading="lazy" ${heroStyle(g)}>` : ""}</div>
     <div class="hero-in">
       ${logoOf(g) ? `<img class="hero-logo" src="${esc(logoOf(g))}" alt="${esc(g.title)}">` : `<h1 class="hero-title">${esc(g.title)}</h1>`}
-      <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
+      <div class="hero-facts"><span class="badges" style="position:static">${badges(g.platforms, g)}</span>${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
       <div class="hero-actions"><button class="btn" data-edit="${g.id}">Details</button></div>
     </div></div>`;
 }
