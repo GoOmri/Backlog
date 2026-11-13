@@ -59,7 +59,13 @@ async function twitchToken(env){
   return d.access_token;
 }
 async function igdb(env, endpoint, query){
-  const r = await fetch("https://api.igdb.com/v4/" + endpoint, {method: "POST", headers: {"Client-ID": env.TWITCH_ID, "Authorization": "Bearer " + await twitchToken(env)}, body: query});
+  let r;
+  // IGDB allows ~4 requests/s: on 429 wait and retry (250ms, 500ms, 1s, 2s) instead of failing the whole batch.
+  for (let i = 0; i < 5; i++){
+    r = await fetch("https://api.igdb.com/v4/" + endpoint, {method: "POST", headers: {"Client-ID": env.TWITCH_ID, "Authorization": "Bearer " + await twitchToken(env)}, body: query});
+    if (r.status !== 429) break;
+    await new Promise(res => setTimeout(res, 250 * 2 ** i + Math.random() * 100));
+  }
   if (r.status === 401) await env.KV.delete("twitch_token");
   if (!r.ok) throw new Error("IGDB " + r.status + ": " + (await r.text()).slice(0, 200));
   return r.json();
