@@ -762,3 +762,6 @@ img.ok.now{transition:none}
 .csub{flex-wrap:wrap;row-gap:2px;justify-content:flex-start}
 .csub > span:first-child{flex:1 1 100%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .csub .stars{flex:none}
+/* Owned line: owned platforms as named filled badges, next to outlined "also on" badges */
+.ownline .gp-plats{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;min-height:0}
+.plat.own{font:600 var(--t-xs) var(--body);height:22px;padding:0 8px;letter-spacing:0;opacity:1}

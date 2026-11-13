@@ -987,7 +987,7 @@ function pageShell(x, {own, actions, facts, edit}){
       <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
       <p class="desc clamp" id="desc"></p>
     </div>
-    <aside class="gp-facts">${own}<div class="gp-plats" id="gpPlats"></div><div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"></div>${facts || ""}</aside>
+    <aside class="gp-facts">${own}<div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"></div>${facts || ""}</aside>
   </div>
   <section class="gp-dlc" id="dlcBox" hidden><h3>DLC</h3><div id="dlcList"></div></section>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
@@ -996,7 +996,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span id="ownAvail"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div><div class="ownon"><span class="dim">I own it on</span>${["ps5", "psplus", "steam", "epic", "itch"].map(p => `<button class="chip" data-own="${p}">${PLAT[p][0]}</button>`).join("")}</div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span class="gp-plats" id="gpPlats"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a></div><div class="ownon"><span class="dim">I own it on</span>${["ps5", "psplus", "steam", "epic", "itch"].map(p => `<button class="chip" data-own="${p}">${PLAT[p][0]}</button>`).join("")}</div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = toggleDesc;
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -1102,7 +1102,9 @@ async function fillStrip(g, d){
   fillTags(g);
   const box = $("#strip"); if (!box) return;
   // Platforms: where you own it (filled) and where else it's available (outlined); wishlist platforms are outlined too.
-  if ($("#gpPlats")){ const x = {...g, avail: d.avail || g.avail || []}; $("#gpPlats").innerHTML = badges(x.platforms || [], x) + availBadges(x); }
+  if ($("#gpPlats")){ const x = {...g, avail: d.avail || g.avail || []}; 
+    const mine = x.status === "wishlist" ? badges(x.platforms || [], x) : [...new Set((x.platforms || []).map(p => p === "ps5" && x.ps && x.ps !== "bought" ? "psplus" : p))].map(p => { const v = PLAT[p] || PLAT.other; return `<span class="plat own" style="background:var(${v[2]})">${v[0]}</span>`; }).join("");
+    $("#gpPlats").innerHTML = mine + availBadges(x); }
   // No PlayStation release (e.g. PC only): drop the PS Store link.
   if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) document.querySelectorAll(".pslink").forEach(a => a.remove());
   const score = (n, src) => `<span class="score ${n >= 75 ? "good" : n >= 60 ? "mid" : "low"}" title="${esc(src)}">${n}%</span>`;
@@ -1184,11 +1186,11 @@ async function editSheet(id){
       <div class="field"><span class="label">Top image</span><button class="btn ghost small" id="heroGo">Change top image</button> <button class="btn ghost small" id="heroPosGo">Recenter</button><div id="heroPosBox"></div><div class="coverpick heropick" id="heroes"></div></div>
       <button class="btn ghost small danger" id="eDel">Delete game</button>
 `;
-  const pc = p => `<span class="pc" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`;
-  const ownLine = g.ps === "left" ? `<b class="st no">Left PS Plus</b> · not playable now`
-    : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b class="st no">Not owned</b><span id="ownAvail"></span>`
-    : ownP.length ? `<b class="st yes">Owned</b> ${ownP.map(pc).join(" ")}${viaPlus ? ` ${pc("psplus")}` : ""}`
-    : `<b class="st yes">Owned</b> ${pc("psplus")} · while subscribed`;
+  // One row: status word + platform badges (filled = yours, outlined = also on). No platform names repeated as text.
+  const platRow = `<span class="gp-plats" id="gpPlats"></span>`;
+  const ownLine = g.ps === "left" ? `<b class="st no">Left PS Plus</b>${platRow}`
+    : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b class="st no">Not owned</b>${platRow}`
+    : `<b class="st yes">Owned</b>${platRow}${!ownP.length ? `<span class="dim">while subscribed</span>` : ""}`;
   openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
   $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !$("#editPanel").hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
