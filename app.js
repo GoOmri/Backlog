@@ -643,7 +643,8 @@ function activeChips(){
 }
 function shelfHTML(wish){
   if (!games.size) return emptyHTML();
-  const scope = list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.notNow : !g.hidden));
+  // Unmatched view shows every unmatched game, wishlist included (that's where most come from).
+  const scope = genreF === "__nomatch" ? list().filter(g => g.noMatch) : list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.notNow : !g.hidden));
   shelfScope = scope; shelfWish = wish;
   const s = q.toLowerCase();
   const shown = scope.filter(g => passes(g) && (!s || g.title.toLowerCase().includes(s)));
