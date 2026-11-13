@@ -659,8 +659,8 @@ function shelfHTML(wish){
     anticipated: (a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0)};
   const srt = wish && sort === "title" ? "anticipated" : by[sort] ? sort : "title";
   shown.sort(by[srt]);
-  const key = JSON.stringify([wish, s, sort, statF, genreF, accessF, deckF, [...platF], ...Object.values(F).map(x => [...x])]);
-  if (key !== shelfKey){ shelfReset = !!shelfKey; shelfKey = key; shelfLimit = CHUNK; }
+  const sk = JSON.stringify([wish, s, sort, statF, genreF, accessF, deckF, [...platF], ...Object.values(F).map(x => [...x])]);
+  if (sk !== shelfKey){ shelfReset = !!shelfKey; shelfKey = sk; shelfLimit = CHUNK; }
   shelfShown = shown;
   const nOn = platF.size + F.type.size + F.view.size + F.coop.size + F.access.size + (deckF ? 1 : 0) + (sort !== "title" ? 1 : 0);
   return `${wish ? `<div class="wrap backbar"><button class="linkbtn" data-tab="lib">← Library</button><h2>Your wishlist</h2></div>` : ""}<div class="wrap libwrap"><aside class="side" id="side">${sidebarHTML()}</aside><div class="libmain">
