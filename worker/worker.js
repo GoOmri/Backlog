@@ -37,6 +37,8 @@ export default {
         case "/achrarity": out = await achRarity(env, +url.searchParams.get("appid")); break;
         case "/steamwish": out = await steamWishlist(env); break;
         case "/steam":    out = await steam(env); break;
+        case "/steamsearch": out = await steamSearch(url.searchParams.get("q") || ""); break;
+        case "/steamapp": out = await steamApp(+String(url.searchParams.get("id") || "").match(/\d+/)?.[0]); break;
         default: return json({error: "Not found"}, 404, cors);
       }
       return json(out, 200, cors);
@@ -497,4 +499,22 @@ async function steamWishlist(env){
     for (const it of s.response?.store_items || []) if (it.name) names[it.appid] = it.name;
   }
   return items.map(x => ({appid: x.appid, title: names[x.appid], added: (x.date_added || 0) * 1000, priority: x.priority})).filter(x => x.title);
+}
+
+// Steam fallback for games IGDB doesn't have. Search hides adult-only games for logged-out users, so the app also accepts a pasted store link (/steamapp).
+const STEAM_CDN = id => `https://cdn.akamai.steamstatic.com/steam/apps/${id}/`;
+async function steamSearch(text){
+  const t = cleanTitle(text); if (!t) return [];
+  const r = await (await fetch(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(t)}&cc=us&l=english`)).json().catch(() => ({}));
+  return (r.items || []).filter(i => i.type === "app").slice(0, 6).map(i => ({steamAppId: i.id, title: i.name, thumb: i.tiny_image || STEAM_CDN(i.id) + "capsule_231x87.jpg", steamOnly: true}));
+}
+async function steamApp(id){
+  if (!id) throw new Error("That doesn't look like a Steam link.");
+  const j = await (await fetch(`https://store.steampowered.com/api/appdetails?appids=${id}&cc=us&l=english`)).json().catch(() => ({}));
+  const d = j?.[id]?.data;
+  if (!j?.[id]?.success || !d) throw new Error("Steam didn't return that game (it may be age-restricted or removed).");
+  const y = /\b(19|20)\d{2}\b/.exec(d.release_date?.date || "")?.[0];
+  return {steamOnly: true, steamAppId: id, title: d.name, year: y ? +y : null, cover: STEAM_CDN(id) + "library_600x900.jpg", hero: STEAM_CDN(id) + "library_hero.jpg",
+    genres: (d.genres || []).map(g => g.description).filter(g => !/^(indie|early access|free to play)$/i.test(g)), summary: String(d.short_description || "").replace(/<[^>]+>/g, "").trim(),
+    developers: d.developers || [], platformsAvail: ["PC", d.platforms?.mac ? "Mac" : "", d.platforms?.linux ? "Linux" : ""].filter(Boolean)};
 }

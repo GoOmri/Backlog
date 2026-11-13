@@ -164,6 +164,16 @@ async function applyMatch(g, m){
   }
 }
 
+// Steam-only match (game not on IGDB): Steam's name, art, year, genres. Twin by app id merges like applyMatch.
+async function applySteam(g, appid){
+  const s = await api("/steamapp?id=" + appid);
+  const twin = list().find(x => x.id !== g.id && x.steamAppId === s.steamAppId && (x.igdbId || x.steamOnly));
+  if (twin){ await upd(twin.id, {platforms: [...new Set([...(twin.platforms || []), ...(g.platforms || [])])], status: RANK[g.status] > RANK[twin.status] ? g.status : twin.status}); await del(g.id); return s; }
+  const {platformsAvail, ...data} = s;
+  await upd(g.id, {...data, avail: platformsAvail, asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null, heroSet: null});
+  return s;
+}
+
 /* ---------- background jobs: matching + prices ---------- */
 let running = false;
 const tried = new Set();
@@ -177,7 +187,7 @@ async function runQueue(){
   let done = 0;
   try {
     while (true){
-      const todo = list().filter(g => !g.igdbId && !g.nope && (!g.noMatch || g.noMatchV !== 6) && !tried.has(g.id));
+      const todo = list().filter(g => !g.igdbId && !g.steamOnly && !g.nope && (!g.noMatch || g.noMatchV !== 6) && !tried.has(g.id));
       if (!todo.length) break;
       const batch = todo.slice(0, 10); batch.forEach(g => tried.add(g.id));
       progress(done, done + todo.length, "Getting covers and info");
@@ -189,7 +199,10 @@ async function runQueue(){
           const alt = await api("/search?q=" + encodeURIComponent(t)).catch(() => []);
           m = alt.filter(r => key(r.title) === key(t)).sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0))[0] || m || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
         }
-        if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now(), noMatchV: 6});
+        let st = null;
+        if (!m){ const hits = await api("/steamsearch?q=" + encodeURIComponent(t)).catch(() => []); st = hits.find(h => key(h.title) === key(t)); }
+        if (m) await applyMatch(g, m);
+        else if (!st || !(await applySteam(g, st.steamAppId).catch(() => null))) await upd(g.id, {noMatch: true, noMatchAt: Date.now(), noMatchV: 6});
         progress(done + i + 1, done + todo.length, "Getting covers and info"); // count each game, not each batch of 10
       }
       done += batch.length;
@@ -1207,7 +1220,8 @@ async function editSheet(id){
         ${row("heroPosGo", "Recenter top image")}<div id="heroPosBox"></div>
       </div>
       <div class="egroup-l">Wrong game?</div>
-      <div class="egroup epad"><div class="efix"><input id="fix" value="${esc(clean(g.asTyped || g.title))}" aria-label="Search for the right game"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
+      <div class="egroup epad"><div class="efix"><input id="fix" value="${esc(clean(g.asTyped || g.title))}" aria-label="Search for the right game"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div>
+        <div class="efix esteam"><input id="steamLink" placeholder="store.steampowered.com/app/…" aria-label="Steam store link or app number" inputmode="url"><button class="btn small" id="steamGo">Use</button></div></div>
       <button class="egroup erow edanger" id="eDel">Delete game</button>
 `;  // One row: status word + platform badges (filled = yours, outlined = also on). No platform names repeated as text.
   const platRow = `<span class="gp-plats" id="gpPlats"></span>`;
@@ -1307,15 +1321,24 @@ async function editSheet(id){
       box.querySelectorAll("[data-cover]").forEach(b => b.onclick = async () => { await upd(id, {cover: b.dataset.cover, coverSet: true}); toast("Cover changed"); box.innerHTML = ""; });
     } catch (e){ box.textContent = e.message; }
   };
+  // Paste a Steam store link (or app number): reliable for games Steam hides from search (adult-only).
+  $("#steamGo").onclick = async () => { const v = $("#steamLink").value.match(/app\/(\d+)|^\s*(\d+)\s*$/); if (!v){ toast("Paste a Steam store link"); return; }
+    try { await applySteam({...games.get(id), platforms: [...plats]}, v[1] || v[2]); closeSheet(); toast("Matched from Steam"); } catch (e){ toast(e.message); } };
   $("#fixGo").onclick = async () => {
     const box = $("#matches"); box.textContent = "Searching…";
     try {
       const res = await api("/search?q=" + encodeURIComponent($("#fix").value));
-      box.innerHTML = res.map((r, i) => `<button class="match" data-m="${i}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : "<span></span>"}<span><b>${esc(r.title)}</b><br><span class="why">${r.year || ""}</span></span></button>`).join("") || "No results.";
+      const st = res.length ? [] : await api("/steamsearch?q=" + encodeURIComponent($("#fix").value)).catch(() => []);
+      box.innerHTML = res.map((r, i) => `<button class="match" data-m="${i}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : "<span></span>"}<span><b>${esc(r.title)}</b><br><span class="why">${r.year || ""}</span></span></button>`).join("")
+        || (st.length ? `<div class="why">Nothing on IGDB. Found on Steam:</div>` + st.map(r => `<button class="match steamhit" data-st="${r.steamAppId}"><img src="${esc(r.thumb)}" alt=""><span><b>${esc(r.title)}</b><br><span class="why">Steam</span></span></button>`).join("") : "No results. Try a Steam link below.");
       box.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => { await applyMatch({...games.get(id), platforms: [...plats]}, res[+b.dataset.m]); closeSheet(); });
+      box.querySelectorAll("[data-st]").forEach(b => b.onclick = async () => { try { await applySteam({...games.get(id), platforms: [...plats]}, b.dataset.st); closeSheet(); toast("Matched from Steam"); } catch (e){ toast(e.message); } });
     } catch (e){ box.textContent = e.message; }
   };
-  if (!g.igdbId) return;
+  if (!g.igdbId){ // Steam-only game: description and facts from what Steam gave us
+    if (g.steamOnly){ const d = {summary: g.summary || "", developers: g.developers || [], shots: [], dlc: []}; fillMedia(d, g); fillStrip(g, d).catch?.(() => {}); fillProgress(g); }
+    return;
+  }
   try {
     const d0 = await gameDetails(g.igdbId), d = {...d0, ...(g.logoSet ? {logo: g.logo} : {}), ...(g.heroSet ? {hero: g.hero} : {})};
     fillMedia(d, g); fillStrip(g, d); fillDlc(d); fillProgress(g);
