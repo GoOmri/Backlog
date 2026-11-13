@@ -64,7 +64,8 @@ async function igdb(env, endpoint, query){
   if (!r.ok) throw new Error("IGDB " + r.status + ": " + (await r.text()).slice(0, 200));
   return r.json();
 }
-const q = s => String(s).replace(/\\/g, "").replace(/"/g, '\\"');
+// ™ ® © break IGDB name search ("Celeste™" finds nothing), so drop them from every query.
+const q = s => String(s).replace(/[™®©]/g, "").replace(/\\/g, "").replace(/"/g, '\\"').trim();
 const norm = s => String(s).toLowerCase().replace(/[™®©]/g, "").replace(/[^a-z0-9]+/g, "");
 
 // IGDB platform abbreviations → short codes for "available on".

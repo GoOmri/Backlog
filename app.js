@@ -47,6 +47,7 @@ let mood = new Set(), time = "";
 let db = null, col = null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const clean = t => String(t).replace(/[™®©]/g, "").replace(/\s{2,}/g, " ").trim();
 const key = t => String(t).toLowerCase().replace(/[™®©]/g, "").replace(/[^a-z0-9]+/g, "");
 const list = () => [...games.values()];
 const genresOf = g => [...new Set([...(g.genres || []), ...(g.themes || [])])];
@@ -647,7 +648,7 @@ function shelfHTML(wish){
   const scope = genreF === "__nomatch" ? list().filter(g => g.noMatch) : list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.notNow : !g.hidden));
   shelfScope = scope; shelfWish = wish;
   const s = q.toLowerCase();
-  const shown = scope.filter(g => passes(g) && (!s || g.title.toLowerCase().includes(s)));
+  const shown = scope.filter(g => passes(g) && (!s || key(g.title).includes(key(s))));
   const by = {title: (a, b) => a.title.localeCompare(b.title), rating: (a, b) => (b.rating || 0) - (a.rating || 0), short: (a, b) => (mainH(a) || 999) - (mainH(b) || 999),
     added: (a, b) => (b.added || 0) - (a.added || 0), played: (a, b) => (b.steamHours || 0) - (a.steamHours || 0),
     anticipated: (a, b) => (a.upNext || 9e15) - (b.upNext || 9e15) || (b.myRating || 0) - (a.myRating || 0) || (b.rating || 0) - (a.rating || 0)};
@@ -1163,7 +1164,7 @@ async function editSheet(id){
 `;
   const edit = `
       <div class="field"><span class="label">Status</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
-      <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(g.asTyped || g.title)}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
+      <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(clean(g.asTyped || g.title))}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
       <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
       <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
       <div class="field"><span class="label">Top image</span><button class="btn ghost small" id="heroGo">Change top image</button> <button class="btn ghost small" id="heroPosGo">Recenter</button><div id="heroPosBox"></div><div class="coverpick heropick" id="heroes"></div></div>
