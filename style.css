@@ -824,3 +824,4 @@ img.ok.now{transition:none}
 .matches .steamhit img{width:72px;height:auto;aspect-ratio:231/87;object-fit:cover;border-radius:var(--r-s)}
 .editpanel .esteam{margin-top:var(--s2)}
 .editpanel .esteam input{flex:1;min-width:0}
+.brand{text-decoration:none;color:inherit;cursor:pointer} /* logo = link home, full reload */
