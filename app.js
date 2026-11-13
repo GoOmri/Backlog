@@ -178,7 +178,7 @@ async function runQueue(){
       const batch = todo.slice(0, 10); batch.forEach(g => tried.add(g.id));
       progress(done, done + todo.length, "Getting covers and info");
       const res = await api("/match", {titles: batch.map(g => g.asTyped || g.title)});
-      for (const g of batch){
+      for (const [i, g] of batch.entries()){
         const t = g.asTyped || g.title;
         let m = res[t];
         if (!m || key(m.title) !== key(t)){ // not an exact name: try a wider search for an exact one
@@ -186,6 +186,7 @@ async function runQueue(){
           m = alt.filter(r => key(r.title) === key(t)).sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0))[0] || m || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
         }
         if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now(), noMatchV: 5});
+        progress(done + i + 1, done + todo.length, "Getting covers and info"); // count each game, not each batch of 10
       }
       done += batch.length;
     }
@@ -281,6 +282,7 @@ async function checkDeck(){
 function progress(n, total, text = "", stay = false){
   $("#progress").hidden = !total && !stay;
   $("#progress .track").hidden = !total;
+  $("#progress").classList.toggle("busy", !!total); // moving shine = still working
   $("#progFill").style.width = total ? (n / total * 100) + "%" : "0";
   $("#progText").textContent = total ? `${text} · ${n}/${total}` : text;
 }

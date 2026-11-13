@@ -813,3 +813,7 @@ img.ok.now{transition:none}
 .editpanel .efix{display:flex;gap:var(--s2)}
 .editpanel .efix input{flex:1;min-width:0}
 .editpanel .edanger{margin-top:var(--s3);justify-content:center;background:var(--raise);border-radius:var(--r-m);color:var(--bad);border:0}
+/* Background progress: soft moving shine while work is running */
+.progress.busy .track span{background-image:linear-gradient(90deg,transparent 0,rgb(255 255 255 / .45) 50%,transparent 100%);background-size:200% 100%;background-repeat:no-repeat;animation:progshine 1.4s linear infinite}
+@keyframes progshine{from{background-position:200% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.progress.busy .track span{animation:none}}
