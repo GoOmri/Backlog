@@ -611,7 +611,7 @@ details.fsec:not([open]) > summary::after{transform:rotate(-90deg)}
 details.fsec:not([open]) > summary{margin-bottom:0}
 .fsec .fon{color:var(--accent);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fmore{justify-self:start;margin:4px 0 0 8px;font-size:var(--t-s)}
-.activechips{margin-top:8px}
+.activechips{margin:8px 0}
 .chip.on{border-color:var(--accent);color:var(--accent)}
 .sortsel{margin-left:auto;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:var(--r-s);padding:6px 8px;font:inherit;font-size:var(--t-s)}
 .gtags{display:flex;flex-wrap:wrap;gap:6px;min-height:24px}
