@@ -758,3 +758,7 @@ img.ok.now{transition:none}
 .dlcrow b{display:block;font-size:var(--t-m)}
 .dlcrow .why{display:block;font-size:var(--t-xs);color:var(--dim)}
 .dlcrow .owned{font-size:var(--t-xs);font-weight:600;padding:3px 8px;border-radius:var(--r-s);background:var(--accent);color:var(--bg)}
+/* Card subtitle: tags on one line (… if long), stars on their own line below — never squeeze both */
+.csub{flex-wrap:wrap;row-gap:2px;justify-content:flex-start}
+.csub > span:first-child{flex:1 1 100%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.csub .stars{flex:none}
