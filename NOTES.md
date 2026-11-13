@@ -1,5 +1,7 @@
 # Game Night (repo: Backlog) — notes for Claude
 
+> Visual rules live in **DESIGN.md**: read it before any UI change.
+
 ## Mission (read first)
 A short list of the best games I want to play next, owned or not, so picking the next one is easy.
 - Only the best gets in. Everything on the list is a real option I'd be happy to start tonight.
