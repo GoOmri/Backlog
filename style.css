@@ -788,3 +788,7 @@ img.ok.now{transition:none}
 .ftile .ptrack{margin-top:6px}
 .ftile .score{border:0;padding:0;font:inherit}
 .ftile .dl.vhard,.ftile .dl.hard{color:var(--bad)}.ftile .dl.med{color:var(--gold)}.ftile .dl.easy{color:var(--good)}
+/* Store links: one line (short labels; scrolls sideways if ever too long) */
+.gp-facts .links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:16px}
+.gp-facts .links::-webkit-scrollbar{display:none}
+.gp-facts .links a{flex:none;white-space:nowrap}
