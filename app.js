@@ -979,7 +979,7 @@ function pageShell(x, {own, actions, facts, edit}){
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
   const meta = [when, x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = heroOf(x);
-  return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
+  return `<div class="topbtns">${edit && x.noMatch && !x.igdbId ? `<button class="fixpill" id="fixPill">Fix match</button>` : ""}${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="" ${heroStyle(x)}>` : ""}
     <div class="gp-head">
@@ -1212,6 +1212,8 @@ async function editSheet(id){
     : `<b class="st yes">Owned</b>${platRow}${!ownP.length ? `<span class="dim">while subscribed</span>` : ""}`;
   openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
+  // Unmatched game: purple shortcut opens the panel at "Wrong game?" and runs the search right away.
+  if ($("#fixPill")) $("#fixPill").onclick = e => { e.stopPropagation(); setPanel(true); $("#fix").scrollIntoView({block: "center"}); $("#fixGo").click(); };
   $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !$("#editPanel").hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
   const reopen = () => setTimeout(() => editSheet(id), 120);

@@ -448,7 +448,8 @@ h3,.row-head h3{font-size:var(--t-l);font-weight:600}
 /* purple is for actions only */
 .tab[aria-current="page"]{color:var(--fg)}
 .tab[aria-current="page"] .ico{color:var(--accent)}
-.ptrack span,.track span{background:var(--fg)}
+.ptrack span{background:var(--fg)}
+.track span{background:var(--accent)} /* background progress bar = brand purple */
 .plat-ok{color:var(--fg)}
 .tag.playing{background:var(--raise);color:var(--fg)}
 .score.hi{color:var(--fg)}
@@ -817,3 +818,5 @@ img.ok.now{transition:none}
 .progress.busy .track span{background-image:linear-gradient(90deg,transparent 0,rgb(255 255 255 / .45) 50%,transparent 100%);background-size:200% 100%;background-repeat:no-repeat;animation:progshine 1.4s linear infinite}
 @keyframes progshine{from{background-position:200% 0}to{background-position:-100% 0}}
 @media (prefers-reduced-motion:reduce){.progress.busy .track span{animation:none}}
+/* "Fix match" shortcut next to ⋯ on unmatched games */
+.topbtns .fixpill{height:40px;padding:0 16px;border:0;border-radius:999px;background:var(--accent);color:var(--accent-fg);font:600 var(--t-s) var(--body);white-space:nowrap}
