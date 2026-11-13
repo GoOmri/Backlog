@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating,platforms.abbreviation";
+const MATCH_FIELDS = "parent_game,game_type,name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating,platforms.abbreviation";
 
 export default {
   async fetch(req, env, ctx){
@@ -74,6 +74,7 @@ function slim(g, ttb){
   const t = ttb?.[g.id];
   return {
     igdbId: g.id, slug: g.slug, title: g.name,
+    dlcOf: [1, 2].includes(g.game_type?.id ?? g.game_type) && g.parent_game ? g.parent_game : null, // DLC / expansion → main game's IGDB id
     year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
     cover: IMG(g.cover?.image_id, "cover_big"),
     genres: (g.genres || []).map(x => x.name),
@@ -129,8 +130,8 @@ async function info(env, ids, apps = []){
   if (apps.length) for (const it of await getItems(apps, {include_reviews: true}).catch(() => [])){
     const r = it.reviews?.summary_filtered; if (r?.review_count) steam[it.appid] = {pct: r.percent_positive, n: r.review_count};
   }
-  const rows = await igdb(env, "games", `fields platforms.abbreviation,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
-  return Object.fromEntries(rows.map(g => [g.id, {views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g), avail: [...new Set((g.platforms || []).map(p => PCODE[p.abbreviation]).filter(Boolean))]}]).concat([["steam", steam]]));
+  const rows = await igdb(env, "games", `fields parent_game,game_type,platforms.abbreviation,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
+  return Object.fromEntries(rows.map(g => [g.id, {dlcOf: [1, 2].includes(g.game_type?.id ?? g.game_type) && g.parent_game ? g.parent_game : null, views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g), avail: [...new Set((g.platforms || []).map(p => PCODE[p.abbreviation]).filter(Boolean))]}]).concat([["steam", steam]]));
 }
 
 async function search(env, text){
@@ -156,7 +157,7 @@ function pickTrailer(videos){
   return videos.slice().sort((a, b) => score(b) - score(a))[0]?.video_id || null;
 }
 async function gameFresh(env, id){
-  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,version_parent,involved_companies.company.name,involved_companies.developer,url,external_games.url; where id = ${id};`);
+  const [g] = await igdb(env, "games", `fields ${MATCH_FIELDS},summary,artworks.image_id,screenshots.image_id,videos.video_id,videos.name,similar_games,version_parent,involved_companies.company.name,involved_companies.developer,url,external_games.url,dlcs.name,dlcs.first_release_date,dlcs.cover.image_id,expansions.name,expansions.first_release_date,expansions.cover.image_id; where id = ${id};`);
   if (!g) throw new Error("Game not found");
   // Some entries (editions, ports) have no screenshots or videos of their own: borrow the original game's.
   if (!g.screenshots?.length && g.version_parent){
@@ -168,6 +169,7 @@ async function gameFresh(env, id){
     hero: IMG(g.artworks?.[0]?.image_id || g.screenshots?.[0]?.image_id, "1080p"),
     shots: (g.screenshots?.length ? g.screenshots : g.artworks || []).slice(0, 9).map(s => IMG(s.image_id, "screenshot_huge")), logo: null, igdbUrl: g.url,
     appid: +((g.external_games || []).map(e => /store\.steampowered\.com\/app\/(\d+)/.exec(e.url || "")?.[1]).find(Boolean) || 0) || null,
+    dlc: [...(g.expansions || []), ...(g.dlcs || [])].map(d => ({igdbId: d.id, title: d.name, cover: IMG(d.cover?.image_id, "cover_big"), year: d.first_release_date ? new Date(d.first_release_date * 1000).getUTCFullYear() : null})),
     trailer: pickTrailer(g.videos || []), critic: Math.round(g.aggregated_rating || 0) || null,
     available: [...new Set((g.platforms || []).map(p => ({PS5: "PS5", PS4: "PS4", PC: "PC", Switch: "Switch", "Switch 2": "Switch 2", "Series X|S": "Xbox", XONE: "Xbox"})[p.abbreviation]).filter(Boolean))]};
   try { Object.assign(out, await sgdbArt(env, g.name, out.hero)); } catch {}
