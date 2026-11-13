@@ -5,7 +5,7 @@
 
 const ALLOWED_ORIGIN = "https://goomri.github.io";
 const IMG = (id, size) => id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
-const MATCH_FIELDS = "parent_game,game_type,name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating,platforms.abbreviation";
+const MATCH_FIELDS = "parent_game,name,slug,first_release_date,cover.image_id,genres.name,themes.name,game_modes.name,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name,total_rating,total_rating_count,aggregated_rating,platforms.abbreviation";
 
 export default {
   async fetch(req, env, ctx){
@@ -74,7 +74,7 @@ function slim(g, ttb){
   const t = ttb?.[g.id];
   return {
     igdbId: g.id, slug: g.slug, title: g.name,
-    dlcOf: [1, 2].includes(g.game_type?.id ?? g.game_type) && g.parent_game ? g.parent_game : null, // DLC / expansion → main game's IGDB id
+    dlcOf: g.parent_game || null, // DLC / expansion → main game's IGDB id
     year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
     cover: IMG(g.cover?.image_id, "cover_big"),
     genres: (g.genres || []).map(x => x.name),
@@ -130,8 +130,8 @@ async function info(env, ids, apps = []){
   if (apps.length) for (const it of await getItems(apps, {include_reviews: true}).catch(() => [])){
     const r = it.reviews?.summary_filtered; if (r?.review_count) steam[it.appid] = {pct: r.percent_positive, n: r.review_count};
   }
-  const rows = await igdb(env, "games", `fields parent_game,game_type,platforms.abbreviation,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
-  return Object.fromEntries(rows.map(g => [g.id, {dlcOf: [1, 2].includes(g.game_type?.id ?? g.game_type) && g.parent_game ? g.parent_game : null, views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g), avail: [...new Set((g.platforms || []).map(p => PCODE[p.abbreviation]).filter(Boolean))]}]).concat([["steam", steam]]));
+  const rows = await igdb(env, "games", `fields parent_game,platforms.abbreviation,player_perspectives.name,multiplayer_modes.offlinecoop,multiplayer_modes.splitscreen,multiplayer_modes.onlinecoop,keywords.name; where id = (${ids.join(",")}); limit 500;`);
+  return Object.fromEntries(rows.map(g => [g.id, {dlcOf: g.parent_game || null, views: (g.player_perspectives || []).map(x => x.name), ...coop(g), kw: feel(g), avail: [...new Set((g.platforms || []).map(p => PCODE[p.abbreviation]).filter(Boolean))]}]).concat([["steam", steam]]));
 }
 
 async function search(env, text){
