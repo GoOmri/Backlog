@@ -107,13 +107,23 @@ async function ttbFor(env, ids){
 
 // Name lookups. IGDB's free-text search started returning nothing, so match by name instead:
 // exact (case-insensitive), then "starts with", then "contains". Editions/DLC are skipped where possible.
+// Store titles carry extras IGDB doesn't: "(2008)", "(full version)", ": PC Edition", " - Standard Edition", "2026 Edition".
+const EDITION = /\s*[:\-–—]?\s*(the\s+)?((pc|standard|deluxe|definitive|complete|enhanced|ultimate|gold|goty|game of the year|anniversary|remastered|director'?s cut|special|digital|premium|collector'?s|legendary|digital deluxe|\d{4})\s+)+edition$/i;
+const cleanTitle = t => String(t).replace(/[™®©]/g, "").replace(/\s*[([][^)\]]*[)\]]\s*/g, " ").replace(EDITION, "").replace(/\s{2,}/g, " ").trim();
+const yearHint = t => +(/\((19|20)\d{2}\)/.exec(t)?.[0].slice(1, 5)) || null;
 async function byName(env, t, extra = "& version_parent = null", limit = 6){
+  const c = cleanTitle(t);
+  if (c && c !== String(t).trim()){ const rows = await byName0(env, t, extra, limit, true); return rows.length ? rows : byName0(env, c, extra, limit); }
+  return byName0(env, t, extra, limit);
+}
+async function byName0(env, t, extra, limit, exactOnly = false){
   const n = q(t);
   for (const cond of [`name ~ "${n}"`, `name ~ "${n}"*`, `name ~ *"${n}"*`]){
     const rows = await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${cond} ${extra}; sort total_rating_count desc; limit ${limit};`);
     if (rows.length) return rows;
   }
   // Last try: every word, any punctuation between ("Bioframe outpost" → "Bioframe: Outpost", ">observer_" → "observer").
+  if (exactOnly) return [];
   const words = String(t).replace(/[™®©]/g, "").split(/[^\p{L}\p{N}']+/u).filter(w => w.length > 1);
   if (!words.length) return [];
   return igdb(env, "games", `fields ${MATCH_FIELDS}; where ${words.map(w => `name ~ *"${q(w)}"*`).join(" & ")} ${extra}; sort total_rating_count desc; limit ${limit};`);
@@ -123,8 +133,8 @@ async function match(env, titles){
   if (!titles.length) return {};
   const picks = {};
   for (const t of titles){
-    const k = norm(t), list = await byName(env, t);
-    const exact = list.filter(g => norm(g.name) === k);
+    const k = norm(cleanTitle(t)), y = yearHint(t), list = await byName(env, t);
+    const exact = list.filter(g => norm(g.name) === k || norm(g.name) === norm(t)).sort((a, b) => y ? Math.abs((a.first_release_date ? new Date(a.first_release_date * 1000).getUTCFullYear() : 0) - y) - Math.abs((b.first_release_date ? new Date(b.first_release_date * 1000).getUTCFullYear() : 0) - y) : 0);
     const starts = list.filter(g => norm(g.name).startsWith(k)).sort((a, b) => a.name.length - b.name.length);
     picks[t] = exact[0] || starts[0] || list[0] || null;
   }
@@ -151,6 +161,8 @@ async function search(env, text){
       if (!seen.has(g.id)){ seen.add(g.id); list.push(g); }
     if (list.length >= 8) break;
   }
+  const c = cleanTitle(text);
+  if (list.length < 3 && c && c !== text.trim()) for (const g of await byName0(env, c, "", 8)) if (!seen.has(g.id)){ seen.add(g.id); list.push(g); }
   if (list.length < 3){ // punctuation-blind fallback, same as byName
     const words = String(text).replace(/[™®©]/g, "").split(/[^\p{L}\p{N}']+/u).filter(w => w.length > 1);
     if (words.length) for (const g of await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${words.map(w => `name ~ *"${q(w)}"*`).join(" & ")}; sort total_rating_count desc; limit 8;`))
