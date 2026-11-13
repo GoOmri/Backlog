@@ -21,6 +21,7 @@ const ICON = {
   compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
   book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
   plus: '<path d="M5 12h14M12 5v14"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   chev: '<path d="m6 9 6 6 6-6"/>'
 };
@@ -52,6 +53,9 @@ const key = t => String(t).toLowerCase().replace(/[™®©]/g, "").replace(/[^a-
 const all = () => [...games.values()];
 const list = () => all().filter(g => !g.folded); // DLC whose main game is in the list lives on that game's page
 const genresOf = g => [...new Set([...(g.genres || []), ...(g.themes || [])])];
+// Page tag line: co-op once (our own label), no repeats by normalized name, max 6.
+const tagLine = (g, src) => { const co = basicTags(g).find(t => COOPS.includes(t)), seen = new Set();
+  return [co, ...src.filter(t => !/co-?op|multiplayer/i.test(t))].filter(t => t && t !== "Indie" && !seen.has(key(t)) && seen.add(key(t))).slice(0, 6); };
 const mainH = g => g.ttb?.main || null;
 const lenOf = h => !h ? "" : h < 10 ? "short" : h <= 30 ? "medium" : "long";
 const starsTxt = n => n ? "★".repeat(n) + "☆".repeat(5 - n) : "";
@@ -971,15 +975,15 @@ function inList(x){
 function pageShell(x, {own, actions, facts, edit}){
   const yr = new Date().getFullYear();
   const when = !x.year ? "Coming soon" : x.year > yr ? `Coming ${x.year}` : x.year;
-  const meta = [when, ...basicTags(x).filter(t => VIEWS.includes(t) || COOPS.includes(t)), x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
+  const meta = [when, x.deck === 3 ? "Deck Verified" : x.deck === 2 ? "Deck Playable" : ""].filter(Boolean).join(" · ");
   const art = heroOf(x);
   return `<div class="topbtns">${edit ? `<button class="x" id="kebab" aria-label="Edit options" aria-haspopup="true">${ic("more")}</button>` : ""}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></div>
   ${edit ? `<div class="editpanel" id="editPanel" hidden>${edit}</div>` : ""}
   <header class="gp-hero">${art ? `<img class="gp-bg" src="${esc(art)}" alt="" ${heroStyle(x)}>` : ""}
     <div class="gp-head">
       ${logoOf(x) ? `<img class="gp-logo" src="${esc(logoOf(x))}" alt="${esc(x.title)}">` : `<h1 class="gp-title">${esc(x.title)}</h1>`}
-      ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
-      <div class="gtags" id="gtags">${genresOf(x).filter(t => t !== "Indie").slice(0, 5).map(t => `<span>${esc(t)}</span>`).join("")}</div>
+      <div class="meta" id="gpMeta">${esc(meta)}</div>
+      <div class="gtags" id="gtags">${tagLine(x, genresOf(x)).map(t => `<span>${esc(t)}</span>`).join("")}</div>
       <div class="gp-actions">${actions}</div>
     </div></header>
   <div class="gp-body">
@@ -987,7 +991,7 @@ function pageShell(x, {own, actions, facts, edit}){
       <div class="media"><div class="mslides" id="mslides"><div class="mslide">${art ? `<img src="${esc(art)}" alt="">` : ""}</div></div><div class="mdots" id="mdots"></div></div>
       <p class="desc clamp" id="desc"></p>
     </div>
-    <aside class="gp-facts">${own}<div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"></div>${facts || ""}</aside>
+    <aside class="gp-facts">${own}<div class="ftiles"><div class="strip" id="strip"></div><div class="prog" id="prog"></div><div class="diff" id="diffBox"></div></div>${facts || ""}</aside>
   </div>
   <section class="gp-dlc" id="dlcBox" hidden><h3>DLC</h3><div id="dlcList"></div></section>
   <section class="gp-similar" id="simBox" hidden><h3>Similar games</h3><div class="row" id="simRow"></div></section>`;
@@ -1056,11 +1060,11 @@ let trophyList = null;
 async function fillProgress(g){
   const box = $("#prog"); if (!box) return;
   const rows = [];
-  const bar = (label, got, total, extra = "") => `<div class="pbar"><div class="pline"><span>${label}</span><span><b>${got}/${total}</b>${extra}</span></div><div class="ptrack"><span style="width:${total ? got / total * 100 : 0}%"></span></div></div>`;
+  const bar = (label, got, total, extra = "") => `<div class="ftile"><span class="fl">${label}</span><b>${got}/${total}</b><div class="ptrack"><span style="width:${total ? got / total * 100 : 0}%"></span></div>${extra ? `<span class="fs">${extra.replace(/^ · /, "")}</span>` : ""}</div>`;
   const draw = () => { if ($("#prog") === box) box.innerHTML = rows.join(""); };
   const ps = (g.platforms || []).some(p => p === "ps5" || p === "psplus") || g.ps;
   let psRarity = null;
-  if (g.steamAppId) api("/achievements?appid=" + g.steamAppId).then(a => { if (a.total){ rows.unshift(bar("Steam achievements", a.got, a.total)); draw(); } }).catch(() => {});
+  if (g.steamAppId) api("/achievements?appid=" + g.steamAppId).then(a => { if (a.total){ rows.unshift(bar("Achievements", a.got, a.total)); draw(); } }).catch(() => {});
   if (ps){
     try {
       trophyList ||= api("/trophies");
@@ -1080,7 +1084,7 @@ async function fillDifficulty(g, psRarity){
   if ($("#diffBox") !== box) return;
   if (!r){ box.innerHTML = ""; return; }
   const [pct, what] = r, lvl = pct < 5 ? ["Very hard", "vhard"] : pct < 15 ? ["Hard", "hard"] : pct < 35 ? ["Medium", "med"] : ["Easy", "easy"];
-  box.innerHTML = `<span class="dchip ${lvl[1]}">${lvl[0]}</span><span>${what} earned by <b>${pct}%</b> of players</span>`;
+  box.innerHTML = `<div class="ftile"><span class="fl">${what === "Platinum" ? "Platinum" : "Difficulty"}</span><b class="dl ${lvl[1]}">${lvl[0]}</b><span class="fs">${what === "Platinum" ? "" : what.toLowerCase() + " · "}${pct}% of players</span></div>`;
 }
 // Critics · Steam % · Developer · Your hours.
 // Steam's top 5 player tags replace the IGDB genres when the game is on Steam (saved on this device for 30 days).
@@ -1088,7 +1092,7 @@ async function fillTags(g){
   const app = g.steamAppId || g.appid; if (!app) return;
   let t = null; try { const c = JSON.parse(localStorage.getItem("tt:" + app)); if (c && Date.now() - c.at < 30 * 864e5) t = c.t; } catch {}
   if (!t){ t = await api("/toptags?appid=" + app).catch(() => null); if (t?.length) try { localStorage.setItem("tt:" + app, JSON.stringify({at: Date.now(), t})); } catch {} }
-  const el = $("#gtags"); if (el && t?.length) el.innerHTML = t.map(x => `<span>${esc(x)}</span>`).join("");
+  const el = $("#gtags"); if (el && t?.length) el.innerHTML = tagLine(g, t).map(x => `<span>${esc(x)}</span>`).join("");
 }
 // DLC / expansions from IGDB; "Owned" when that DLC is in your list (folded into this page). Tap → its own preview.
 function fillDlc(d){
@@ -1107,16 +1111,18 @@ async function fillStrip(g, d){
     $("#gpPlats").innerHTML = mine + availBadges(x); }
   // No PlayStation release (e.g. PC only): drop the PS Store link.
   if (d.available?.length && !d.available.some(p => p === "PS5" || p === "PS4")) document.querySelectorAll(".pslink").forEach(a => a.remove());
-  const score = (n, src) => `<span class="score ${n >= 75 ? "good" : n >= 60 ? "mid" : "low"}" title="${esc(src)}">${n}%</span>`;
+  const tile = (label, val, sub = "") => `<div class="ftile"><span class="fl">${label}</span><b>${val}</b>${sub ? `<span class="fs">${sub}</span>` : ""}</div>`;
+  const score = (n, src) => tile(src, `<span class="score ${n >= 75 ? "good" : n >= 60 ? "mid" : "low"}">${n}%</span>`);
+  if (d.developers?.[0] && $("#gpMeta") && !$("#gpMeta").dataset.dev){ $("#gpMeta").dataset.dev = 1; $("#gpMeta").textContent = [$("#gpMeta").textContent, d.developers[0]].filter(Boolean).join(" · "); }
   const sp = g.steamPct;
-  const parts = [sp != null ? score(sp, "Steam reviews") : d.critic ? score(d.critic, "Critics") : null, null, null, d.developers?.[0] && `<span>by <b>${esc(d.developers[0])}</b></span>`, (d.ttb || g.ttb)?.main && `<span><b>~${(d.ttb || g.ttb).main}h</b> to beat</span>`, g.steamHours ? `<span>You played <b>${g.steamHours}h</b></span>` : null];
+  const parts = [sp != null ? score(sp, "Steam reviews") : d.critic ? score(d.critic, "Critics") : null, (d.ttb || g.ttb)?.main && tile("To beat", `~${(d.ttb || g.ttb).main} h`), g.steamHours ? tile("You played", `${g.steamHours} h`) : null];
   const draw = () => { if ($("#strip") === box) box.innerHTML = parts.filter(Boolean).join(""); };
   draw();
   if (g.steamAppId){
     let r = null;
     try { r = JSON.parse(localStorage.getItem("rev:" + g.steamAppId)); if (r && Date.now() - r.t > 7 * 864e5) r = null; } catch {}
     if (!r){ try { r = {...await api("/steamrev?appid=" + g.steamAppId), t: Date.now()}; localStorage.setItem("rev:" + g.steamAppId, JSON.stringify(r)); } catch {} }
-    if (r?.pct != null){ parts[0] = score(r.pct, `Steam reviews · ${r.label} · ${r.total} reviews`); draw(); }
+    if (r?.pct != null){ parts[0] = score(r.pct, "Steam reviews"); draw(); }
   }
 }
 // Anything that opens or collapses animates its height (same timing as everything else).
@@ -1167,16 +1173,17 @@ async function editSheet(id){
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
     : ownP.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
   // One button for the next step only.
-  const NEXT = {wishlist: "I bought it", backlog: "Finished", dropped: "Pick it up again"};
-  const actions = `${NEXT[g.status] ? `<div class="menuwrap"><button class="btn" id="statBtn">${NEXT[g.status]}</button><div class="popmenu" id="statMenu" hidden></div></div>` : ""}
+  const NEXT = {wishlist: "I bought it", backlog: "Finished", dropped: "Play again"};
+  // One row, never wraps: status, tap-to-rate stars, then icon buttons on the right.
+  const actions = `${NEXT[g.status] ? `<button class="btn" id="statBtn">${NEXT[g.status]}</button>` : g.status === "done" ? `<span class="stbadge">${ic("check", 16)}Finished</span>` : ""}
+    ${g.status !== "wishlist" ? `<span class="rstars" role="group" aria-label="Your rating">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</span>` : ""}
+    <span class="gp-spacer"></span>
     ${g.status === "wishlist" ? `<button class="ibtn on-heart" id="wishBtn" title="Remove from wishlist" aria-label="Remove from wishlist">${ic("heartf")}</button>` : ""}
-    <div class="menuwrap"><button class="ibtn ${g.myRating ? "on" : ""}" id="rateBtn" title="Rate" aria-label="Rate">${ic("star", 20, !!g.myRating)}${g.myRating ? `<small>${g.myRating}</small>` : ""}</button>
-      <div class="popmenu stars" id="rateMenu" hidden>${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">${ic("star", 26)}</button>`).join("")}</div></div>
     <button class="ibtn ${g.upNext ? "on" : ""}" id="upNextBtn" title="Up next" aria-label="Up next" aria-pressed="${!!g.upNext}">${ic("pin")}</button>
     <button class="ibtn" id="nopeBtn" title="${g.notNow ? "Back on Play" : "Not now"}" aria-label="${g.notNow ? "Back on Play" : "Not now"}">${g.notNow ? ic("undo") : ic("down")}</button>`;
   const facts = `
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam page ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PlayStation Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a class="pslink" href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
-    <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
+    <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
 `;
   const edit = `
       <div class="field"><span class="label">Status</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
@@ -1195,15 +1202,13 @@ async function editSheet(id){
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
   $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !$("#editPanel").hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
   const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
-  const pop = (btn, menu) => { $(btn).onclick = e => { e.stopPropagation(); sh.querySelectorAll(".popmenu").forEach(m => { if (m !== $(menu)) m.hidden = true; }); $(menu).hidden = !$(menu).hidden; }; };
-  pop("#rateBtn", "#rateMenu");
   const reopen = () => setTimeout(() => editSheet(id), 120);
   if ($("#statBtn")) $("#statBtn").onclick = async e => {
     e.stopPropagation();
     if (g.status === "wishlist") return askBought("backlog");
     const st = g.status === "dropped" ? "backlog" : "done";
     await save({status: st, finishedAt: st === "done" ? Date.now() : null});
-    toast(st === "done" ? "Finished! Rate it with the star" : "Back in your library"); reopen();
+    toast(st === "done" ? "Finished! Tap the stars to rate it" : "Back in your library"); reopen();
   };
   if ($("#wishBtn")) $("#wishBtn").onclick = async () => {
     const snap = {...g}; delete snap.id; closeSheet(); await del(id);
@@ -1220,7 +1225,6 @@ async function editSheet(id){
   sh.querySelectorAll("[data-star]").forEach(b => b.onclick = () => {
     stars = +b.dataset.star === stars ? 0 : +b.dataset.star;
     sh.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= stars));
-    $("#rateBtn").innerHTML = ic("star", 20, !!stars) + (stars ? `<small>${stars}</small>` : ""); $("#rateBtn").classList.toggle("on", !!stars); $("#rateMenu").hidden = true;
     save({myRating: stars || null});
   });
   // Bought a wishlist game: pick the platform once, then it moves to that status.
