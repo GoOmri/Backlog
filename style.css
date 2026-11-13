@@ -820,3 +820,7 @@ img.ok.now{transition:none}
 @media (prefers-reduced-motion:reduce){.progress.busy .track span{animation:none}}
 /* "Fix match" shortcut next to ⋯ on unmatched games */
 .topbtns .fixpill{height:40px;padding:0 16px;border:0;border-radius:999px;background:var(--accent);color:var(--accent-fg);font:600 var(--t-s) var(--body);white-space:nowrap}
+/* Fix match: Steam fallback rows (wide capsule art) + Steam link box */
+.matches .steamhit img{width:72px;height:auto;aspect-ratio:231/87;object-fit:cover;border-radius:var(--r-s)}
+.editpanel .esteam{margin-top:var(--s2)}
+.editpanel .esteam input{flex:1;min-width:0}
