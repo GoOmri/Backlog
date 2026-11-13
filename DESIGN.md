@@ -35,6 +35,7 @@ Read with NOTES.md before any visual change. New UI reuses what's here; if somet
 - Buttons: one filled `--accent` primary per view (the status button); others are outlined/ghost or 44px round icon buttons.
 - Sheets: full-screen game page or bottom sheet; close top-right; actions at the bottom, primary on the right.
 
+- Edit panel (⋯): grouped like phone settings — small grey group labels (sentence case), groups on `--raise` with hairline dividers, rows 44px with a › chevron that open their picker below, chip rows scroll sideways, destructive action alone at the bottom in `--bad`.
 - Game page: header = title → year · developer (· Deck) → one tag line (`tagLine`, max 6, co-op once) → action row (status/“✓ Finished” · tap stars · spacer · icon buttons). Facts = 2-column tiles (`.ftile`: label, value, optional small line); a tile with no data isn't drawn.
 
 ## One piece of information, one place
