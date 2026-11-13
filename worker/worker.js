@@ -107,7 +107,10 @@ async function byName(env, t, extra = "& version_parent = null", limit = 6){
     const rows = await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${cond} ${extra}; sort total_rating_count desc; limit ${limit};`);
     if (rows.length) return rows;
   }
-  return [];
+  // Last try: every word, any punctuation between ("Bioframe outpost" → "Bioframe: Outpost", ">observer_" → "observer").
+  const words = String(t).replace(/[™®©]/g, "").split(/[^\p{L}\p{N}']+/u).filter(w => w.length > 1);
+  if (!words.length) return [];
+  return igdb(env, "games", `fields ${MATCH_FIELDS}; where ${words.map(w => `name ~ *"${q(w)}"*`).join(" & ")} ${extra}; sort total_rating_count desc; limit ${limit};`);
 }
 // Best match for up to 10 titles.
 async function match(env, titles){
@@ -141,6 +144,11 @@ async function search(env, text){
     for (const g of await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${cond}; sort total_rating_count desc; limit 8;`))
       if (!seen.has(g.id)){ seen.add(g.id); list.push(g); }
     if (list.length >= 8) break;
+  }
+  if (list.length < 3){ // punctuation-blind fallback, same as byName
+    const words = String(text).replace(/[™®©]/g, "").split(/[^\p{L}\p{N}']+/u).filter(w => w.length > 1);
+    if (words.length) for (const g of await igdb(env, "games", `fields ${MATCH_FIELDS}; where ${words.map(w => `name ~ *"${q(w)}"*`).join(" & ")}; sort total_rating_count desc; limit 8;`))
+      if (!seen.has(g.id)){ seen.add(g.id); list.push(g); }
   }
   const ttb = await ttbFor(env, list.map(g => g.id));
   return list.slice(0, 10).map(g => slim(g, ttb));

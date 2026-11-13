@@ -173,7 +173,7 @@ async function runQueue(){
   let done = 0;
   try {
     while (true){
-      const todo = list().filter(g => !g.igdbId && !g.nope && (!g.noMatch || g.noMatchV !== 4) && !tried.has(g.id));
+      const todo = list().filter(g => !g.igdbId && !g.nope && (!g.noMatch || g.noMatchV !== 5) && !tried.has(g.id));
       if (!todo.length) break;
       const batch = todo.slice(0, 10); batch.forEach(g => tried.add(g.id));
       progress(done, done + todo.length, "Getting covers and info");
@@ -185,7 +185,7 @@ async function runQueue(){
           const alt = await api("/search?q=" + encodeURIComponent(t)).catch(() => []);
           m = alt.filter(r => key(r.title) === key(t)).sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0))[0] || m || alt.find(r => key(r.title).startsWith(key(t))) || alt[0] || null;
         }
-        if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now(), noMatchV: 4});
+        if (m) await applyMatch(g, m); else await upd(g.id, {noMatch: true, noMatchAt: Date.now(), noMatchV: 5});
       }
       done += batch.length;
     }
