@@ -239,7 +239,8 @@ async function tagList(env){
   return all;
 }
 // Steam user tags for owned/wishlist games, kept to the few the app uses.
-const STAG = {"Metroidvania": "Metroidvania", "Souls-like": "Soulslike", "Difficult": "Hard", "Relaxing": "Chill", "Cozy": "Chill", "Puzzle Platformer": "Puzzle-platformer", "Precision Platformer": "Precision", "Atmospheric": "Atmospheric", "Exploration": "Exploration", "Local Co-Op": "Couch co-op"};
+const SOFT = ["Utilities", "Design & Illustration", "Animation & Modeling", "Photo Editing", "Video Production", "Audio Production", "Game Development", "Software", "Software Training", "Web Publishing"];
+const STAG = {...Object.fromEntries(SOFT.map(t => [t, "Software"])), "Metroidvania": "Metroidvania", "Souls-like": "Soulslike", "Difficult": "Hard", "Relaxing": "Chill", "Cozy": "Chill", "Puzzle Platformer": "Puzzle-platformer", "Precision Platformer": "Precision", "Atmospheric": "Atmospheric", "Exploration": "Exploration", "Local Co-Op": "Couch co-op"};
 async function getItems(apps, req, cc = "US"){
   const out = [];
   for (let i = 0; i < apps.length; i += 100){
