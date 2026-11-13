@@ -59,9 +59,11 @@ const KIND = {"Platform":"Platformer","Puzzle":"Puzzle","Shooter":"Shooter","Fig
 const THEME = {"Horror":"Horror","Survival":"Survival","Open world":"Open world","Mystery":"Mystery"};
 // Plain description: 2D/3D, what kind of game, co-op.
 const kwOf = g => [...(g.kw || []), ...(g.stags || [])];
+const isSoft = g => (g.stags || []).includes("Software");
 const tagMemo = new WeakMap();
 function basicTags(g){ let t = tagMemo.get(g); if (!t){ t = basicTags0(g); tagMemo.set(g, t); } return t; }
 function basicTags0(g){
+  if (isSoft(g)) return ["Software"];
   const v = [...new Set((g.views || []).map(x => VIEW[x]).filter(Boolean))].slice(0, 1);
   let k = [...new Set((g.genres || []).map(x => KIND[x]).filter(Boolean))].sort((a, b) => (a === "Adventure") - (b === "Adventure"));
   if (kwOf(g).includes("Metroidvania")) k = ["Metroidvania", ...k.filter(x => x !== "Platformer")];
@@ -74,7 +76,7 @@ function basicTags0(g){
 // PlayStation access: bought (yours), claimed (monthly PS Plus, yours while subscribed),
 // catalog (PS Plus Extra, can leave), left (gone from PS Plus, not playable now).
 const PS_LABEL = {bought: "Bought", claimed: "Claimed", catalog: "Catalog", left: "Left PS Plus"};
-const playable = g => g.ps !== "left" && !g.hidden;
+const playable = g => g.ps !== "left" && !g.hidden && !isSoft(g); // software stays in Library, never suggested
 
 /* ---------- API (Cloudflare Worker) ---------- */
 async function api(path, body){
@@ -253,12 +255,13 @@ async function checkCovers(){
 }
 // Steam user tags (Metroidvania, Souls-like, Cozy…) for games with a Steam app id.
 async function checkSteamTags(){
-  const need = list().filter(g => g.steamAppId && g.stags === undefined);
+  // stagsV 2 = software tags added: re-read unmatched Steam entries once (that's where software sits).
+  const need = list().filter(g => g.steamAppId && (g.stags === undefined || (g.noMatch && g.stagsV !== 2)));
   for (let i = 0; i < need.length; i += 100){
     const chunk = need.slice(i, i + 100);
     progress(i, need.length, "Reading Steam tags");
     const res = await api("/steamtags", {apps: chunk.map(g => g.steamAppId)});
-    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {stags: res[g.steamAppId] || []})));
+    await commitChunks(chunk.map(g => b => b.update(doc(col, g.id), {stags: res[g.steamAppId] || [], stagsV: 2})));
   }
 }
 async function checkDeck(){
@@ -409,6 +412,7 @@ function badges(ps, g){
   if (g?.status === "wishlist") return (ps || []).map(p => `<span class="plat avail" title="Wishlist · ${(PLAT[p] || PLAT.other)[0]}">${(PLAT[p] || PLAT.other)[1]}</span>`).join("");
   return (ps || []).map(p => { const v = PLAT[p] || PLAT.other; const dk = p === "steam" && g?.deck >= 2; return `<span class="plat" style="background:var(${v[2]})" title="${v[0]}${dk ? " · good on Steam Deck" : ""}">${v[1]}${dk ? "✓" : ""}</span>`; }).join(""); }
 function coverTag(g){
+  if (isSoft(g)) return `<span class="tag">Software</span>`;
   if (g.noMatch) return `<span class="tag nomatch">No match</span>`;
   if (g.ps === "left") return `<span class="tag">Left P+</span>`;
   if (g.status === "dropped") return `<span class="tag">Dropped</span>`;
@@ -645,7 +649,7 @@ function activeChips(){
 function shelfHTML(wish){
   if (!games.size) return emptyHTML();
   // Unmatched view shows every unmatched game, wishlist included (that's where most come from).
-  const scope = genreF === "__nomatch" ? list().filter(g => g.noMatch) : list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.notNow : !g.hidden));
+  const scope = genreF === "__nomatch" ? list().filter(g => g.noMatch && !isSoft(g)) : list().filter(g => (wish ? g.status === "wishlist" : g.status !== "wishlist") && (statF === "hidden" ? g.notNow : !g.hidden));
   shelfScope = scope; shelfWish = wish;
   const s = q.toLowerCase();
   const shown = scope.filter(g => passes(g) && (!s || key(g.title).includes(key(s))));
@@ -891,7 +895,7 @@ function menuSheet(){
     <button data-act="steamwish">Import Steam wishlist<small>Adds games from your Steam wishlist</small></button>
     <button data-act="import">Import a file<small>The export from the old Backlog</small></button>
     <button data-act="nope">Not now: suggestions<small>Suggestions you turned down — they won't come back</small></button>
-    <button data-act="unmatched">Unmatched games<small>${list().filter(g => g.noMatch).length} games couldn't be matched (often software, soundtracks, demos)</small></button>
+    <button data-act="unmatched">Unmatched games<small>${list().filter(g => g.noMatch && !isSoft(g)).length} games couldn't be matched (often soundtracks, demos)</small></button>
     <button data-act="psplus">Update from PlayStation<small>Paste your PS Plus tab: bought, claimed, catalog, left</small></button>
     <button data-act="rematch">Re-check all matches<small>Fixes games matched to the wrong version</small></button>
     <button data-act="signout">Sign out</button></div>
