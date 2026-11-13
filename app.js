@@ -1173,7 +1173,7 @@ async function editSheet(id){
   const pills = g.status === "wishlist" ? `<span class="pill">Wishlist</span>`
     : ownP.map(p => `<span class="pill" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</span>`).join("") + (viaPlus ? `<span class="pill" style="--c:var(--psplus)">${g.ps === "left" ? "Left PS+" : "PS+"}</span>` : "");
   // One button for the next step only.
-  const NEXT = {wishlist: "I bought it", backlog: "Finished", dropped: "Play again"};
+  const NEXT = {wishlist: "Bought", backlog: "Finished", dropped: "Resume"}; // one word each so the row always fits
   // One row, never wraps: status, tap-to-rate stars, then icon buttons on the right.
   const actions = `${NEXT[g.status] ? `<button class="btn" id="statBtn">${NEXT[g.status]}</button>` : g.status === "done" ? `<span class="stbadge">${ic("check", 16)}Finished</span>` : ""}
     ${g.status !== "wishlist" ? `<span class="rstars" role="group" aria-label="Your rating">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</span>` : ""}
