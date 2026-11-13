@@ -792,3 +792,24 @@ img.ok.now{transition:none}
 .gp-facts .links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:16px}
 .gp-facts .links::-webkit-scrollbar{display:none}
 .gp-facts .links a{flex:none;white-space:nowrap}
+/* ⋯ edit panel: grouped rows (DESIGN.md) */
+.editpanel .egroup-l{font-size:var(--t-xs);color:var(--dim);margin:var(--s3) 4px 6px;text-transform:none;letter-spacing:0}
+.editpanel .egroup-l:first-child{margin-top:0}
+.editpanel .egroup{background:var(--raise);border-radius:var(--r-m);overflow:hidden;width:100%}
+.editpanel .ecell{display:block;padding:10px 12px;border-bottom:1px solid var(--line)}
+.editpanel .ecell:last-child{border-bottom:0}
+.editpanel .elabel{display:block;font-size:var(--t-xs);color:var(--dim);margin-bottom:8px}
+.editpanel .erowchips{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none}
+.editpanel .erowchips::-webkit-scrollbar{display:none}
+.editpanel .erowchips .chip{flex:none;white-space:nowrap}
+.editpanel .platchip[aria-pressed="true"]{background:var(--c);color:#0E1116;border-color:transparent}
+.editpanel .erowline{display:flex;justify-content:space-between;align-items:center;gap:var(--s2)}
+.editpanel .erowline input{width:auto;background:none;border:0;color:var(--dim);font:inherit;text-align:right}
+.editpanel .erow{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:44px;padding:0 12px;background:none;border:0;border-bottom:1px solid var(--line);color:var(--fg);font:inherit;font-size:var(--t-s);text-align:left;cursor:pointer}
+.editpanel .egroup > .erow:last-of-type{border-bottom:0}
+.editpanel .erow svg{color:var(--dim);transform:rotate(-90deg)}
+.editpanel .egroup > .logopick:not(:empty),.editpanel .egroup > .coverpick:not(:empty),.editpanel #heroPosBox:not(:empty){padding:0 12px 10px}
+.editpanel .epad{padding:8px}
+.editpanel .efix{display:flex;gap:var(--s2)}
+.editpanel .efix input{flex:1;min-width:0}
+.editpanel .edanger{margin-top:var(--s3);justify-content:center;background:var(--raise);border-radius:var(--r-m);color:var(--bad);border:0}

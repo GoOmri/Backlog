@@ -1183,17 +1183,27 @@ async function editSheet(id){
     <button class="ibtn" id="nopeBtn" title="${g.notNow ? "Back on Play" : "Not now"}" aria-label="${g.notNow ? "Back on Play" : "Not now"}">${g.notNow ? ic("undo") : ic("down")}</button>`;
   const facts = `
     <div class="links"><a href="${g.steamAppId ? `https://store.steampowered.com/app/${g.steamAppId}` : `https://store.steampowered.com/search/?term=${encodeURIComponent(g.title)}`}" target="_blank" rel="noopener">Steam ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PS Store ↗</a>${(g.platforms || []).some(p => p === "ps5" || p === "psplus") ? `<a class="pslink" href="https://psnprofiles.com/search/games?q=${encodeURIComponent(g.title)}" target="_blank" rel="noopener">PSNProfiles ↗</a>` : ""}</div>
-    <label class="fin" id="finField" ${g.status === "done" ? "" : "hidden"}>Finished on <input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
 `;
+  // ⋯ panel (DESIGN.md): grouped like phone settings — Your copy · Looks · Wrong game? · Delete.
+  const row = (id, label) => `<button class="erow" id="${id}"><span>${label}</span>${ic("chev", 18)}</button>`;
   const edit = `
-      <div class="field"><span class="label">Status</span><div class="chips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
-      <div class="field"><span class="label">Wrong game?</span><div class="chips"><input id="fix" value="${esc(clean(g.asTyped || g.title))}" style="flex:1"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
-      <div class="field"><span class="label">Logo</span><button class="btn ghost small" id="logoGo">Change logo</button><div class="logopick" id="logos"></div></div>
-      <div class="field"><span class="label">Cover</span><button class="btn ghost small" id="coverGo">Change cover</button><div class="coverpick" id="covers"></div></div>
-      <div class="field"><span class="label">Top image</span><button class="btn ghost small" id="heroGo">Change top image</button> <button class="btn ghost small" id="heroPosGo">Recenter</button><div id="heroPosBox"></div><div class="coverpick heropick" id="heroes"></div></div>
-      <button class="btn ghost small danger" id="eDel">Delete game</button>
-`;
-  // One row: status word + platform badges (filled = yours, outlined = also on). No platform names repeated as text.
+      <div class="egroup-l">Your copy</div>
+      <div class="egroup">
+        <div class="ecell"><span class="elabel">Status</span><div class="erowchips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
+        <div class="ecell"><span class="elabel">Own it on</span><div class="erowchips">${Object.keys(PLAT).map(p => `<button class="chip platchip" data-setplat="${p}" style="--c:var(${PLAT[p][2]})" aria-pressed="${plats.has(p)}">${PLAT[p][0]}</button>`).join("")}</div></div>
+        <label class="ecell erowline" id="finField" ${g.status === "done" ? "" : "hidden"}><span>Finished on</span><input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
+      </div>
+      <div class="egroup-l">Looks</div>
+      <div class="egroup">
+        ${row("logoGo", "Logo")}<div class="logopick" id="logos"></div>
+        ${row("coverGo", "Cover")}<div class="coverpick" id="covers"></div>
+        ${row("heroGo", "Top image")}<div class="coverpick heropick" id="heroes"></div>
+        ${row("heroPosGo", "Recenter top image")}<div id="heroPosBox"></div>
+      </div>
+      <div class="egroup-l">Wrong game?</div>
+      <div class="egroup epad"><div class="efix"><input id="fix" value="${esc(clean(g.asTyped || g.title))}" aria-label="Search for the right game"><button class="btn ghost small" id="fixGo">Search</button></div><div class="matches" id="matches"></div></div>
+      <button class="egroup erow edanger" id="eDel">Delete game</button>
+`;  // One row: status word + platform badges (filled = yours, outlined = also on). No platform names repeated as text.
   const platRow = `<span class="gp-plats" id="gpPlats"></span>`;
   const ownLine = g.ps === "left" ? `<b class="st no">Left PS Plus</b>${platRow}`
     : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b class="st no">Not owned</b>${platRow}`
@@ -1239,7 +1249,7 @@ async function editSheet(id){
   let pinned = !!g.upNext;
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
   $("#nopeBtn").onclick = () => { closeSheet(); if (g.notNow){ upd(id, {notNow: null, hidden: false}).catch(saveErr); toast(`${g.title} is back on Play`); } else notForMe(g); };
-  sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); });
+  sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); g.platforms = [...plats]; gameDetails(g.igdbId).then(d => fillStrip(g, d)).catch(() => {}); });
   $("#desc").onclick = toggleDesc;
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
