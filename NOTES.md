@@ -35,12 +35,13 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - **Play** `homeHTML()` — Up next carousel (pinned owned + wishlist, `upNextGames`) + Show all sheet + Wishlist link, then `ROWS` (Metroidvanias, With Yanshula = couch co-op 2D/3D platformers, 2D platformers, 3D platformers, Couch co-op, Unique) via `playRow()`: your Owned/Wishlist games (not finished, dropped or pinned) mixed with `/finds` picks, sorted by `quality()` with a daily shuffle of each row's top 20, top 10 + See all sheet (`rowCache`). Then `radarHTML()` (Coming soon PS5 / Steam, top 10). No Find tab (old `disc` tab id falls back to Play). Unique = Find picks only (owned games have no tags for it). A game shows in one row only (earlier rows win).
 - Backfill: `/info` also returns `avail` and, for Steam app ids, Steam review % (`steamPct`/`steamN`, via GetItems include_reviews) — owned games then rank by Steam % like finds. Couch finder (`/couch`) removed.
 - **Library** `shelfHTML()` with sidebar filters. **Stats** (`diaryHTML()`, tab id `diary`). **Wishlist** view = tab `wish`.
+- Preview page: "I own it on" chips live in the ⋯ panel (Your copy), like owned games; the page shows Not owned + available-on badges.
 - Add (`addSheet`): search first (worker `/search`, 350ms debounce) → results with year + available-on badges → tap opens `previewSheet` (or `editSheet` if already yours); back returns to the same search. Preview has "I own it on" platform chips (saves as Owned on that platform). Bulk paste is behind "Paste a list instead".
 - Game page: `pageShell` + `editSheet(id)` (owned/wishlist) or `previewSheet(x)` (not in list: pin, heart, 👎). Ownership line: green Owned + platform chips / red Not owned.
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers.
 
 ## Rendering
-- List sheets (See all, Up next): opening a game pushes history `{sheet: 2}`; back (swipe or ✕) redraws the list in place at the saved scroll (`listY`); the game page opens at the top (`toTop`).
+- List sheets (See all, Up next): sticky title bar with ✕ (blurred). Opening a game pushes history `{sheet: 2}`; back (swipe or ✕) redraws the list in place at the saved scroll (`listY`); the game page opens at the top (`toTop`).
 - `render()` rebuilds the tab's HTML string; on the same tab `patch(el, html)` applies only the differences (keys: data-key / data-edit / id). To update a small part, change the data and call `render()` (or `softRender()` for batched). `patch()` also works for any element, e.g. a sheet.
 
 - Recenter (`#heroPosGo`): drag preview + zoom slider (1–2×) → `heroPos {x,y,z}` per game; `heroStyle()` applies object-position + scale + clip-path on the page hero and carousel. New top image pick resets it.
