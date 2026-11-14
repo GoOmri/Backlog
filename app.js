@@ -857,11 +857,14 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && so
 
 /* ---------- sheets ---------- */
 // The system back gesture (swipe from the screen edge) closes an open page.
-addEventListener("popstate", () => { if ($("#dlg").open) shut(); });
+// From a game page opened out of a list, back returns to the list at the same scroll spot (no close + reopen).
+addEventListener("popstate", () => { if (!$("#dlg").open) return;
+  if (sheetBack && history.state?.sheet){ const b = sheetBack; sheetBack = null; b(); $("#dlg").scrollTop = listY; } else shut(); });
 // Close with a slide-down instead of vanishing; Esc goes through the same path.
 // When a game page is opened from a list sheet (Up next, See all), closing it (✕ or swipe back) returns to that list.
-let sheetBack = null, listOpen = null;
-document.addEventListener("click", e => { if (listOpen && e.target.closest(".sheet-list [data-edit], .sheet-list [data-preview], .sheet-list [data-un]")) sheetBack = listOpen; }, true);
+let sheetBack = null, listOpen = null, listY = 0, toTop = false;
+document.addEventListener("click", e => { if (listOpen && e.target.closest(".sheet-list [data-edit], .sheet-list [data-preview], .sheet-list [data-un]")){
+  sheetBack = listOpen; listY = $("#dlg").scrollTop; toTop = true; history.pushState({sheet: 2}, ""); } }, true);
 function shut(){ const g = $("#dlg"); if (!g.open || g.classList.contains("closing")) return;
   const back = sheetBack; sheetBack = null; listOpen = null;
   if (back){ setTimeout(back, 200); } g.classList.add("closing"); setTimeout(() => { if (g.classList.contains("closing")){ g.classList.remove("closing"); g.close(); } }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180); }
@@ -901,7 +904,7 @@ document.addEventListener("error", e => { const i = e.target; if (i.tagName !== 
   i.classList.add("bad"); }, true);
 new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1)
   for (const i of n.tagName === "IMG" ? [n] : n.querySelectorAll("img")) if (i.complete && i.naturalWidth) i.classList.add("ok", "now"); }).observe(document.body, {childList: true, subtree: true});
-function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (!$("#dlg").open) $("#dlg").showModal(); }
+function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (toTop){ toTop = false; $("#dlg").scrollTop = 0; } if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ if (history.state?.sheet) history.back(); else shut(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
@@ -1537,7 +1540,7 @@ document.addEventListener("change", e => {
   if (id === "sortSel"){ sort = e.target.value; render(); }
   if (id === "importFile" && e.target.files[0]){ importFile(e.target.files[0]); e.target.value = ""; }
 });
-$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval($("#dlg")._vt); if (history.state?.sheet) history.back(); softPending = false; render(); });
+$("#dlg").addEventListener("close", () => { $("#sheet").innerHTML = ""; clearInterval($("#dlg")._vt); if (history.state?.sheet) history.go(-history.state.sheet); softPending = false; render(); });
 document.addEventListener("scroll", e => {
   const el = e.target; if (el.id !== "slides" && el.id !== "mslides") return;
   const i = Math.round(el.scrollLeft / el.clientWidth);

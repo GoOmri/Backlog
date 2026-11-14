@@ -40,6 +40,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers.
 
 ## Rendering
+- List sheets (See all, Up next): opening a game pushes history `{sheet: 2}`; back (swipe or ✕) redraws the list in place at the saved scroll (`listY`); the game page opens at the top (`toTop`).
 - `render()` rebuilds the tab's HTML string; on the same tab `patch(el, html)` applies only the differences (keys: data-key / data-edit / id). To update a small part, change the data and call `render()` (or `softRender()` for batched). `patch()` also works for any element, e.g. a sheet.
 
 - Recenter (`#heroPosGo`): drag preview + zoom slider (1–2×) → `heroPos {x,y,z}` per game; `heroStyle()` applies object-position + scale + clip-path on the page hero and carousel. New top image pick resets it.
