@@ -443,11 +443,11 @@ function coverTag(g){
   return "";
 }
 // "Available on" (outlined) for platforms you don't own it on. Owned platforms stay filled; PS Plus/PS5 cover PS, Steam/Epic/itch cover PC.
-const AVAIL = {ps5: "PS5", ps4: "PS4", pc: "PC", switch: "NS"};
+// PS4 games play on PS5, so PS4 shows as PS5 (one tag).
+const AVAIL = {ps5: "PS5", pc: "PC", switch: "NS"};
 function availBadges(g){
   const own = g.platforms || [], hasPS = own.some(p => p === "ps5" || p === "psplus"), hasPC = own.some(p => ["steam", "epic", "itch"].includes(p));
-  const av = (g.avail || []).filter(c => AVAIL[c] && !(hasPS && (c === "ps5" || c === "ps4")) && !(hasPC && c === "pc"));
-  if (av.includes("ps5")) av.splice(av.indexOf("ps4") >>> 0, av.includes("ps4") ? 1 : 0);
+  const av = [...new Set((g.avail || []).map(c => c === "ps4" ? "ps5" : c))].filter(c => AVAIL[c] && !(hasPS && c === "ps5") && !(hasPC && c === "pc"));
   return av.map(c => `<span class="plat avail" title="Available on ${AVAIL[c]}">${AVAIL[c]}</span>`).join("");
 }
 // Steam store art as a fallback when IGDB/SteamGridDB have none yet (new indies). Plain image URLs, no API calls.
