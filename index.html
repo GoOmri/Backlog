@@ -19,6 +19,13 @@
 <div id="splash" aria-hidden="true"><img src="splash.png" alt="">
   <div class="splash-title"><span class="t-back">GAME NIGHT</span><span class="t-front">GAME NIGHT</span></div>
   <div class="splash-load"><span>Loading your games</span><i></i></div></div>
+<script>
+// Safety net that doesn't depend on app.js: show startup errors on the splash, and offer a retry if it's still up after 10s.
+(function(){ var say = function(h){ var s = document.getElementById("splash"), l = s && s.querySelector(".splash-load span"); if (!l) return; s.style.pointerEvents = "auto"; l.innerHTML = h; };
+  addEventListener("error", function(e){ if (e.message) say("Couldn't start: " + String(e.message).replace(/[<>&]/g, "") + ' · <a href="./" style="color:#C9B6FF">Retry</a>'); });
+  addEventListener("unhandledrejection", function(e){ say("Couldn't start: " + String(e.reason && e.reason.message || e.reason).replace(/[<>&]/g, "") + ' · <a href="./" style="color:#C9B6FF">Retry</a>'); });
+  setTimeout(function(){ say('Still loading… <a href="./" style="color:#C9B6FF">Tap to retry</a>'); }, 10000); })();
+</script>
 <header class="bar">
   <div class="bar-in">
     <a class="brand" href="./" aria-label="Game Night: home (reloads)"><img src="icon-192.png" alt="" width="28" height="28"><span class="brand-name">Game Night</span></a>
