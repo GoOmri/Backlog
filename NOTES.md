@@ -79,7 +79,7 @@ Decided: one Play tab (Find merged in), mixed purely by quality, Library = stora
 3. ✅ Worker /finds (finds13): only 2D platformers, 3D platformers, couch co-op, unique (gems + Experimental/Surreal/Artistic tags) + coming soon (still /upcoming). `quality()` = Steam % pulled to 80 + critics ±3, IGDB fallback. Hard no's in top tags: Sports, F2P, MMO, Visual Novel. `slim()` now has `avail` (ps5/ps4/pc/switch/xbox). Find shows the 4 rows, top 10 each (See all comes in step 4).
 4. ✅ One Play tab: Up next carousel, then rows 2D platformers / 3D platformers / Couch co-op / Unique / Coming soon — top 10 + See all, owned + found mixed by quality. Rows defined as one list so splitting back into Play + Find is a small change.
    Quality: Steam % (pulled toward average when few reviews) + small critics bonus; IGDB rating as fallback for PS-only. Owned games: Steam % only if already stored, no new lookups. Genre for owned games: IGDB genre + perspective (no Steam tag backfill). Rows skip Finished/Dropped.
-5. ✅ Platform badges (`availBadges()`, `.plat.avail`; PS5 hides PS4; found/new games carry `avail` from slim()): owned (filled) vs available (outlined), Steam Deck next to Steam.
+5. ✅ Platform badges (`availBadges()`, `.plat.avail`; PS4 shows as PS5 — one tag, 2026-11-14; found/new games carry `avail` from slim()): owned (filled) vs available (outlined), Steam Deck next to Steam.
 Old "curation rebuild" (taste score with many penalties) dropped: rules kept breaking on exceptions; quality decides.
 
 ## Later
