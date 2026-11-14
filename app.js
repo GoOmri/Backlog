@@ -478,7 +478,7 @@ const isPlatformer = g => (g.genres || []).includes("Platform");
 // Up next as a list you can reorder: hold ≡ and drag. The carousel follows this order (stored in each game's upNext value).
 function upNextSheet(){
   const gs = list().filter(g => g.upNext && playable(g) && (g.status === "backlog" || g.status === "wishlist")).sort((a, b) => a.upNext - b.upNext);
-  openSheet(`<div class="sheet-list"><h2>Up next</h2><ol class="unlist" id="unlist">${gs.map(g => `<li data-id="${g.id}">
+  openSheet(`<div class="sheet-list"><h2>Up next<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></h2><ol class="unlist" id="unlist">${gs.map(g => `<li data-id="${g.id}">
     ${g.cover ? `<img src="${esc(g.cover)}" alt="">` : "<i></i>"}<span class="unt">${esc(g.title)}</span><span class="unh" aria-hidden="true">≡</span></li>`).join("")}</ol></div>`, "full");
   listOpen = upNextSheet;
   // Hold a row ~0.2s to pick it up, then drag. A quick tap opens the game; a quick swipe scrolls.
@@ -1022,7 +1022,7 @@ async function previewSheet(x){
   const have = inList(x);
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
-  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span class="gp-plats" id="gpPlats"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PS Store ↗</a></div><div class="ownon"><span class="dim">I own it on</span>${["ps5", "psplus", "steam", "epic", "itch"].map(p => `<button class="chip" data-own="${p}">${PLAT[p][0]}</button>`).join("")}</div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
+  openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span class="gp-plats" id="gpPlats"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PS Store ↗</a></div>`, edit: `<div class="egroup-l">Your copy</div><div class="egroup"><div class="ecell"><span class="elabel">I own it on</span><div class="erowchips ownon">${["ps5", "psplus", "steam", "epic", "itch"].map(p => `<button class="chip platchip" data-own="${p}" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</button>`).join("")}</div></div></div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
   $("#desc").onclick = toggleDesc;
   let wid = null;
   $("#pvWish").onclick = async () => {
@@ -1040,6 +1040,8 @@ async function previewSheet(x){
   };
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   // Owned: one tap on the platform saves it to the Library (or turns the wishlist entry just made into owned).
+  $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
+  $("#sheet").addEventListener("click", e => { if (!$("#editPanel")?.hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
   $(".ownon").onclick = async e => { const p = e.target.closest("[data-own]")?.dataset.own; if (!p) return;
     const {because, score, added, date, gem, taste, appid, price, ...data} = x;
     const id = wid || newId(), owned = {platforms: [p], status: "backlog", ...(pinned ? {upNext: Date.now()} : {})};
@@ -1514,7 +1516,7 @@ document.addEventListener("click", async e => {
     await setDoc(doc(col, newId()), {...it, asTyped: it.title, platforms: [], status: "wishlist", added: Date.now()}); }
   else if (d.rnope){ const it = radarItem(+d.rnope); notForMe(it); }
   else switch (d.act){
-    case "seeall": { const key = t.dataset.row, show = () => { const r = ROWS.find(x => x[1] === key); openSheet(`<div class="sheet-list"><h2>${r[0]}</h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div></div>`, "full"); listOpen = show; }; show(); break; }
+    case "seeall": { const key = t.dataset.row, show = () => { const r = ROWS.find(x => x[1] === key); openSheet(`<div class="sheet-list"><h2>${r[0]}<button class="x" data-act="close" aria-label="Close">${ic("x")}</button></h2><div class="grid">${(rowCache[r[1]] || []).map(itemCard).join("")}</div></div>`, "full"); listOpen = show; }; show(); break; }
     case "unmatched": closeSheet(); statF = ""; genreF = "__nomatch"; tab = "lib"; saveFilters(); render(); break;
     case "upnext": upNextSheet(); break;
     case "add": addSheet(); break;

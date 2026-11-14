@@ -825,3 +825,7 @@ img.ok.now{transition:none}
 .editpanel .esteam{margin-top:var(--s2)}
 .editpanel .esteam input{flex:1;min-width:0}
 .brand{text-decoration:none;color:inherit;cursor:pointer} /* logo = link home, full reload */
+
+/* List sheets (See all, Up next): title bar sticks while scrolling, with ✕ */
+.sheet-list h2{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:8px;margin:calc(-20px - env(safe-area-inset-top,0px)) -20px 16px;padding:calc(12px + env(safe-area-inset-top,0px)) 12px 12px 20px;background:rgb(14 17 22 / .78);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.sheet-list h2 .x{position:static;margin-left:auto;width:40px;height:40px;flex:none;color:var(--fg)}
