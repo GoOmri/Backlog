@@ -1199,7 +1199,7 @@ async function editSheet(id){
   // One button for the next step only.
   const NEXT = {wishlist: "Bought", backlog: "Finished", dropped: "Resume"}; // one word each so the row always fits
   // One row, never wraps: status, tap-to-rate stars, then icon buttons on the right.
-  const actions = `${NEXT[g.status] ? `<button class="btn" id="statBtn">${NEXT[g.status]}</button>` : g.status === "done" ? `<span class="stbadge">${ic("check", 16)}Finished</span>` : ""}
+  const actions = `${NEXT[g.status] ? `<span class="menuwrap"><button class="btn" id="statBtn">${NEXT[g.status]}</button><div class="popmenu" id="statMenu" hidden></div></span>` : g.status === "done" ? `<span class="stbadge">${ic("check", 16)}Finished</span>` : ""}
     ${g.status !== "wishlist" ? `<span class="rstars" role="group" aria-label="Your rating">${[1,2,3,4,5].map(n => `<button data-star="${n}" class="${n <= (g.myRating || 0) ? "on" : ""}" aria-label="${n} stars">★</button>`).join("")}</span>` : ""}
     <span class="gp-spacer"></span>
     ${g.status === "wishlist" ? `<button class="ibtn on-heart" id="wishBtn" title="Remove from wishlist" aria-label="Remove from wishlist">${ic("heartf")}</button>` : ""}
@@ -1252,9 +1252,10 @@ async function editSheet(id){
     toast(`${g.title} removed from wishlist`, () => setDoc(doc(col, id), snap));
   };
   sh.addEventListener("click", e => { if (!e.target.closest(".menuwrap")) sh.querySelectorAll(".popmenu").forEach(m => m.hidden = true); });
-  sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = () => {
+  sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = e => {
     const st = b.dataset.setstat;
-    if (g.status === "wishlist" && st !== "wishlist" && st !== "dropped" && $("#statBtn")) return askBought(st);
+    // Wishlist → Owned/Finished: close the panel and ask where it was bought (menu under the Bought button).
+    if (g.status === "wishlist" && st !== "wishlist" && st !== "dropped" && $("#statBtn")){ e.stopPropagation(); setPanel(false); return askBought(st); }
     save({status: st, finishedAt: st === "done" ? (Date.parse($("#finDate").value) || Date.now()) : null}); reopen();
   });
   $("#finDate").onchange = () => save({finishedAt: Date.parse($("#finDate").value) || Date.now()});
