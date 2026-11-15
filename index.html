@@ -20,6 +20,10 @@
   <div class="splash-title"><span class="t-back">GAME NIGHT</span><span class="t-front">GAME NIGHT</span></div>
   <div class="splash-load"><span>Loading your games</span><i></i></div></div>
 <script>
+// Splash only on a fresh start: sessionStorage survives Android reloading the page in the background, not closing the app.
+try { if (sessionStorage.getItem("splashSeen")) document.getElementById("splash").remove(); else sessionStorage.setItem("splashSeen", "1"); } catch (e) {}
+</script>
+<script>
 // Safety net that doesn't depend on app.js: show startup errors on the splash, and offer a retry if it's still up after 10s.
 (function(){ var say = function(h){ var s = document.getElementById("splash"), l = s && s.querySelector(".splash-load span"); if (!l) return; s.style.pointerEvents = "auto"; l.innerHTML = h; };
   addEventListener("error", function(e){ if (e.message) say("Couldn't start: " + String(e.message).replace(/[<>&]/g, "") + ' · <a href="./" style="color:#C9B6FF">Retry</a>'); });

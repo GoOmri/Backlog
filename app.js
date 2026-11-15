@@ -500,7 +500,7 @@ function upNextSheet(){
   };
   ol.onpointerup = ol.onpointercancel = e => {
     clearTimeout(timer);
-    if (!li){ if (armed && !moved && e.type === "pointerup"){ sheetBack = upNextSheet; editSheet(armed.dataset.id); } armed = null; return; }
+    if (!li){ if (armed && !moved && e.type === "pointerup"){ goDeeper(upNextSheet); editSheet(armed.dataset.id); } armed = null; return; }
     li.classList.remove("drag"); li.style.transform = ""; li = null; armed = null;
     const vals = gs.map(g => g.upNext).sort((a, b) => a - b);
     [...ol.children].forEach((el, i) => { const g = games.get(el.dataset.id); if (g && g.upNext !== vals[i]) upd(g.id, {upNext: vals[i]}).catch(saveErr); });
@@ -858,16 +858,25 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && so
 /* ---------- sheets ---------- */
 // The system back gesture (swipe from the screen edge) closes an open page.
 // From a game page opened out of a list, back returns to the list at the same scroll spot (no close + reopen).
-addEventListener("popstate", () => { if (!$("#dlg").open) return;
-  if (sheetBack && history.state?.sheet){ const b = sheetBack; sheetBack = null; b(); $("#dlg").scrollTop = listY; } else shut(); });
+// Back = one level up: game → the page/list/search it came from → the tab → Library (from Wishlist) → Play → out of the app.
+addEventListener("popstate", () => { if (skipPop){ skipPop = false; return; }
+  if (!$("#dlg").open){ if (tab === "home") return history.back(); goTab(tab === "wish" ? "lib" : "home", false); return; } // home: skip stale entries
+  const b = history.state?.sheet && backs.pop(); if (b){ b.fn(); $("#dlg").scrollTop = b.y; } else shut(); });
 // Close with a slide-down instead of vanishing; Esc goes through the same path.
 // When a game page is opened from a list sheet (Up next, See all), closing it (✕ or swipe back) returns to that list.
-let sheetBack = null, listOpen = null, listY = 0, toTop = false;
-document.addEventListener("click", e => { if (listOpen && e.target.closest(".sheet-list [data-edit], .sheet-list [data-preview], .sheet-list [data-un]")){
-  sheetBack = listOpen; listY = $("#dlg").scrollTop; toTop = true; history.pushState({sheet: 2}, ""); } }, true);
+let backs = [], listOpen = null, curPage = null, toTop = false, skipPop = false;
+// One level deeper inside the sheet: remember how to redraw this level (and its scroll) for back.
+function goDeeper(fn){ if (!fn) return; backs.push({fn, y: $("#dlg").scrollTop}); toTop = true; history.pushState({sheet: 2}, ""); }
+document.addEventListener("click", e => { if (!$("#dlg").open || !e.target.closest("#sheet [data-edit], #sheet [data-preview], #sheet [data-un]")) return;
+  const v = $("#aQ")?.value; goDeeper($("#aQ") ? () => addSheet(v) : $(".sheet-list") ? listOpen : curPage); }, true);
+// Tabs below Play get history entries (Wishlist sits under Library), so back walks up to Play, then out.
+const depthOf = t => t === "home" ? 0 : t === "wish" ? 2 : 1;
+function tabNav(to){ const a = depthOf(tab), b = depthOf(to);
+  if (b > a) for (let i = a; i < b; i++) history.pushState({tab: i + 1}, "");
+  else if (b < a){ skipPop = true; history.go(b - a); } }
 function shut(){ const g = $("#dlg"); if (!g.open || g.classList.contains("closing")) return;
-  const back = sheetBack; sheetBack = null; listOpen = null;
-  if (back){ setTimeout(back, 200); } g.classList.add("closing"); setTimeout(() => { if (g.classList.contains("closing")){ g.classList.remove("closing"); g.close(); } }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180); }
+  backs = []; listOpen = null; curPage = null;
+  g.classList.add("closing"); setTimeout(() => { if (g.classList.contains("closing")){ g.classList.remove("closing"); g.close(); } }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180); }
 $("#dlg").addEventListener("cancel", e => { e.preventDefault(); closeSheet(); });
 // Restart a one-shot CSS animation class on an element.
 function anim(el, c){ if (!el) return; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
@@ -904,7 +913,7 @@ document.addEventListener("error", e => { const i = e.target; if (i.tagName !== 
   i.classList.add("bad"); }, true);
 new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1)
   for (const i of n.tagName === "IMG" ? [n] : n.querySelectorAll("img")) if (i.complete && i.naturalWidth) i.classList.add("ok", "now"); }).observe(document.body, {childList: true, subtree: true});
-function openSheet(html, tall = false){ $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (toTop){ toTop = false; $("#dlg").scrollTop = 0; } if (!$("#dlg").open) $("#dlg").showModal(); }
+function openSheet(html, tall = false){ curPage = null; $("#dlg").classList.remove("closing"); if (!$("#dlg").open) history.pushState({sheet: 1}, ""); $("#dlg").classList.toggle("tall", tall === true); $("#dlg").classList.toggle("full", tall === "full"); $("#sheet").innerHTML = html; if (toTop){ toTop = false; $("#dlg").scrollTop = 0; } if (!$("#dlg").open) $("#dlg").showModal(); }
 function closeSheet(){ if (history.state?.sheet) history.back(); else shut(); }
 function note(t){ openSheet(`<p>${esc(t)}</p><div class="actions"><button class="btn" data-act="close">OK</button></div>`); }
 const platOpts = sel => Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v[0]}</option>`).join("");
@@ -953,8 +962,6 @@ function addSheet(q0 = ""){
       const list = await api("/search?q=" + encodeURIComponent(t)).catch(() => null);
       if (n !== addSeq || !$("#aRes")) return;
       $("#aRes").innerHTML = list ? addResults(list) : `<div class="status">Search failed. Try again.</div>`; }, 350); };
-  // Back from a result's page returns here with the same search.
-  $("#aRes").onclick = e => { if (e.target.closest("[data-edit], [data-preview]")) { const v = $("#aQ").value; sheetBack = () => addSheet(v); } };
   if (q0) $("#aQ").oninput();
   $("#aGo").onclick = async () => {
     $("#aGo").disabled = true;
@@ -1023,7 +1030,7 @@ async function previewSheet(x){
   if (have) return editSheet(have.id);
   previewCache.set(x.igdbId, x);
   openSheet(pageShell(x, {own: `<div class="ownline"><b class="st no">Not owned</b><span class="gp-plats" id="gpPlats"></span></div><div class="links"><a href="https://store.steampowered.com/search/?term=${encodeURIComponent(x.title)}" target="_blank" rel="noopener">Steam ↗</a><a class="pslink" href="https://store.playstation.com/en-il/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener">PS Store ↗</a></div>`, edit: `<div class="egroup-l">Your copy</div><div class="egroup"><div class="ecell"><span class="elabel">I own it on</span><div class="erowchips ownon">${["ps5", "psplus", "steam", "epic", "itch"].map(p => `<button class="chip platchip" data-own="${p}" style="--c:var(${PLAT[p][2]})">${PLAT[p][0]}</button>`).join("")}</div></div></div>`, actions: `<button class="ibtn" id="pvPin" title="Up next" aria-label="Up next">${ic("pin")}</button><button class="ibtn" id="pvWish" title="Add to wishlist" aria-label="Add to wishlist">${ic("heart")}</button><button class="ibtn" id="pvNope" title="Not now" aria-label="Not now">${ic("down", 18)}</button>`}), "full");
-  $("#desc").onclick = toggleDesc;
+  $("#desc").onclick = toggleDesc; curPage = () => previewSheet(x);
   let wid = null;
   $("#pvWish").onclick = async () => {
     if (wid){ await del(wid); wid = null; $("#pvWish").innerHTML = ic("heart"); $("#pvWish").classList.remove("on-heart"); toast("Removed from wishlist"); return; }
@@ -1233,7 +1240,7 @@ async function editSheet(id){
   const ownLine = g.ps === "left" ? `<b class="st no">Left PS Plus</b>${platRow}`
     : g.status === "wishlist" || (!ownP.length && !viaPlus) ? `<b class="st no">Not owned</b>${platRow}`
     : `<b class="st yes">Owned</b>${platRow}${!ownP.length ? `<span class="dim">while subscribed</span>` : ""}`;
-  openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full");
+  openSheet(pageShell(g, {own: `<div class="ownline">${ownLine}</div>`, actions, facts, edit}), "full"); curPage = () => editSheet(id);
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
   // Unmatched game: purple shortcut opens the panel at "Wrong game?" and runs the search right away.
   if ($("#fixPill")) $("#fixPill").onclick = e => { e.stopPropagation(); setPanel(true); $("#fix").scrollIntoView({block: "center"}); $("#fixGo").click(); };
@@ -1491,15 +1498,17 @@ async function siftAct(a){
   sift.i++; sift.batch++; siftShow();
 }
 
-document.addEventListener("click", async e => {
-  const t = e.target.closest("button"); if (!t) return;
-  const d = t.dataset;
-  if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
-  if (d.tab){ const ch = tab !== d.tab, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(d.tab) >= ix(tab) ? "tabinr" : "tabinl"; tabScroll[tab] = scrollY; tab = d.tab; q = ""; loadFilters(); renderTabs();
+function goTab(to, nav = true){ const ch = tab !== to, ix = k => TABS.findIndex(t => t[0] === (k === "wish" ? "lib" : k)), dir = ix(to) >= ix(tab) ? "tabinr" : "tabinl"; tabScroll[tab] = scrollY; if (nav) tabNav(to); tab = to; q = ""; loadFilters(); renderTabs();
     // Old screen slides out the other way (~110ms) while the new one is built, then the new one slides in: no blank frame.
     const m = $("#main"); m.classList.remove("tabinr", "tabinl", "taboutr", "taboutl");
     if (ch){ void m.offsetWidth; m.classList.add(dir === "tabinr" ? "taboutl" : "taboutr"); }
     setTimeout(() => { render(); scrollTo(0, tabScroll[tab] || 0); m.classList.remove("taboutr", "taboutl"); if (ch) anim(m, dir); }, ch ? 110 : 0); }
+
+document.addEventListener("click", async e => {
+  const t = e.target.closest("button"); if (!t) return;
+  const d = t.dataset;
+  if (t.matches(".ibtn,.heartbtn")) anim(t, "pop");
+  if (d.tab) goTab(d.tab);
   else if (d.f != null){ const k = d.f.indexOf("|"); toggleFilter(d.f.slice(0, k), d.f.slice(k + 1)); }
   else if (d.plat){ platF.has(d.plat) ? platF.delete(d.plat) : platF.add(d.plat); render(); }
   else if (d.mood){ mood.has(d.mood) ? mood.delete(d.mood) : mood.add(d.mood); render(); }

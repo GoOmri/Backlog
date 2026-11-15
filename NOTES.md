@@ -42,7 +42,9 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers.
 
 ## Rendering
-- List sheets (See all, Up next): sticky title bar with ✕ (blurred). Opening a game pushes history `{sheet: 2}`; back (swipe or ✕) redraws the list in place at the saved scroll (`listY`); the game page opens at the top (`toTop`).
+- List sheets (See all, Up next): sticky title bar with ✕ (blurred).
+- Back (swipe, back button or ✕) = one level up (2026-11-16): game → game it came from (Similar/DLC) → list / Add search → tab → Library (from Wishlist) → Play → exits. Sheet levels: `goDeeper(fn)` pushes `{sheet: 2}` + `backs` stack entry (redraw fn + scroll); `curPage` = current game page. Tabs: `goTab(to)` + `tabNav()` keep one history entry per level below Play (`depthOf`: Play 0, tabs 1, Wishlist 2).
+- Splash only on a fresh start: inline script in index.html removes it when sessionStorage `splashSeen` is set.
 - `render()` rebuilds the tab's HTML string; on the same tab `patch(el, html)` applies only the differences (keys: data-key / data-edit / id). To update a small part, change the data and call `render()` (or `softRender()` for batched). `patch()` also works for any element, e.g. a sheet.
 
 - Recenter (`#heroPosGo`): drag preview + zoom slider (1–2×) → `heroPos {x,y,z}` per game; `heroStyle()` applies object-position + scale + clip-path on the page hero and carousel. New top image pick resets it.
