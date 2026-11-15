@@ -38,6 +38,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - Preview page: "I own it on" chips live in the ⋯ panel (Your copy), like owned games; the page shows Not owned + available-on badges.
 - Add (`addSheet`): search first (worker `/search`, 350ms debounce) → results with year + available-on badges → tap opens `previewSheet` (or `editSheet` if already yours); back returns to the same search. Preview has "I own it on" platform chips (saves as Owned on that platform). Bulk paste is behind "Paste a list instead".
 - Game page: `pageShell` + `editSheet(id)` (owned/wishlist) or `previewSheet(x)` (not in list: pin, heart, 👎). Ownership line: green Owned + platform chips / red Not owned.
+- ⋯ panel "Own it on" chips (2026-11-15 fix): on a wishlist game, tapping a platform moves it to Owned (redraws the page); otherwise the Owned/Not owned word and badges update in place (also for games with no IGDB id).
 - Background queue `runQueue`: match → backfill → checkDeck → checkSteamTags → covers.
 
 ## Rendering

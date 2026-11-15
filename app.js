@@ -1276,7 +1276,14 @@ async function editSheet(id){
   let pinned = !!g.upNext;
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
   $("#nopeBtn").onclick = () => { closeSheet(); if (g.notNow){ upd(id, {notNow: null, hidden: false}).catch(saveErr); toast(`${g.title} is back on Play`); } else notForMe(g); };
-  sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p)); save({platforms: [...plats]}); g.platforms = [...plats]; gameDetails(g.igdbId).then(d => fillStrip(g, d)).catch(() => {}); });
+  // Own it on: a wishlist game you mark on a platform becomes Owned; the Owned/Not owned word and badges follow right away.
+  sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p));
+    const d = {platforms: [...plats]};
+    if (g.status === "wishlist" && plats.has(p)){ d.status = "backlog"; if (p === "ps5") d.ps = "bought"; save(d); toast(`Moved to Owned · ${PLAT[p][0]}`); return reopen(); }
+    save(d); Object.assign(g, d);
+    const st = sh.querySelector(".ownline .st"), mine = g.status !== "wishlist" && plats.size > 0;
+    if (st && g.ps !== "left"){ st.className = "st " + (mine ? "yes" : "no"); st.textContent = mine ? "Owned" : "Not owned"; }
+    (g.igdbId ? gameDetails(g.igdbId) : Promise.resolve({})).catch(() => ({})).then(x => fillStrip(g, x)); });
   $("#desc").onclick = toggleDesc;
   let armed = false;
   $("#eDel").onclick = async () => { if (!armed){ armed = true; $("#eDel").textContent = "Tap again to delete"; return; } await del(id); closeSheet(); };
