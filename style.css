@@ -652,7 +652,7 @@ details.fsec[open]::details-content{block-size:auto;opacity:1}
   --ps:#5C86F2; --heart:#FF6B86; --bad:#ff6b6b;
   --good:#5fd38d; --warn:#E39158; --gold:#F2C14E; --hot:#FF7A45; --accent-fg:#1A1033;
   --accent:#A78BFA; --line:#28303B; --dim:#8D97A5; --fg:#E9EDF2; --raise:#1F2630; --surface:#161B22;
-  --bg:#0E1116;--e-out:cubic-bezier(.2,.8,.2,1);--e-in:cubic-bezier(.4,0,1,1);--e-bounce:cubic-bezier(.34,1.56,.64,1);--d-fast:.12s;--d:.22s;--d-slow:.32s}
+  --bg:#0E1116;--e-out:cubic-bezier(.2,.8,.2,1);--e-in:cubic-bezier(.4,0,1,1);--e-bounce:cubic-bezier(.34,1.56,.64,1);--d-fast:.12s;--d:.22s;--d-slow:.32s;--d-fade:.8s}
 #main.tabinr,#main.tabinl{animation-duration:var(--d);animation-timing-function:var(--e-out)}
 #main.taboutl,#main.taboutr{animation-duration:var(--d-fast);animation-timing-function:var(--e-in)}
 dialog[open],dialog[open]::backdrop{animation-duration:var(--d);animation-timing-function:var(--e-out)}
@@ -831,6 +831,6 @@ img.ok.now{transition:none}
 .sheet-list h2 .x{position:static;margin-left:auto;width:40px;height:40px;flex:none;color:var(--fg)}
 
 /* Trailer: screenshot cover until playing; double tap to skip without zooming */
-.vwrap .vcover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;pointer-events:none;transition:opacity var(--d-slow) var(--e-out)}
+.vwrap .vcover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;pointer-events:none;transition:opacity var(--d-fade) ease-in-out}
 .vwrap .vcover.gone{opacity:0}
 .vctl{touch-action:manipulation}
