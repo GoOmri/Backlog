@@ -10,7 +10,7 @@ Read with NOTES.md before any visual change. New UI reuses what's here; if somet
 - Spacing: `--s1` 4 · `--s2` 8 · `--s3` 16 · `--s4` 24 · `--s5` 32 · `--s6` 48. Nothing in between.
 - Radius: `--r-s` 8 small chips/badges/thumbs · `--r-m` 12 cards/media · `--r-l` 16 sheets. Pills (999px) only for chips and the main status button.
 - Fonts: `--display` titles/headings · `--body` everything else · `--mono` counts only ("598 games") · Press Start 2P only for the brand/splash.
-- Motion: `--d-fast/--d/--d-slow` with `--e-out`; no new durations. Exception: `--d-fade` (.8s, ease-in-out) only for crossfading media over video (trailer cover).
+- Motion: `--d-fast/--d/--d-slow` with `--e-out`; no new durations.
 
 ## Text
 - Weights: 400 body, 600 emphasis/labels. 700 only for the big page title.
