@@ -103,6 +103,7 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - Motion tokens in style.css (`--d-fast/--d/--d-slow`, `--e-out/--e-in/--e-bounce`); buttons have a bouncy press.
 - Art: shimmer placeholder, fades in on load (`img.ok`); already-loaded art shows instantly (`.now`). Coming soon shows skeleton cards while loading.
 - No vibration, no undo toasts (Omri's choice).
+- Trailers: tried and rejected (2026-11-16) — screenshot cover over the player until it plays, and Steam trailers (not gameplay). Omri prefers the video showing right away, YouTube overlay and all.
 
 ## Name, icon, splash (2026-11-11)
 - App name **Game Night** (header, tab title, manifest). Repo/URL still Backlog.
