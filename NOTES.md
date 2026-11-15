@@ -105,7 +105,14 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - App name **Game Night** (header, tab title, manifest). Repo/URL still Backlog.
 - Icon = Omri's pixel couch scene cropped on the cat (64×64 art → icon-192.png 3× / icon-512.png 8×, nearest-neighbor; 512 also listed as maskable). Splash = splash.png (270×600 art → 1080×2400 at 4×), `#splash` in index.html, centered, pixel font Press Start 2P; title = two stacked spans (`.t-back` cream stroke + dark extrusion, `.t-front` purple→navy gradient). `hideSplash()` after first load (min ~0.9s, max 6s).
 
-## Open items (end of 2026-11-11/12 session)
+## Open items (end of 2026-11-13/15 session)
+- **App stuck on launch (reported 11-14):** no code cause found. Pushed a splash safety net (inline script in index.html shows startup errors + Retry; "Still loading… Tap to retry" after 10s). Waiting on Omri: stuck on Android's plain cat-icon screen (page not arriving → try in Chrome / reinstall) or on the couch splash (read the error it now shows). A live check was offered, not yet OK'd.
+- **Steam Deck (proposed, not built):** "Tonight on Deck" Play row (Up next/backlog with Deck Verified/Playable) + Install/Play buttons via `steam://install/<appid>` / `steam://run/<appid>` when the app runs on the Deck. Omri was told how to add Game Night as a non-Steam shortcut (Chrome `--app=` or Firefox `--kiosk`); Steam's built-in browser likely blocks Google sign-in. Mockup next.
+- **Too many games (worry):** idea not built — a "Shelf" status for unplayed freebies (out of Play/Sift/default Library). Ask what feels heavy first (browsing vs numbers).
+- itch games not on IGDB/Steam: could use itch's own cover/title (itch API key needed as worker secret `ITCH_KEY`). Not built.
+- Earlier open items below still stand unless marked done.
+
+## Older open items (end of 2026-11-11/12 session)
 - Sift logic feels "backwards" to Omri (Keep changes nothing visible) — unresolved; he's not sold on opt-in (Play shows only kept games). Talk before changing.
 - Stats tiles look skewed — revisit with Omri.
 - Ideas offered, not yet approved: "Wrong game?" on Sift cards; "Out now" badge for released wishlist/coming-soon games; hours total under Up next; Wishlist chip in Library status filters; rate-on-finish.
