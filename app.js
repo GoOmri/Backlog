@@ -1060,26 +1060,22 @@ async function previewSheet(x){
 // Trailer: no YouTube buttons. A thin timeline to scrub, the title, tap left/right for −/+10s, middle to pause.
 let ytReady;
 function loadYT(){ return ytReady ||= new Promise(res => { window.onYouTubeIframeAPIReady = res; const sc = document.createElement("script"); sc.src = "https://www.youtube.com/iframe_api"; document.head.append(sc); }); }
-// A game screenshot covers the player until it has played ~2.5s (YouTube's own title/logo overlay shows at the start).
-async function mountTrailer(id, root = document, cover = ""){
+async function mountTrailer(id, root = document){
   const $r = sel => root.querySelector(sel);
-  const wrap = $r("#ytp")?.parentElement; if (cover && wrap && !wrap.querySelector(".vcover")) wrap.insertAdjacentHTML("afterbegin", `<img class="vcover" src="${esc(cover)}" alt="">`);
   await loadYT(); if (!$r("#ytp")) return;
   const flash = t => { const f = $r("#vflash"); if (!f) return; f.textContent = t; f.classList.remove("show"); void f.offsetWidth; f.classList.add("show"); };
   const pl = new YT.Player($r("#ytp"), {videoId: id, playerVars: {autoplay: 1, mute: 1, start: 5, controls: 0, cc_load_policy: 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3, fs: 0},
-    events: {onStateChange: e => { $r("#vctl")?.classList.toggle("paused", e.data === 2); if (e.data === 1) setTimeout(() => wrap?.querySelector(".vcover")?.classList.add("gone"), 2500); }, onReady: e => e.target.playVideo()}});
+    events: {onStateChange: e => $r("#vctl")?.classList.toggle("paused", e.data === 2), onReady: e => { e.target.playVideo(); const t = e.target.getVideoData()?.title; if ($r("#vtitle")) $r("#vtitle").textContent = t || ""; }}});
   clearInterval(root._vt);
   let scrubbing = false;
   root._vt = setInterval(() => { const f = $r("#vfill"); if (!f || !pl.getDuration || scrubbing) return; const dur = pl.getDuration() || 0; if (dur) f.style.width = (pl.getCurrentTime() / dur * 100) + "%"; }, 250);
   const ctl = $r("#vctl");
-  // Like YouTube: one tap = pause/play, double tap left/right half = −10s/+10s (more taps keep skipping).
-  let tapT = 0, lastTap = 0;
   ctl.onclick = e => {
     if (e.target.closest("#vbar")) return;
-    const r = ctl.getBoundingClientRect(), fwd = e.clientX - r.left > r.width / 2, now = Date.now(), dbl = now - lastTap < 300;
-    lastTap = now; clearTimeout(tapT);
-    if (dbl){ pl.seekTo(Math.max(0, pl.getCurrentTime() + (fwd ? 10 : -10)), true); flash(fwd ? "+10s" : "−10s"); return; }
-    tapT = setTimeout(() => { if (pl.getPlayerState() === 1){ pl.pauseVideo(); flash("❚❚"); } else { pl.playVideo(); flash("▶"); } }, 300);
+    const r = ctl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+    if (x < .35){ pl.seekTo(Math.max(0, pl.getCurrentTime() - 10), true); flash("−10s"); }
+    else if (x > .65){ pl.seekTo(pl.getCurrentTime() + 10, true); flash("+10s"); }
+    else if (pl.getPlayerState() === 1){ pl.pauseVideo(); flash("❚❚"); } else { pl.playVideo(); flash("▶"); }
   };
   // Drag along the timeline to scrub: the bar follows your finger, the video jumps as you move and settles on release.
   const bar = $r("#vbar");
@@ -1181,14 +1177,14 @@ function fillMedia(d, x = {}){
   if (lg && !$(".gp-logo") && $(".gp-title")) $(".gp-title").outerHTML = `<img class="gp-logo" src="${esc(lg)}" alt="${esc(x.title || "")}">`;
   const h = heroOf(xs, d.hero); if (h && $(".gp-bg") && $(".gp-bg").src !== h) $(".gp-bg").src = h;
   const slides = [
-    d.trailer && `<div class="mslide vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`,
+    d.trailer && `<div class="mslide vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vtitle" id="vtitle"></div><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`,
     ...(d.shots || []).map(u => `<div class="mslide"><img src="${esc(u)}" alt="" loading="lazy"></div>`)
   ].filter(Boolean);
   if (slides.length){
     $("#mslides").innerHTML = slides.join("");
     $("#mdots").innerHTML = slides.map((_, i) => `<button class="dotbtn" data-mgo="${i}" aria-label="Slide ${i + 1}" ${i === 0 ? 'aria-current="true"' : ""}></button>`).join("");
   }
-  if (d.trailer && $("#dlg #ytp")) mountTrailer(d.trailer, $("#dlg"), d.shots?.[0] || "");
+  if (d.trailer && $("#dlg #ytp")) mountTrailer(d.trailer, $("#dlg"));
   const byIgdb = new Map(list().map(g => [g.igdbId, g]));
   const sims = (d.similar || []).filter(x => !byIgdb.get(x.igdbId)?.nope);
   if (sims.length && $("#simBox")){
@@ -1428,7 +1424,7 @@ function siftShow(){
   // Gameplay first: three screenshots stacked (tap the stack for the next three), ▶ turns the top one into the gameplay trailer.
   const stack = $("#siftStack"), dots = $("#siftDots"), me = sift.i, med = u => u.replace("t_screenshot_huge", "t_screenshot_med");
   let shots = [], k = 0, trailer = null;
-  // The trailer autoplays muted in the middle slot with only a timeline (same player as the game page: tap to pause/play, double tap ±10s).
+  // The trailer autoplays muted in the middle slot with only a timeline (same player as the game page: tap middle to pause/play, sides ±10s).
   const vid = () => `<div class="sift-shot trailer vwrap"><div id="ytp"></div><div class="vctl" id="vctl"><div class="vflash" id="vflash"></div><div class="vbar" id="vbar"><span id="vfill"></span></div></div></div>`;
   const shot = u => `<div class="sift-shot"><img src="${esc(u)}" alt=""></div>`;
   const per = () => trailer ? 2 : 3;
@@ -1441,7 +1437,7 @@ function siftShow(){
       const html = set.map(shot);
       if (trailer) html.splice(Math.min(1, html.length), 0, vid());
       stack.innerHTML = html.join("");
-      if (trailer) mountTrailer(trailer, $("#sift"), shots[0] ? med(shots[0]) : "");
+      if (trailer) mountTrailer(trailer, $("#sift"));
     }
     const pages = Math.ceil(shots.length / per());
     dots.innerHTML = pages > 1 ? Array.from({length: pages}, (_, n) => `<i class="${n === k / per() ? "on" : ""}"></i>`).join("") : "";
