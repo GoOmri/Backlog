@@ -315,14 +315,16 @@ const MAIN = {
   unique: (t) => t.some(x => UNIQUE.includes(x))
 };
 // With Yanshula (Omri + wife): loved Astro Bot, Rayman Legends, Unravel, It Takes Two, Sackboy, Stardew, Chicory, and
-// pass-the-controller games like Hollow Knight and Ori. No shooters (Huntdown), first person (Vholume), party games (Heave Ho).
-const DUO_NO = ["Party", "PvP", "Fighting", "Competitive", "Sports", "Racing", "Shooter", "Shoot 'Em Up", "Twin Stick Shooter", "Run and Gun", "FPS", "Bullet Hell", "Top-Down Shooter", "Third-Person Shooter", "Arena Shooter"];
+// pass-the-controller games like Hollow Knight and Ori. No shooters (Huntdown), first person (Vholume), party/physics games
+// (Heave Ho, Human Fall Flat), or a free 3D camera (Hi-Fi Rush, The Upturned: motion sickness). 3D only as a 3D platformer
+// (Sackboy, Astro Bot, It Takes Two: camera mostly fixed); the data can't tell fixed from free camera otherwise.
+const DUO_NO = ["Party", "Physics", "PvP", "Fighting", "Competitive", "Sports", "Racing", "Shooter", "Shoot 'Em Up", "Twin Stick Shooter", "Run and Gun", "FPS", "Bullet Hell", "Top-Down Shooter", "Third-Person Shooter", "Arena Shooter"];
 const DUO_YES = ["Platformer", "2D Platformer", "3D Platformer", "Puzzle Platformer", "Puzzle", "Adventure", "Cozy", "Farming Sim", "Life Sim", "Metroidvania", "Exploration"];
 const DUO_PASS = ["Hand-drawn", "Beautiful", "Cute", "Colorful", "Family Friendly", "Atmospheric", "Cartoony"]; // single-player: only good-looking ones
 // Hard no's: these in a game's main tags drop it from every row.
 const NO = ["Sports", "Free to Play", "Massively Multiplayer", "Visual Novel"];
 async function finds(env){
-  const c = await env.KV.get("finds15", "json");
+  const c = await env.KV.get("finds16", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600;
   const clean = `version_parent = null & parent_game = null`;
@@ -350,10 +352,11 @@ async function finds(env){
   const items = games.map(g => {
     const h = gameOf.get(g.id), main = (h.tags || []).slice(0, TOP);
     const keys = new Set([...h.keys].filter(k => !MAIN[k] || MAIN[k](main, g)));
-    const t8 = (h.tags || []).slice(0, 8), fp = (g.player_perspectives || []).some(p => p.name === "First person");
+    const t8 = (h.tags || []).slice(0, 8), views = (g.player_perspectives || []).map(p => p.name), fp = views.includes("First person");
+    const free3d = t8.some(t => t === "3D" || t === "Third Person") || (views.includes("Third person") && !views.includes("Side view") && !views.includes("Bird view / Isometric"));
     const coopHit = h.keys.has("coop") || h.keys.has("yanshula");
     keys.delete("yanshula");
-    if (!fp && !t8.some(t => DUO_NO.includes(t)) && main.some(t => DUO_YES.includes(t))
+    if (!fp && (!free3d || main.includes("3D Platformer")) && !t8.some(t => DUO_NO.includes(t)) && main.some(t => DUO_YES.includes(t))
       && (coopHit || ((keys.has("mv") || keys.has("plat2d") || keys.has("plat3d")) && t8.some(t => DUO_PASS.includes(t))))) keys.add("yanshula");
     const x = {...slim(g), date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
     x.score = quality(h.pct, h.n, g.aggregated_rating, g.total_rating);
@@ -363,7 +366,7 @@ async function finds(env){
   }).filter(i => i.keys.size && !i.no && i.x.date && i.x.date > since && i.x.date <= now);
   const pick = k => items.filter(i => i.keys.has(k)).map(i => i.x).sort((a, b) => b.score - a.score).slice(0, 40);
   const d = {mv: pick("mv"), plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique"), yanshula: pick("yanshula")};
-  await env.KV.put("finds15", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds16", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 // One quality number (0–100) for any game: Steam % pulled toward 80 when there are few reviews,

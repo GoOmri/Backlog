@@ -549,7 +549,12 @@ async function fetchHero(g){
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
 const plat = g => (g.genres || []).includes("Platform");
 const DUO_G = ["Puzzle", "Adventure", "Simulator"];
-const duoNo = g => (g.views || []).includes("First person") || (g.genres || []).some(x => ["Shooter", "Fighting", "Sport", "Racing"].includes(x));
+// No first person; third person only for platformers (fixed-ish camera like Sackboy), never free-camera 3D action.
+const free3d = g => (g.views || []).includes("Third person") && !(g.views || []).some(v => v === "Side view" || v === "Bird view / Isometric");
+// Owned Steam games also get the worker's Steam-tag checks (catches Human Fall Flat: IGDB calls it a platformer).
+const DUO_NO_T = ["Party", "Physics", "PvP", "Fighting", "Competitive", "Sports", "Racing", "Shooter", "Shoot 'Em Up", "Twin Stick Shooter", "Run and Gun", "FPS", "Bullet Hell", "Top-Down Shooter", "Third-Person Shooter", "Arena Shooter"];
+const duoNoTags = g => { const t = (g.stags || []).slice(0, 8); return t.some(x => DUO_NO_T.includes(x)) || (t.some(x => x === "3D" || x === "Third Person") && !t.includes("3D Platformer")); };
+const duoNo = g => duoNoTags(g) || (g.views || []).includes("First person") || (free3d(g) && !plat(g)) || (g.genres || []).some(x => ["Shooter", "Fighting", "Sport", "Racing"].includes(x));
 // Play = Up next carousel, then rows. Each row mixes your games (owned or wishlist; not finished, dropped or pinned)
 // with Find picks from /finds, sorted purely by quality. To split back into Play + Find, give each tab its own part of ROWS.
 const ROWS = [
