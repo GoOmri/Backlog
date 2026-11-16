@@ -324,7 +324,7 @@ const DUO_PASS = ["Hand-drawn", "Beautiful", "Cute", "Colorful", "Family Friendl
 // Hard no's: these in a game's main tags drop it from every row.
 const NO = ["Sports", "Free to Play", "Massively Multiplayer", "Visual Novel"];
 async function finds(env){
-  const c = await env.KV.get("finds16", "json");
+  const c = await env.KV.get("finds17", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600;
   const clean = `version_parent = null & parent_game = null`;
@@ -358,7 +358,7 @@ async function finds(env){
     keys.delete("yanshula");
     if (!fp && (!free3d || main.includes("3D Platformer")) && !t8.some(t => DUO_NO.includes(t)) && main.some(t => DUO_YES.includes(t))
       && (coopHit || ((keys.has("mv") || keys.has("plat2d") || keys.has("plat3d")) && t8.some(t => DUO_PASS.includes(t))))) keys.add("yanshula");
-    const x = {...slim(g), date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
+    const x = {...slim(g), date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app, stags: (h.tags || []).slice(0, 12)};
     x.score = quality(h.pct, h.n, g.aggregated_rating, g.total_rating);
     x.gem = h.n < 1500 && h.pct >= 92;
     if (x.gem) keys.add("unique");
@@ -366,7 +366,7 @@ async function finds(env){
   }).filter(i => i.keys.size && !i.no && i.x.date && i.x.date > since && i.x.date <= now);
   const pick = k => items.filter(i => i.keys.has(k)).map(i => i.x).sort((a, b) => b.score - a.score).slice(0, 40);
   const d = {mv: pick("mv"), plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique"), yanshula: pick("yanshula")};
-  await env.KV.put("finds16", JSON.stringify({t: Date.now(), d}));
+  await env.KV.put("finds17", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 // One quality number (0–100) for any game: Steam % pulled toward 80 when there are few reviews,

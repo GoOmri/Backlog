@@ -472,7 +472,6 @@ function cardHTML(g, sub){
     <span class="csub"><span>${esc(sub ?? (basicTags(g).slice(0, 2).join(" · ") || g.year || ""))}</span>${right}</span></button>`;
 }
 /* ---------- home ---------- */
-const FAV = ["Platform", "Puzzle", "Point-and-click", "Mystery", "Adventure"]; // his favourite kinds of games
 // Top carousel: platformers and metroidvanias only (IGDB files both under "Platform").
 const isPlatformer = g => (g.genres || []).includes("Platform");
 // Up next as a list you can reorder: hold ≡ and drag. The carousel follows this order (stored in each game's upNext value).
@@ -513,15 +512,21 @@ function upNextGames(){
   // The carousel is the shortlist. Suggestions only fill it while nothing is pinned.
   return pinned.length ? pinned : rest.slice(0, 5);
 }
-function recommended(){
-  const w = {};
-  list().filter(g => g.status === "done" || g.myRating >= 4)
-    .forEach(g => genresOf(g).forEach(t => w[t] = (w[t] || 0) + (g.myRating ? g.myRating - 2 : 1)));
-  FAV.forEach(t => w[t] = (w[t] || 0) + 3);
-  const max = Math.max(1, ...Object.values(w));
-  return list().filter(g => g.status === "backlog" && g.igdbId && !g.upNext && playable(g))
-    .map(g => [g, genresOf(g).reduce((s, t) => s + (w[t] || 0), 0) / max + (g.rating || 65) / 100])
-    .sort((a, b) => b[1] - a[1]).map(r => r[0]);
+// Taste: rows rank by quality + up to 15 points for likeness (genres, feel keywords, Steam tags, camera) to games you
+// finished, weighted by your stars (dropped counts against). With Yanshula learns only from games played together
+// (g.duo, plus the games Omri named until they're marked).
+const DUO_SEED = ["astro bot", "rayman legends", "hollow knight", "stardew valley", "chicory", "ori and the", "unravel", "it takes two", "sackboy"];
+const COMMON = new Set(["t:Indie", "t:Singleplayer", "g:Indie", "t:Great Soundtrack", "t:Multiplayer", "t:Co-op", "t:Local Co-Op", "t:Action", "t:Adventure", "t:Casual"]);
+const featsOf = g => [...(g.genres || []).map(x => "g:" + x), ...(g.kw || []).map(x => "k:" + x), ...(g.stags || []).slice(0, 12).map(x => "t:" + x), ...(g.views || []).map(x => "v:" + x)].filter(f => !COMMON.has(f));
+const isDuo = g => g.duo || DUO_SEED.some(t => clean(g.title || "").toLowerCase().startsWith(t));
+function tasteProfile(duo){
+  const P = {};
+  for (const g of list()){
+    if (g.status !== "done" && g.status !== "dropped" || duo && !isDuo(g)) continue;
+    const w = g.status === "dropped" ? -1 : g.myRating ? g.myRating - 2 : 1;
+    for (const f of featsOf(g)) P[f] = (P[f] || 0) + w;
+  }
+  return P;
 }
 function heroHTML(g){
   if (g.igdbId && g.hero == null && !heroAsked.has(g.id)) fetchHero(g);
@@ -574,7 +579,11 @@ let rowCache = {};
 function rowItems(key, test, seen, src, boost = () => 0){
   const mine = list().filter(g => !seen.has(g.igdbId || g.id) && !g.notNow && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g) + boost(g)}));
   const found = ((topMV || {})[src || key] || []).filter(x => !seen.has(x.igdbId) && !inList(x) && (!src || plat(x))).map(x => ({x, q: quality(x) + boost(x)}));
-  const sorted = [...mine, ...found].sort((a, b) => b.q - a.q);
+  const both = [...mine, ...found], P = tasteProfile(key === "yanshula");
+  const sim = o => { const f = featsOf(o); return f.length ? f.reduce((n, x) => n + (P[x] || 0), 0) / Math.sqrt(f.length) : 0; };
+  const ss = both.map(i => Math.max(0, sim(i.g || i.x))), mx = Math.max(0, ...ss);
+  if (mx > 0) both.forEach((i, k) => i.q += 15 * ss[k] / mx);
+  const sorted = both.sort((a, b) => b.q - a.q);
   // Daily rotation: the top 20 keep their place in the row but swap order each day, so different great games surface.
   const day = Math.floor(Date.now() / 864e5), hash = t => { let h = day; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
   const id = i => String(i.g ? i.g.igdbId || i.g.id : i.x.igdbId);
