@@ -302,6 +302,7 @@ const SEARCHES = [
   ["plat2d", ["2D Platformer"]], ["plat2d", ["2D Platformer"], 100],
   ["plat3d", ["3D Platformer"]], ["plat3d", ["3D Platformer"], 100],
   ["coop", ["Local Co-Op"]], ["coop", ["Local Co-Op"], 100],
+  ["yanshula", ["Local Co-Op", "Platformer"]], ["yanshula", ["Local Co-Op", "Puzzle"]], ["yanshula", ["Local Co-Op", "Cozy"]],
   ["unique", ["Experimental"]], ["unique", ["Surreal"]], ["unique", ["Artistic"]]
 ];
 // A row only counts a game when the row's genre is one of the game's main Steam tags (top 5), never "anywhere in the list".
@@ -313,10 +314,15 @@ const MAIN = {
   plat3d: (t) => t.includes("3D Platformer"),
   unique: (t) => t.some(x => UNIQUE.includes(x))
 };
+// With Yanshula (Omri + wife): loved Astro Bot, Rayman Legends, Unravel, It Takes Two, Sackboy, Stardew, Chicory, and
+// pass-the-controller games like Hollow Knight and Ori. No shooters (Huntdown), first person (Vholume), party games (Heave Ho).
+const DUO_NO = ["Party", "PvP", "Fighting", "Competitive", "Sports", "Racing", "Shooter", "Shoot 'Em Up", "Twin Stick Shooter", "Run and Gun", "FPS", "Bullet Hell", "Top-Down Shooter", "Third-Person Shooter", "Arena Shooter"];
+const DUO_YES = ["Platformer", "2D Platformer", "3D Platformer", "Puzzle Platformer", "Puzzle", "Adventure", "Cozy", "Farming Sim", "Life Sim", "Metroidvania", "Exploration"];
+const DUO_PASS = ["Hand-drawn", "Beautiful", "Cute", "Colorful", "Family Friendly", "Atmospheric", "Cartoony"]; // single-player: only good-looking ones
 // Hard no's: these in a game's main tags drop it from every row.
 const NO = ["Sports", "Free to Play", "Massively Multiplayer", "Visual Novel"];
 async function finds(env){
-  const c = await env.KV.get("finds14", "json");
+  const c = await env.KV.get("finds15", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600;
   const clean = `version_parent = null & parent_game = null`;
@@ -344,6 +350,11 @@ async function finds(env){
   const items = games.map(g => {
     const h = gameOf.get(g.id), main = (h.tags || []).slice(0, TOP);
     const keys = new Set([...h.keys].filter(k => !MAIN[k] || MAIN[k](main, g)));
+    const t8 = (h.tags || []).slice(0, 8), fp = (g.player_perspectives || []).some(p => p.name === "First person");
+    const coopHit = h.keys.has("coop") || h.keys.has("yanshula");
+    keys.delete("yanshula");
+    if (!fp && !t8.some(t => DUO_NO.includes(t)) && main.some(t => DUO_YES.includes(t))
+      && (coopHit || ((keys.has("mv") || keys.has("plat2d") || keys.has("plat3d")) && t8.some(t => DUO_PASS.includes(t))))) keys.add("yanshula");
     const x = {...slim(g), date: g.first_release_date || null, steamPct: h.pct, steamN: h.n, rating: h.pct || Math.round(g.total_rating || 0) || null, appid: +h.app};
     x.score = quality(h.pct, h.n, g.aggregated_rating, g.total_rating);
     x.gem = h.n < 1500 && h.pct >= 92;
@@ -351,8 +362,8 @@ async function finds(env){
     return {x, keys, no: main.some(t => NO.includes(t)) || x.genres.includes("Visual Novel")};
   }).filter(i => i.keys.size && !i.no && i.x.date && i.x.date > since && i.x.date <= now);
   const pick = k => items.filter(i => i.keys.has(k)).map(i => i.x).sort((a, b) => b.score - a.score).slice(0, 40);
-  const d = {mv: pick("mv"), plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique")};
-  await env.KV.put("finds14", JSON.stringify({t: Date.now(), d}));
+  const d = {mv: pick("mv"), plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique"), yanshula: pick("yanshula")};
+  await env.KV.put("finds15", JSON.stringify({t: Date.now(), d}));
   return d;
 }
 // One quality number (0–100) for any game: Steam % pulled toward 80 when there are few reviews,

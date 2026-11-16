@@ -32,7 +32,7 @@ Personal game curator for Omri (PS5, Steam + Steam Deck, Epic, itch.io). Live: h
 - No cron (wrangler `crons = []`). ITAD_KEY secret is unused and can be deleted in Cloudflare.
 
 ## Tabs (app.js)
-- **Play** `homeHTML()` — Up next carousel (pinned owned + wishlist, `upNextGames`) + Show all sheet + Wishlist link, then `ROWS` (Metroidvanias, With Yanshula = couch co-op 2D/3D platformers, 2D platformers, 3D platformers, Couch co-op, Unique) via `playRow()`: your Owned/Wishlist games (not finished, dropped or pinned) mixed with `/finds` picks, sorted by `quality()` with a daily shuffle of each row's top 20, top 10 + See all sheet (`rowCache`). Then `radarHTML()` (Coming soon PS5 / Steam, top 10). No Find tab (old `disc` tab id falls back to Play). Unique = Find picks only (owned games have no tags for it). A game shows in one row only (earlier rows win).
+- **Play** `homeHTML()` — Up next carousel (pinned owned + wishlist, `upNextGames`) + Show all sheet + Wishlist link, then `ROWS` (Metroidvanias, With Yanshula = Omri + wife (see below), 2D platformers, 3D platformers, Couch co-op, Unique) via `playRow()`: your Owned/Wishlist games (not finished, dropped or pinned) mixed with `/finds` picks, sorted by `quality()` with a daily shuffle of each row's top 20, top 10 + See all sheet (`rowCache`). Then `radarHTML()` (Coming soon PS5 / Steam, top 10). No Find tab (old `disc` tab id falls back to Play). Unique = Find picks only (owned games have no tags for it). A game shows in one row only (earlier rows win).
 - Backfill: `/info` also returns `avail` and, for Steam app ids, Steam review % (`steamPct`/`steamN`, via GetItems include_reviews) — owned games then rank by Steam % like finds. Couch finder (`/couch`) removed.
 - **Library** `shelfHTML()` with sidebar filters. **Stats** (`diaryHTML()`, tab id `diary`). **Wishlist** view = tab `wish`.
 - Preview page: "I own it on" chips live in the ⋯ panel (Your copy), like owned games; the page shows Not owned + available-on badges.
@@ -103,6 +103,7 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - Motion tokens in style.css (`--d-fast/--d/--d-slow`, `--e-out/--e-in/--e-bounce`); buttons have a bouncy press.
 - Art: shimmer placeholder, fades in on load (`img.ok`); already-loaded art shows instantly (`.now`). Coming soon shows skeleton cards while loading.
 - No vibration, no undo toasts (Omri's choice).
+- With Yanshula row (2026-11-16): couch co-op where platformer/puzzle/adventure/cozy/farming/metroidvania is a main tag, plus single-player pass-the-controller games (platformer/metroidvania; finds need an art tag like Hand-drawn/Cute/Beautiful). Never shooters, party/versus/fighting/sports/racing, or first person. Co-op +5 in ordering. Refs loved: Astro Bot, Rayman Legends, Unravel, It Takes Two, Sackboy, Stardew, Chicory, Hollow Knight, Ori. Rejected: Huntdown (shooty), Vholume (first person), Heave Ho (party). Worker list `yanshula` (DUO_NO / DUO_YES / DUO_PASS, finds15).
 - Trailers: tried and rejected (2026-11-16) — screenshot cover over the player until it plays, and Steam trailers (not gameplay). Omri prefers the video showing right away, YouTube overlay and all.
 
 ## Name, icon, splash (2026-11-11)

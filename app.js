@@ -548,12 +548,15 @@ async function fetchHero(g){
 // Omri's categories. A game can sit in more than one.
 const has = (g, x) => basicTags(g).includes(x) || (g.kw || []).includes(x);
 const plat = g => (g.genres || []).includes("Platform");
+const DUO_G = ["Puzzle", "Adventure", "Simulator"];
+const duoNo = g => (g.views || []).includes("First person") || (g.genres || []).some(x => ["Shooter", "Fighting", "Sport", "Racing"].includes(x));
 // Play = Up next carousel, then rows. Each row mixes your games (owned or wishlist; not finished, dropped or pinned)
 // with Find picks from /finds, sorted purely by quality. To split back into Play + Find, give each tab its own part of ROWS.
 const ROWS = [
   ["Metroidvanias", "mv", g => kwOf(g).includes("Metroidvania")],
-  // 2D and 3D platformers you can play on the couch together. Finds come from the couch co-op search, platformers only.
-  ["With Yanshula", "yanshula", g => plat(g) && g.couch, "coop"],
+  // Omri + wife: couch co-op platformer/puzzle/adventure/cozy, plus single-player platformers to pass the controller.
+  // No shooters, fighting, sports, racing or first person. Co-op gets +5 so it leads. Finds: worker's "yanshula" list.
+  ["With Yanshula", "yanshula", g => !duoNo(g) && (plat(g) || kwOf(g).includes("Metroidvania") || g.couch && (g.genres || []).some(x => DUO_G.includes(x))), null, x => x.couch ? 5 : 0],
   ["2D platformers", "plat2d", g => plat(g) && has(g, "2D")],
   ["3D platformers", "plat3d", g => plat(g) && has(g, "3D")],
   ["Couch co-op", "coop", g => g.couch],
@@ -563,9 +566,9 @@ const ROWS = [
 const quality = x => x.score ?? (x.steamPct != null ? (x.steamPct * (x.steamN || 0) + 80 * 300) / ((x.steamN || 0) + 300)
   : x.rating ? (x.rating * (x.ratingCount || 0) + 75 * 20) / ((x.ratingCount || 0) + 20) : 70);
 let rowCache = {};
-function rowItems(key, test, seen, src){
-  const mine = list().filter(g => !seen.has(g.igdbId || g.id) && !g.notNow && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g)}));
-  const found = ((topMV || {})[src || key] || []).filter(x => !seen.has(x.igdbId) && !inList(x) && (!src || plat(x))).map(x => ({x, q: quality(x)}));
+function rowItems(key, test, seen, src, boost = () => 0){
+  const mine = list().filter(g => !seen.has(g.igdbId || g.id) && !g.notNow && playable(g) && !g.upNext && (g.status === "backlog" || g.status === "wishlist") && test(g)).map(g => ({g, q: quality(g) + boost(g)}));
+  const found = ((topMV || {})[src || key] || []).filter(x => !seen.has(x.igdbId) && !inList(x) && (!src || plat(x))).map(x => ({x, q: quality(x) + boost(x)}));
   const sorted = [...mine, ...found].sort((a, b) => b.q - a.q);
   // Daily rotation: the top 20 keep their place in the row but swap order each day, so different great games surface.
   const day = Math.floor(Date.now() / 864e5), hash = t => { let h = day; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
@@ -575,8 +578,8 @@ function rowItems(key, test, seen, src){
   return all;
 }
 const itemCard = i => i.g ? cardHTML(i.g) : suggestCard(i.x, i.x.year || "");
-function playRow([title, key, test, src], seen){
-  const items = rowCache[key] = rowItems(key, test, seen, src);
+function playRow([title, key, test, src, boost], seen){
+  const items = rowCache[key] = rowItems(key, test, seen, src || undefined, boost);
   if (!items.length) return "";
   const more = items.length > 10 ? `<button class="linkbtn" data-act="seeall" data-row="${key}" style="margin-left:auto">See all</button>` : "";
   return `<section class="section wrap"><div class="row-head"><h3>${title}</h3>${more}</div><div class="row">${items.slice(0, 10).map(itemCard).join("")}</div></section>`;
