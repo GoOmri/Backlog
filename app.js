@@ -765,9 +765,9 @@ function radarHTML(){
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when);
 }
 // Show the last saved result instantly, refresh in the background, re-render only if it changed.
-// Keep the old copy when the new finds list is empty or under half the size of the old one (Steam hiccup).
+// Keep the old copy when the new finds list is empty or has under 20 games in total (Steam hiccup; same floor as the worker).
 const findsCount = f => Object.values(f || {}).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
-const keepOldFinds = (nu, old) => !!old && findsCount(nu) < findsCount(old) / 2;
+const keepOldFinds = (nu, old) => !!old && findsCount(nu) < 20;
 function swr(key, fetcher, set, onErr, keepOld){
   let c = null; try { c = JSON.parse(localStorage.getItem(key)); } catch {}
   fetcher().then(r => { if (keepOld && keepOld(r, c)) return; const j = JSON.stringify(r); if (c && JSON.stringify(c) === j) return; try { localStorage.setItem(key, j); } catch {} set(r); if (tab === "home") render(); },
@@ -1282,18 +1282,19 @@ async function editSheet(id){
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
   // Unmatched game: purple shortcut opens the panel at "Wrong game?" and runs the search right away.
   if ($("#fixPill")) $("#fixPill").onclick = e => { e.stopPropagation(); setPanel(true); $("#fix").scrollIntoView({block: "center"}); $("#fixGo").click(); };
-  const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()}).catch(saveErr);
+  const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()}).then(() => true, e => { saveErr(e); return false; });
   const reopen = () => setTimeout(() => editSheet(id), 120);
   if ($("#statBtn")) $("#statBtn").onclick = async e => {
     e.stopPropagation();
     if (g.status === "wishlist") return askBought("backlog");
     const st = g.status === "dropped" ? "backlog" : "done";
-    await save({status: st, finishedAt: st === "done" ? Date.now() : null});
+    if (!await save({status: st, finishedAt: st === "done" ? Date.now() : null})) return;
     toast(st === "done" ? "Finished! Tap the stars to rate it" : "Back in your library"); reopen();
   };
   if ($("#wishBtn")) $("#wishBtn").onclick = async () => {
-    const snap = {...g}; delete snap.id; closeSheet(); await del(id);
-    toast(`${g.title} removed from wishlist`, () => setDoc(doc(col, id), snap));
+    const snap = {...g}; delete snap.id; closeSheet();
+    try { await del(id); } catch (e){ return saveErr(e); }
+    toast(`${g.title} removed from wishlist`, () => setDoc(doc(col, id), snap).catch(saveErr));
   };
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = e => {
     const st = b.dataset.setstat;
@@ -1313,7 +1314,7 @@ async function editSheet(id){
     const m = $("#statMenu"); m.hidden = false;
     m.innerHTML = `<div class="label" style="padding:6px 12px">Where did you buy it?</div>` + ["ps5","steam","epic","itch"].map(p => `<button data-buy="${p}">${PLAT[p][0]}</button>`).join("");
     m.querySelectorAll("[data-buy]").forEach(x => x.onclick = async () => {
-      await save({status: st, platforms: [x.dataset.buy], ps: x.dataset.buy === "ps5" ? "bought" : g.ps || null, upNext: g.upNext || null});
+      if (!await save({status: st, platforms: [x.dataset.buy], ps: x.dataset.buy === "ps5" ? "bought" : g.ps || null, upNext: g.upNext || null})) return;
       toast(`Moved to ${STAT[st]} · ${PLAT[x.dataset.buy][0]}`); closeSheet();
     });
   };
