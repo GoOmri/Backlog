@@ -615,7 +615,7 @@ let homeMemo = {};
 function homeHTML(){
   if (!games.size) return emptyHTML();
   homeMode = "owned";
-  if (topMV === null) topMV = swr("c:finds", () => api("/finds"), r => topMV = r) || {};
+  if (topMV === null) topMV = swr("c:finds", () => api("/finds"), r => topMV = r, null, keepOldFinds) || {};
   const day = Math.floor(Date.now() / 864e5);
   if (homeMemo.games === games && homeMemo.finds === topMV && homeMemo.radar === radar && homeMemo.day === day) return homeMemo.html;
   const html = homeBuild();
@@ -765,9 +765,12 @@ function radarHTML(){
   return row("Coming soon on PS5", radar.soonPs5, when) + row("Coming soon on Steam", radar.soonPc, when);
 }
 // Show the last saved result instantly, refresh in the background, re-render only if it changed.
-function swr(key, fetcher, set, onErr){
+// Keep the old copy when the new finds list is empty or under half the size of the old one (Steam hiccup).
+const findsCount = f => Object.values(f || {}).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
+const keepOldFinds = (nu, old) => !!old && findsCount(nu) < findsCount(old) / 2;
+function swr(key, fetcher, set, onErr, keepOld){
   let c = null; try { c = JSON.parse(localStorage.getItem(key)); } catch {}
-  fetcher().then(r => { const j = JSON.stringify(r); if (c && JSON.stringify(c) === j) return; try { localStorage.setItem(key, j); } catch {} set(r); if (tab === "home") render(); },
+  fetcher().then(r => { if (keepOld && keepOld(r, c)) return; const j = JSON.stringify(r); if (c && JSON.stringify(c) === j) return; try { localStorage.setItem(key, j); } catch {} set(r); if (tab === "home") render(); },
     e => { if (!c && onErr){ onErr(e); if (tab === "home") render(); } });
   return c;
 }
@@ -897,6 +900,11 @@ addEventListener("popstate", () => { if (skipPop){ skipPop = false; return; }
 let backs = [], listOpen = null, curPage = null, toTop = false, skipPop = false;
 // One level deeper inside the sheet: remember how to redraw this level (and its scroll) for back.
 function goDeeper(fn){ if (!fn) return; backs.push({fn, y: $("#dlg").scrollTop}); toTop = true; history.pushState({sheet: 2}, ""); }
+// One click listener for the open game page (set once, so opening pages never adds more): tap outside the ⋯ panel closes it, tap outside a menu closes the menus.
+$("#sheet").addEventListener("click", e => {
+  if ($("#editPanel") && !$("#editPanel").hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false);
+  if (!e.target.closest(".menuwrap")) $("#sheet").querySelectorAll(".popmenu").forEach(m => m.hidden = true);
+});
 document.addEventListener("click", e => { if (!$("#dlg").open || !e.target.closest("#sheet [data-edit], #sheet [data-preview], #sheet [data-un]")) return;
   const v = $("#aQ")?.value; goDeeper($("#aQ") ? () => addSheet(v) : $(".sheet-list") ? listOpen : curPage); }, true);
 // Tabs below Play get history entries (Wishlist sits under Library), so back walks up to Play, then out.
@@ -1012,11 +1020,11 @@ function toast(text, undo){
 }
 async function notForMe(g){
   if (g.id && games.has(g.id)){
-    upd(g.id, {notNow: true, sifted: true, hidden: false}).catch(saveErr); toast(`${g.title}: not now`, () => upd(g.id, {notNow: null}));
+    upd(g.id, {notNow: true, sifted: true, hidden: false}).catch(saveErr); toast(`${g.title}: not now`, () => upd(g.id, {notNow: null}).catch(saveErr));
   } else {
     const nid = newId(); const {because, score, added, ...data} = g;
-    await setDoc(doc(col, nid), {...data, asTyped: g.title, platforms: [], status: "wishlist", hidden: true, nope: true, added: Date.now()});
-    toast(`${g.title} won't be suggested again`, () => del(nid));
+    try { await setDoc(doc(col, nid), {...data, asTyped: g.title, platforms: [], status: "wishlist", hidden: true, nope: true, added: Date.now()}); } catch (e){ return saveErr(e); }
+    toast(`${g.title} won't be suggested again`, () => del(nid).catch(saveErr));
   }
 }
 function nopeSheet(){
@@ -1078,7 +1086,6 @@ async function previewSheet(x){
   $("#pvNope").onclick = () => { closeSheet(); notForMe(x); };
   // Owned: one tap on the platform saves it to the Library (or turns the wishlist entry just made into owned).
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
-  $("#sheet").addEventListener("click", e => { if (!$("#editPanel")?.hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
   $(".ownon").onclick = async e => { const p = e.target.closest("[data-own]")?.dataset.own; if (!p) return;
     const {because, score, added, date, gem, taste, appid, price, ...data} = x;
     const id = wid || newId(), owned = {platforms: [p], status: "backlog", ...(pinned ? {upNext: Date.now()} : {})};
@@ -1275,8 +1282,7 @@ async function editSheet(id){
   $("#kebab").onclick = e => { e.stopPropagation(); setPanel($("#editPanel").hidden); };
   // Unmatched game: purple shortcut opens the panel at "Wrong game?" and runs the search right away.
   if ($("#fixPill")) $("#fixPill").onclick = e => { e.stopPropagation(); setPanel(true); $("#fix").scrollIntoView({block: "center"}); $("#fixGo").click(); };
-  $("#sheet").addEventListener("click", e => { if ($("#editPanel") && !$("#editPanel").hidden && !e.target.closest("#editPanel, #kebab")) setPanel(false); });
-  const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()});
+  const sh = $("#sheet"), save = d => upd(id, {...d, touched: Date.now()}).catch(saveErr);
   const reopen = () => setTimeout(() => editSheet(id), 120);
   if ($("#statBtn")) $("#statBtn").onclick = async e => {
     e.stopPropagation();
@@ -1289,7 +1295,6 @@ async function editSheet(id){
     const snap = {...g}; delete snap.id; closeSheet(); await del(id);
     toast(`${g.title} removed from wishlist`, () => setDoc(doc(col, id), snap));
   };
-  sh.addEventListener("click", e => { if (!e.target.closest(".menuwrap")) sh.querySelectorAll(".popmenu").forEach(m => m.hidden = true); });
   sh.querySelectorAll("[data-setstat]").forEach(b => b.onclick = e => {
     const st = b.dataset.setstat;
     // Wishlist → Owned/Finished: close the panel and ask where it was bought (menu under the Bought button).

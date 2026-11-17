@@ -323,13 +323,16 @@ const DUO_YES = ["Platformer", "2D Platformer", "3D Platformer", "Puzzle Platfor
 const DUO_PASS = ["Hand-drawn", "Beautiful", "Cute", "Colorful", "Family Friendly", "Atmospheric", "Cartoony"]; // single-player: only good-looking ones
 // Hard no's: these in a game's main tags drop it from every row.
 const NO = ["Sports", "Free to Play", "Massively Multiplayer", "Visual Novel"];
+// Should a finds result be saved? Not when over half the searches failed or the lists are nearly empty.
+function findsLookOk(failed, total, d){ return failed * 2 <= total && Object.values(d).reduce((n, a) => n + a.length, 0) >= 20; }
 async function finds(env){
   const c = await env.KV.get("finds17", "json");
   if (c && Date.now() - c.t < 24 * 3600e3) return c.d;
   const now = Math.floor(Date.now() / 1000), since = 1199145600;
   const clean = `version_parent = null & parent_game = null`;
   const all = await tagList(env), tid = new Map(all.map(t => [t.name, t.tagid])), tname = new Map(all.map(t => [t.tagid, t.name]));
-  const res = await Promise.all(SEARCHES.map(([k, t, st]) => steamTagSearch(t.map(n => tid.get(n)), "sort_by=Reviews_DESC", st).then(r => r.map(x => ({...x, k}))).catch(() => [])));
+  let failed = 0; // a search that errors or comes back empty counts as failed (Steam hiccup)
+  const res = await Promise.all(SEARCHES.map(([k, t, st]) => steamTagSearch(t.map(n => tid.get(n)), "sort_by=Reviews_DESC", st).then(r => { if (!r.length) failed++; return r.map(x => ({...x, k})); }).catch(() => { failed++; return []; })));
   // Quality bar: well reviewed, or a hidden gem (few reviews but nearly all positive).
   const good = x => (x.pct >= 85 && x.n >= 300) || (x.pct >= 92 && x.n >= 40);
   const hits = new Map();
@@ -366,6 +369,8 @@ async function finds(env){
   }).filter(i => i.keys.size && !i.no && i.x.date && i.x.date > since && i.x.date <= now);
   const pick = k => items.filter(i => i.keys.has(k)).map(i => i.x).sort((a, b) => b.score - a.score).slice(0, 40);
   const d = {mv: pick("mv"), plat2d: pick("plat2d"), plat3d: pick("plat3d"), coop: pick("coop"), unique: pick("unique"), yanshula: pick("yanshula")};
+  // Steam outage: don't save a thin result for 24 hours. Give back the older copy if there is one; the next request tries again.
+  if (!findsLookOk(failed, SEARCHES.length, d)) return c ? c.d : d;
   await env.KV.put("finds17", JSON.stringify({t: Date.now(), d}));
   return d;
 }
@@ -455,9 +460,10 @@ async function psnToken(env){
 async function trophies(env){
   const c = await env.KV.get("trophies2", "json");
   if (c && Date.now() - c.t < 6 * 3600e3) return c.d;
-  const tok = await psnToken(env), d = [];
+  const tok = await psnToken(env), d = []; let bad = false;
   for (let off = 0; off < 2000; off += 400){
     const r = await (await fetch(`https://m.np.playstation.com/api/trophy/v1/users/me/trophyTitles?limit=400&offset=${off}`, {headers: {Authorization: "Bearer " + tok}})).json();
+    if (!Array.isArray(r.trophyTitles)){ bad = true; break; } // error answer: don't treat it as an empty list
     for (const x of r.trophyTitles || []){
       const e = x.earnedTrophies || {}, f = x.definedTrophies || {};
       d.push({title: x.trophyTitleName, platform: x.trophyTitlePlatform, npId: x.npCommunicationId, svc: x.npServiceName, progress: x.progress || 0,
@@ -465,6 +471,7 @@ async function trophies(env){
     }
     if (!r.nextOffset) break;
   }
+  if (bad || !d.length) return c ? c.d : d; // partial or empty: don't save it, try again next time
   await env.KV.put("trophies2", JSON.stringify({t: Date.now(), d}));
   return d;
 }
