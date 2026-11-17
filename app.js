@@ -151,14 +151,26 @@ async function commitChunks(ops){
     try { await b.commit(); } catch (e){ gone(e); for (const f of chunk){ const b1 = writeBatch(db); f(b1); await b1.commit().catch(gone); } } }
 }
 
+// Fold other cards into `keep`: platforms, best status, and everything personal (rating, dates, pin, art...). Keep's own values win. Then delete the others.
+const MERGE_FIELDS = ["myRating", "finishedAt", "upNext", "steamHours", "steamAppId", "duo", "notNow", "sifted", "heroPos", "logo"];
+async function mergeInto(keep, drops){
+  const gs = [keep, ...drops];
+  const d = {platforms: [...new Set(gs.flatMap(g => g.platforms || []))], status: gs.reduce((m, g) => RANK[g.status] > RANK[m] ? g.status : m, keep.status)};
+  for (const f of MERGE_FIELDS) { const v = gs.map(g => g[f]).find(v => v != null); if (v != null) d[f] = v; }
+  if (gs.some(g => g.duo === true)) d.duo = true;
+  if (gs.some(g => g.ps === "bought")) d.ps = "bought"; else { const v = gs.map(g => g.ps).find(v => v != null); if (v != null) d.ps = v; }
+  // chosen art travels as a set: only when keep has not chosen its own
+  const c = keep.coverSet ? null : drops.find(g => g.coverSet && g.cover); if (c) { d.cover = c.cover; d.coverSet = true; }
+  const h = keep.heroSet ? null : drops.find(g => g.heroSet && g.hero); if (h) { d.hero = h.hero; d.heroSet = true; d.heroPos = h.heroPos ?? null; }
+  await upd(keep.id, d);
+  for (const g of drops) await del(g.id);
+}
+
 // Point a game at an IGDB entry; if another entry already is that game, merge into it.
 async function applyMatch(g, m){
   const twin = list().find(x => x.id !== g.id && x.igdbId === m.igdbId);
   if (twin){
-    await upd(twin.id, {platforms: [...new Set([...(twin.platforms || []), ...(g.platforms || [])])],
-      status: RANK[g.status] > RANK[twin.status] ? g.status : twin.status,
-      ...(g.steamHours != null ? {steamHours: g.steamHours, steamAppId: g.steamAppId} : {})});
-    await del(g.id);
+    await mergeInto(twin, [g]);
   } else {
     await upd(g.id, {...m, ...(g.couchSet ? {couch: g.couch} : {}), asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null, heroSet: null});
   }
@@ -168,7 +180,7 @@ async function applyMatch(g, m){
 async function applySteam(g, appid){
   const s = await api("/steamapp?id=" + appid);
   const twin = list().find(x => x.id !== g.id && x.steamAppId === s.steamAppId && (x.igdbId || x.steamOnly));
-  if (twin){ await upd(twin.id, {platforms: [...new Set([...(twin.platforms || []), ...(g.platforms || [])])], status: RANK[g.status] > RANK[twin.status] ? g.status : twin.status}); await del(g.id); return s; }
+  if (twin){ await mergeInto(twin, [g]); return s; }
   const {platformsAvail, ...data} = s;
   await upd(g.id, {...data, avail: platformsAvail, asTyped: g.asTyped || g.title, noMatch: false, hero: null, logo: null, heroSet: null});
   return s;
@@ -240,14 +252,10 @@ async function mergeEditions(){
   for (const g of list()) { const k = baseKey(g.title); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(g); }
   for (const gs of groups.values()){
     if (gs.length < 2) continue;
-    gs.sort((a, b) => (b.myRating || 0) - (a.myRating || 0) || RANK[b.status] - RANK[a.status] || a.title.length - b.title.length);
+    if (new Set(gs.map(g => g.igdbId).filter(Boolean)).size > 1) continue; // same name, different games: leave alone
+    gs.sort((a, b) => !!b.igdbId - !!a.igdbId || (b.myRating || 0) - (a.myRating || 0) || RANK[b.status] - RANK[a.status] || a.title.length - b.title.length);
     const [keep, ...rest] = gs;
-    const d = {platforms: [...new Set(gs.flatMap(g => g.platforms || []))], status: gs.reduce((m, g) => RANK[g.status] > RANK[m] ? g.status : m, keep.status)};
-    for (const f of ["myRating", "finishedAt", "upNext", "steamHours", "steamAppId", "duo"]) { const v = gs.map(g => g[f]).find(v => v != null); if (v != null) d[f] = v; }
-    if (gs.some(g => g.duo === true)) d.duo = true;
-    if (gs.some(g => g.ps === "bought")) d.ps = "bought";
-    await upd(keep.id, d);
-    for (const g of rest) await del(g.id);
+    await mergeInto(keep, rest);
   }
 }
 async function backfill(){

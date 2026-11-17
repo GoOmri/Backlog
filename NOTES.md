@@ -134,3 +134,10 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - Merging editions keeps duo = true if any edition has it.
 - Chip only shows on Finished or Dropped games (taste only learns from those).
 - Unverified (phone): chip on a seed game (e.g. Hollow Knight) is on and can be turned off; on a merged game; hidden on In progress and Wishlist games.
+
+## 2026-11-17 Protect personal data when games merge
+- One helper `mergeInto(keep, drops)` (app.js, above `applyMatch`) now does every merge: `applyMatch`, `applySteam` (Fix match, Re-check, background queue) and `mergeEditions`. It keeps rating, finished date, Up next pin, duo, PS status, not-now/sifted, chosen cover/top image (+ framing), Steam hours. The kept card's own values win.
+- `mergeEditions` no longer merges same-name games that have different IGDB ids (e.g. two "God of War"). When it merges, it keeps the matched card (the one with an igdbId).
+- Edge: editions whose IGDB ids differ (two separate IGDB entries) are now also left as two cards.
+- Checked here with a throwaway Node script (copied helper): rating/date/pin/duo/PS survive, different igdbIds stay apart, matched card kept. Not tested with real Firestore.
+- Check on phone: give a game a rating and pin, use Fix match to match it to a game you already own, confirm rating and pin survive. Check two same-name games stay separate.
