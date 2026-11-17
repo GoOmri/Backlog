@@ -128,3 +128,9 @@ Old "curation rebuild" (taste score with many penalties) dropped: rules kept bre
 - Taste ideas offered, not built: Steam "more like this" as a finds source; Sift "couch mode" to swipe co-op picks together.
 - Lint note: the only remaining eslint error is `YT` (YouTube API global) — expected.
 - Working style: mockup first for anything visual; ask before big changes with a size; no live checks unless asked; run `node --check` + eslint no-undef before every push.
+
+## 2026-11-17 Fix Played with Yanshula chip
+- Seed games can now be switched off (explicit chip value wins over the title list); chip shows the real state.
+- Merging editions keeps duo = true if any edition has it.
+- Chip only shows on Finished or Dropped games (taste only learns from those).
+- Unverified (phone): chip on a seed game (e.g. Hollow Knight) is on and can be turned off; on a merged game; hidden on In progress and Wishlist games.

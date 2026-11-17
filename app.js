@@ -244,6 +244,7 @@ async function mergeEditions(){
     const [keep, ...rest] = gs;
     const d = {platforms: [...new Set(gs.flatMap(g => g.platforms || []))], status: gs.reduce((m, g) => RANK[g.status] > RANK[m] ? g.status : m, keep.status)};
     for (const f of ["myRating", "finishedAt", "upNext", "steamHours", "steamAppId", "duo"]) { const v = gs.map(g => g[f]).find(v => v != null); if (v != null) d[f] = v; }
+    if (gs.some(g => g.duo === true)) d.duo = true;
     if (gs.some(g => g.ps === "bought")) d.ps = "bought";
     await upd(keep.id, d);
     for (const g of rest) await del(g.id);
@@ -518,7 +519,7 @@ function upNextGames(){
 const DUO_SEED = ["astro bot", "rayman legends", "hollow knight", "stardew valley", "chicory", "ori and the", "unravel", "it takes two", "sackboy"];
 const COMMON = new Set(["t:Indie", "t:Singleplayer", "g:Indie", "t:Great Soundtrack", "t:Multiplayer", "t:Co-op", "t:Local Co-Op", "t:Action", "t:Adventure", "t:Casual"]);
 const featsOf = g => [...(g.genres || []).map(x => "g:" + x), ...(g.kw || []).map(x => "k:" + x), ...(g.stags || []).slice(0, 12).map(x => "t:" + x), ...(g.views || []).map(x => "v:" + x)].filter(f => !COMMON.has(f));
-const isDuo = g => g.duo || DUO_SEED.some(t => clean(g.title || "").toLowerCase().startsWith(t));
+const isDuo = g => g.duo ?? DUO_SEED.some(t => clean(g.title || "").toLowerCase().startsWith(t));
 function tasteProfile(duo){
   const P = {};
   for (const g of list()){
@@ -1238,7 +1239,7 @@ async function editSheet(id){
       <div class="egroup-l">Your copy</div>
       <div class="egroup">
         <div class="ecell"><span class="elabel">Status</span><div class="erowchips">${Object.entries(STAT).map(([k, v]) => `<button class="chip" data-setstat="${k}" aria-pressed="${g.status === k}">${v}</button>`).join("")}</div></div>
-        ${g.status === "wishlist" ? "" : `<div class="ecell"><span class="elabel">Played with</span><div class="erowchips"><button class="chip" id="duoChip" aria-pressed="${!!g.duo}">Yanshula</button></div></div>`}
+        ${g.status !== "done" && g.status !== "dropped" ? "" : `<div class="ecell"><span class="elabel">Played with</span><div class="erowchips"><button class="chip" id="duoChip" aria-pressed="${!!isDuo(g)}">Yanshula</button></div></div>`}
         <div class="ecell"><span class="elabel">Own it on</span><div class="erowchips">${Object.keys(PLAT).map(p => `<button class="chip platchip" data-setplat="${p}" style="--c:var(${PLAT[p][2]})" aria-pressed="${plats.has(p)}">${PLAT[p][0]}</button>`).join("")}</div></div>
         <label class="ecell erowline" id="finField" ${g.status === "done" ? "" : "hidden"}><span>Finished on</span><input type="date" id="finDate" value="${toDate(g.finishedAt) || toDate(Date.now())}"></label>
       </div>
@@ -1303,7 +1304,7 @@ async function editSheet(id){
   $("#upNextBtn").onclick = () => { pinned = !pinned; $("#upNextBtn").classList.toggle("on", pinned); $("#upNextBtn").setAttribute("aria-pressed", pinned); save({upNext: pinned ? (g.upNext || Date.now()) : null}); toast(pinned ? "Added to your shortlist" : "Removed from your shortlist"); };
   $("#nopeBtn").onclick = () => { closeSheet(); if (g.notNow){ upd(id, {notNow: null, hidden: false}).catch(saveErr); toast(`${g.title} is back on Play`); } else notForMe(g); };
   // Played with Yanshula: makes this game a reference for the With Yanshula row (see tasteProfile).
-  if ($("#duoChip")) $("#duoChip").onclick = () => { g.duo = !g.duo; $("#duoChip").setAttribute("aria-pressed", g.duo); save({duo: g.duo}); };
+  if ($("#duoChip")) $("#duoChip").onclick = () => { g.duo = !isDuo(g); $("#duoChip").setAttribute("aria-pressed", g.duo); save({duo: g.duo}); };
   // Own it on: a wishlist game you mark on a platform becomes Owned; the Owned/Not owned word and badges follow right away.
   sh.querySelectorAll("[data-setplat]").forEach(b => b.onclick = () => { const p = b.dataset.setplat; plats.has(p) ? plats.delete(p) : plats.add(p); b.setAttribute("aria-pressed", plats.has(p));
     const d = {platforms: [...plats]};
