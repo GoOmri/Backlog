@@ -152,7 +152,7 @@ async function commitChunks(ops){
 }
 
 // Fold other cards into `keep`: platforms, best status, and everything personal (rating, dates, pin, art...). Keep's own values win. Then delete the others.
-const MERGE_FIELDS = ["myRating", "finishedAt", "upNext", "steamHours", "steamAppId", "duo", "notNow", "sifted", "heroPos", "logo"];
+const MERGE_FIELDS = ["myRating", "finishedAt", "upNext", "steamHours", "steamAppId", "duo", "notNow", "sifted"]; // not heroPos (crop of one image, moves with hero) and not logo (moves with logoSet)
 async function mergeInto(keep, drops){
   const gs = [keep, ...drops];
   const d = {platforms: [...new Set(gs.flatMap(g => g.platforms || []))], status: gs.reduce((m, g) => RANK[g.status] > RANK[m] ? g.status : m, keep.status)};
@@ -162,7 +162,11 @@ async function mergeInto(keep, drops){
   // chosen art travels as a set: only when keep has not chosen its own
   const c = keep.coverSet ? null : drops.find(g => g.coverSet && g.cover); if (c) { d.cover = c.cover; d.coverSet = true; }
   const h = keep.heroSet ? null : drops.find(g => g.heroSet && g.hero); if (h) { d.hero = h.hero; d.heroSet = true; d.heroPos = h.heroPos ?? null; }
-  await upd(keep.id, d);
+  // a visible card must not stay hidden/"nope" because a hidden nope card was the one kept
+  if (gs.some(g => !g.hidden)) d.hidden = false;
+  if (gs.some(g => !g.nope)) d.nope = null;
+  const l = keep.logoSet ? null : drops.find(g => g.logoSet && g.logo); if (l){ d.logo = l.logo; d.logoSet = true; }
+  await updateDoc(doc(col, keep.id), d); // no gone-catch: if the save fails, throw and delete nothing
   for (const g of drops) await del(g.id);
 }
 
@@ -253,7 +257,7 @@ async function mergeEditions(){
   for (const gs of groups.values()){
     if (gs.length < 2) continue;
     if (new Set(gs.map(g => g.igdbId).filter(Boolean)).size > 1) continue; // same name, different games: leave alone
-    gs.sort((a, b) => !!b.igdbId - !!a.igdbId || (b.myRating || 0) - (a.myRating || 0) || RANK[b.status] - RANK[a.status] || a.title.length - b.title.length);
+    gs.sort((a, b) => !!b.igdbId - !!a.igdbId || !!a.hidden - !!b.hidden || (b.myRating || 0) - (a.myRating || 0) || RANK[b.status] - RANK[a.status] || a.title.length - b.title.length);
     const [keep, ...rest] = gs;
     await mergeInto(keep, rest);
   }
@@ -1380,7 +1384,7 @@ async function editSheet(id){
       const st = res.length ? [] : await api("/steamsearch?q=" + encodeURIComponent($("#fix").value)).catch(() => []);
       box.innerHTML = res.map((r, i) => `<button class="match" data-m="${i}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : "<span></span>"}<span><b>${esc(r.title)}</b><br><span class="why">${r.year || ""}</span></span></button>`).join("")
         || (st.length ? `<div class="why">Nothing on IGDB. Found on Steam:</div>` + st.map(r => `<button class="match steamhit" data-st="${r.steamAppId}"><img src="${esc(r.thumb)}" alt=""><span><b>${esc(r.title)}</b><br><span class="why">Steam</span></span></button>`).join("") : "No results. Try a Steam link below.");
-      box.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => { await applyMatch({...games.get(id), platforms: [...plats]}, res[+b.dataset.m]); closeSheet(); });
+      box.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => { try { await applyMatch({...games.get(id), platforms: [...plats]}, res[+b.dataset.m]); closeSheet(); } catch (e){ toast(e.message); } });
       box.querySelectorAll("[data-st]").forEach(b => b.onclick = async () => { try { await applySteam({...games.get(id), platforms: [...plats]}, b.dataset.st); closeSheet(); toast("Matched from Steam"); } catch (e){ toast(e.message); } });
     } catch (e){ box.textContent = e.message; }
   };
